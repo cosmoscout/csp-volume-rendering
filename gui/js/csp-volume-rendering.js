@@ -15,7 +15,460 @@
          */
         init() {
             CosmoScout.gui.initSlider("volumeRendering.setResolution", 32, 2048, 32, [256]);
-            CosmoScout.gui.initSliderRange("volumeRendering.setSamplingRate", {"min": 0.001, "33%": 0.01, "66%": 0.1, "max": 1}, 0.001, [0.005]);
+            CosmoScout.gui.initSliderRange("volumeRendering.setSamplingRate", { "min": 0.001, "33%": 0.01, "66%": 0.1, "max": 1 }, 0.001, [0.005]);
+
+            const html = `
+                <div>
+                    <h1>Transfer function</h1>
+                    <div>
+                        <svg id="tf-graph" width="420" height="150"></svg>
+                    </div>
+                    <div class="row">
+                        <div class="col-1">
+                            <button id="color-lock" style="height: 35px; width: 35px" class="waves-effect waves-light block btn glass">
+                                <i class="material-icons">lock</i>
+                            </button>
+                        </div>
+                        <div class="col-3">
+                            <input type="color" id="picker" style="height: 35px" color="#0000FF" class="waves-effect waves-light block glass btn">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-4">
+                            <button id="export" class="waves-effect waves-light block btn glass text">Export</button>
+                        </div>
+                        <div class="col-8">
+                            <input type="text" id="export-location" placeholder="Filename" class="text-input text">
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-4">
+                            <button id="import" class="waves-effect waves-light block btn glass text">Import</button>
+                        </div>
+                        <div class="col-8">
+                            <select id="import-box">
+                                <option value="-1">none</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            `;
+            CosmoScout.gui.registerHtml("tf-editor", html, "tf-editor-container");
+
+            this.createElements();
+
+            setTimeout(() => {
+                this.ready();
+            }, 500);
+        }
+
+        ready() {
+            // Access the svg dom element
+            this.svg = d3.select("#tf-graph");
+            this._width = +this.svg.attr("width") - this.margin.left - this.margin.right;
+            this._height = +this.svg.attr("height") - this.margin.top - this.margin.bottom - 15;
+            if (this.id != "tf-1") {
+                this.initialized = true;
+                this.initializeElements();
+                this.drawChart();
+            }
+        }
+
+        createElements() {
+            // Custom margins
+            this.margin = {
+                top: 10,
+                right: 20,
+                bottom: 20,
+                left: 25
+            };
+            this.formatCount = d3.format(",.0f");
+
+            // Axis scales
+            this.xScale = d3.scale.linear();
+            this.yScale = d3.scale.linear();
+
+            // Area for the opacity map representation
+            this.area = d3.svg.area();
+
+            // Keep track of control points interaction
+            this.dragged = null;
+            this.selected = null;
+            this.last_color = 'green';
+
+            this.controlPoints = [];
+        }
+
+        initializeElements() {
+            var extent = [0, 255];
+            if (this.fitToData && this._data && this._data.length > 0) {
+                extent = d3.extent(this._data);
+            }
+            var me = this;
+            this.xScale
+                .rangeRound([0, this._width])
+                .domain(extent);
+            this.yScale
+                .domain([0, 1])
+                .range([this._height, 0]);
+            if (this.controlPoints.length == 0) {
+                this.controlPoints.push({
+                    'x': extent[0],
+                    'opacity': 0,
+                    'color': '#0000FF',
+                    'locked': true
+                });
+                this.controlPoints.push({
+                    'x': extent[1],
+                    'opacity': 1,
+                    'color': '#FF0000',
+                    'locked': true
+                });
+            }
+            this.selected = this.controlPoints[0];
+            this.area
+                .x(function (d) {
+                    return me.xScale(d.x);
+                })
+                .y0(function (d) {
+                    return me.yScale(d.opacity);
+                })
+                .y1(this._height);
+
+            // Access the color selector
+            $("#picker").value = "#0000FF";
+            $("#picker").on("change", function () {
+                me.selected.color = this.value;
+                me.redraw();
+            });
+            // Export button listener
+            $("#export").on("click", function () {
+                me.export.call(me)
+            });
+            // Import button listener
+            $("#import").on("click", function () {
+                me.import.call(me)
+            });
+
+            // Lock button listener
+            $("#color-lock").on("click", function () {
+                if (me.controlPoints.some(point => point.locked && point !== me.selected)) {
+                    me.selected.locked = !me.selected.locked;
+                    me.redraw();
+                    me.updateLockButtonState();
+                }
+            });
+        }
+
+        updateLockButtonState() {
+            var colorLockButton = $("#color-lock i");
+            if (this.selected.locked) {
+                $(colorLockButton).html("lock");
+            }
+            else {
+                $(colorLockButton).html("lock_open");
+            }
+        }
+
+        // Perform the drawing
+        drawChart() {
+            var me = this;
+            var g = this.svg.append("g")
+                .attr("transform", "translate(" + this.margin.left + "," + this.margin.top + ")")
+                .on("mouseleave", function () {
+                    me.mouseup();
+                });
+
+            // Gradient definitions
+            g.append("defs").append("linearGradient")
+                .attr("id", "tfGradient")
+                //.attr("gradientUnits", "userSpaceOnUse")
+                .attr("gradientUnits", "objectBoundingBox")
+                .attr("spreadMethod", "pad")
+                .attr("x1", "0%").attr("y1", "0%")
+                .attr("x2", "100%").attr("y2", "0%");
+            //.attr("x1", me.xScale(0)).attr("y1", me.yScale(0))
+            //.attr("x2", me.xScale(255)).attr("y2", me.yScale(0));
+
+            // Draw control points
+            g.append("path")
+                .datum(me.controlPoints)
+                .attr("class", "line")
+                .attr("fill", "url(#tfGradient" + ")")
+                .attr("stroke", "black");
+
+            g.append("path")
+                .datum(me.controlPoints)
+                .attr("class", "line")
+                .attr("fill", "none")
+                .attr("stroke", "black")
+                .call(function () {
+                    me.redraw();
+                });
+
+            // Mouse interaction handler
+            g.append("rect")
+                .attr("y", -10)
+                .attr("x", -10)
+                .attr("width", me._width + 20)
+                .attr("height", me._height + 20)
+                .style("opacity", 0)
+                .on("mousedown", function () {
+                    me.mousedown();
+                })
+                .on("mouseup", function () {
+                    me.mouseup();
+                })
+                .on("mousemove", function () {
+                    me.mousemove();
+                });
+
+            g.append("text")
+                .attr("transform", "translate(" + (me._width + me.margin.left - 5) + " ," + (me._height + me.margin.top + 20) + ")")
+                .attr("class", "label")
+                .text("Unit");
+
+            // Draw axis
+            var xTicks = me.xScale.ticks(me.numberTicks);
+            xTicks[xTicks.length - 1] = me.xScale.domain()[1];
+            g.append("g")
+                .attr("class", "axis axis--x")
+                .attr("transform", "translate(0," + me._height + ")")
+                .call(d3.svg.axis().scale(me.xScale).orient("bottom").tickValues(xTicks));
+
+            g.append("g")
+                .attr("class", "axis axis--y")
+                .attr("transform", "translate(0, 0)")
+                .call(d3.svg.axis().scale(me.yScale).orient("left").ticks(me.numberTicks));
+        }
+
+        // update scales with new data input
+        updateScales() {
+            if (this.fitToData) {
+                var dataExtent = [];
+                if (this._data && this._data.length > 0) {
+                    dataExtent = d3.extent(this._data);
+                }
+                if (dataExtent[0] == dataExtent[1]) {
+                    dataExtent[1] += 1;
+                }
+                this.xScale.domain(dataExtent);
+            } else {
+                this.xScale.domain([0, 255]);
+            }
+        }
+
+        // update the axis with the new data input
+        updateAxis() {
+            let svg = d3.select($('svg')).select("g");
+            var xTicks = this.xScale.ticks(this.numberTicks);
+            xTicks[xTicks.length - 1] = this.xScale.domain()[1];
+            svg.selectAll(".axis.axis--x").call(d3.axisBottom(this.xScale).tickValues(xTicks));
+        }
+
+        updateControlPoints(controlPoints) {
+            var updateScale = d3.scale.linear()
+                .domain(d3.extent(controlPoints, point => point.x))
+                .range(this.xScale.domain());
+            controlPoints.forEach(point => point.x = updateScale(point.x));
+            this.controlPoints = controlPoints;
+        }
+
+        // Update the chart content
+        redraw() {
+            var me = this;
+
+            if (!me.controlPoints.some(point => point.locked)) {
+                me.selected.locked = !me.selected.locked;
+                me.redraw();
+                me.updateLockButtonState();
+            }
+            me.controlPoints.forEach((point, index) => {
+                if (index == 0) {
+                    point.x = me.xScale.invert(0);
+                }
+                else if (index == me.controlPoints.length - 1) {
+                    point.x = me.xScale.invert(me._width);
+                }
+
+                if (!point.locked) {
+                    var right = me.controlPoints.slice(index, me.controlPoints.length).find(point => point.locked);
+                    var left = me.controlPoints.slice(0, index).reverse().find(point => point.locked);
+                    if (left && right) {
+                        point.color = d3.interpolateRgb(left.color, right.color)((point.x - left.x) / (right.x - left.x));
+                    }
+                    else if (left) {
+                        point.color = left.color;
+                    }
+                    else if (right) {
+                        point.color = right.color;
+                    }
+                }
+            });
+            //TODO Trigger tf changed event or something
+
+            var svg = d3.select("#tf-graph").select("g");
+            svg.selectAll("path.line").datum(me.controlPoints).attr("d", me.area);
+
+            // Add circle to connect and interact with the control points
+            var circle = svg.selectAll("circle").data(me.controlPoints)
+
+            circle.enter().append("circle")
+                .attr("cx", function (d) {
+                    return me.xScale(d.x);
+                })
+                .attr("cy", function (d) {
+                    return me.yScale(d.opacity);
+                })
+                .style("fill", function (d) {
+                    return d.color;
+                })
+                .attr("r", 1e-6)
+                .on("mousedown", function (d) {
+                    me.selected = me.dragged = d;
+                    me.last_color = d.color;
+                    me.redraw();
+                    me.updateLockButtonState();
+                })
+                .on("mouseup", function () {
+                    me.mouseup();
+                })
+                .on("contextmenu", function (d, i) {
+                    // react on right-clicking
+                    d3.event.preventDefault();
+                    d.color = $("#picker").value;
+                    d.locked = true;
+                    me.redraw();
+                    me.updateLockButtonState();
+                })
+                .transition()
+                .duration(750)
+                .attr("r", function (d) {
+                    return d.locked ? 6.0 : 4.0;
+                });
+
+            circle.classed("selected", function (d) {
+                return d === me.selected;
+            })
+                .style("fill", function (d) {
+                    return d.color;
+                })
+                .attr("cx", function (d) {
+                    return me.xScale(d.x);
+                })
+                .attr("cy", function (d) {
+                    return me.yScale(d.opacity);
+                })
+                .attr("r", function (d) {
+                    return d.locked ? 6.0 : 4.0;
+                });
+
+            circle.exit().remove();
+
+            // Create a linear gradient definition of the control points
+            var gradient = svg.select("linearGradient").selectAll("stop").data(me.controlPoints);
+
+            gradient.enter().append("stop")
+                .attr("stop-color", function (d) {
+                    return d.color;
+                })
+                .attr("stop-opacity", function (d) {
+                    return d.opacity;
+                })
+                .attr("offset", function (d) {
+                    var l = (me.controlPoints[me.controlPoints.length - 1].x - me.controlPoints[0].x);
+                    return "" + ((d.x - me.controlPoints[0].x) / l * 100) + "%";
+                });
+
+            gradient.attr("stop-color", function (d) {
+                return d.color;
+            })
+                .attr("stop-opacity", function (d) {
+                    return d.opacity;
+                })
+                .attr("offset", function (d) {
+                    var l = (me.controlPoints[me.controlPoints.length - 1].x - me.controlPoints[0].x);
+                    return "" + ((d.x - me.controlPoints[0].x) / l * 100) + "%";
+                });
+
+            gradient.exit().remove();
+
+            if (d3.event) {
+                d3.event.preventDefault();
+                d3.event.stopPropagation();
+            }
+
+            // Override dirty checking
+            var controlPoints = this.controlPoints;
+            this.controlPoints = [];
+            this.controlPoints = controlPoints;
+        }
+
+        /**
+         * Update x axis label
+         */
+        updateUnit(unit) {
+            if (unit == "")
+                unit = "-";
+            var me = this;
+            var svg = d3.select($('svg')).select("g");
+            svg.select(".label").text("Unit: " + unit);
+        }
+
+        /////// User interaction related event callbacks ////////
+
+        mousedown() {
+            var me = this;
+            var pos = d3.mouse(me.svg.node());
+            var point = {
+                "x": me.xScale.invert(Math.max(0, Math.min(pos[0] - me.margin.left, me._width))),
+                "opacity": me.yScale.invert(Math.max(0, Math.min(pos[1] - me.margin.top, me._height)))
+            };
+            me.selected = me.dragged = point;
+            var bisect = d3.bisector(function (a, b) {
+                return a.x - b.x;
+            }).left;
+            var indexPos = bisect(me.controlPoints, point);
+            me.controlPoints.splice(indexPos, 0, point);
+            me.redraw();
+            me.updateLockButtonState();
+        }
+
+        mousemove() {
+            if (!this.dragged) return;
+
+            function equalPoint(a, index, array) {
+                return a.x == this.x && a.opacity == this.opacity && a.color == this.color;
+            };
+            var index = this.controlPoints.findIndex(equalPoint, this.selected);
+            if (index == -1) return;
+            var m = d3.mouse(this.svg.node());
+            this.selected = this.dragged = this.controlPoints[index];
+            if (index != 0 && index != this.controlPoints.length - 1) {
+                this.dragged.x = this.xScale.invert(Math.max(0, Math.min(this._width, m[0] - this.margin.left)));
+            }
+            this.dragged.opacity = this.yScale.invert(Math.max(0, Math.min(this._height, m[1] - this.margin.top)));
+            var bisect = d3.bisector(function (a, b) {
+                return a.x - b.x;
+            }).left;
+            var bisect2 = d3.bisector(function (a, b) {
+                return a.x - b.x;
+            }).right;
+            var virtualIndex = bisect(this.controlPoints, this.dragged);
+            var virtualIndex2 = bisect2(this.controlPoints, this.dragged);
+            if (virtualIndex < index) {
+                this.controlPoints.splice(virtualIndex, 1);
+            } else if (virtualIndex > index) {
+                this.controlPoints.splice(index + 1, 1);
+            } else if (virtualIndex2 - index >= 2) {
+                this.controlPoints.splice(index + 1, 1);
+            }
+            this.redraw();
+        }
+
+        mouseup() {
+            if (!this.dragged) return;
+            this.dragged = null;
         }
     }
 
