@@ -122,6 +122,7 @@ void Plugin::init() {
         cs::graphics::ColorMap colorMap(json, false);
         mRenderer->setTransferFunction(colorMap.getRawData());
         mNextFrame.mTransferFunction = colorMap.getRawData();
+        mRenderedFrames.clear();
       }));
 
   // Init volume representation
@@ -166,6 +167,7 @@ void Plugin::update() {
   if (mGettingFrame) {
     if (mFutureFrameData.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
       mRenderingFrame.mFrameData = mFutureFrameData.get();
+      mRenderedFrames.push_back(mRenderingFrame);
 
       displayFrame(mRenderingFrame);
 
@@ -179,6 +181,8 @@ void Plugin::update() {
     requestFrame(currentCameraRotation);
   }
 
+  if (mRenderedFrames.size() > 0) {
+    tryReuseFrame(currentCameraRotation);
   }
 
   mLastFrameInterval++;
@@ -219,6 +223,26 @@ void Plugin::requestFrame(glm::dquat cameraRotation) {
         mRenderingFrame.mResolution, mRenderingFrame.mSamplingRate);
     mGettingFrame      = true;
     mLastFrameInterval = 0;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Plugin::tryReuseFrame(glm::dquat cameraRotation) {
+  cs::utils::FrameTimings::ScopedTimer timer("Try reuse frame");
+
+  double minDiff = 0;
+  Frame& bestFrame = mRenderedFrames[0];
+  for (Frame& f : mRenderedFrames) {
+    double diff = glm::extractRealComponent(f.mCameraRotation * glm::conjugate(cameraRotation));
+    if (diff < minDiff) {
+      minDiff   = diff;
+      bestFrame = f;
+    }
+  }
+  if (glm::extractRealComponent(
+          mDisplayedFrame.mCameraRotation * glm::conjugate(bestFrame.mCameraRotation)) > -0.99) {
+    displayFrame(bestFrame);
   }
 }
 

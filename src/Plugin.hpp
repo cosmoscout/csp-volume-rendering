@@ -54,6 +54,7 @@ class Plugin : public cs::core::PluginBase {
   };
 
   void requestFrame(glm::dquat cameraRotation);
+  void tryReuseFrame(glm::dquat cameraRotation);
   void displayFrame(Frame& frame);
 
   Settings mPluginSettings;
@@ -80,6 +81,7 @@ class Plugin : public cs::core::PluginBase {
   Frame                             mNextFrame;
   Frame                             mRenderingFrame;
   Frame                             mDisplayedFrame;
+  std::vector<Frame>                mRenderedFrames;
 };
 
 } // namespace csp::volumerendering
