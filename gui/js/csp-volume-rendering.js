@@ -25,12 +25,12 @@
                     </div>
                     <div class="row">
                         <div class="col-1">
-                            <button id="color-lock" style="height: 35px; width: 35px" class="waves-effect waves-light block btn glass">
+                            <a id="color-lock" class="btn glass block" title="Lock Color">
                                 <i class="material-icons">lock</i>
-                            </button>
+                            </a>
                         </div>
                         <div class="col-3">
-                            <input type="color" id="picker" style="height: 35px" color="#0000FF" class="waves-effect waves-light block glass btn">
+                            <input type="text" class="form-control color-input" id="tf-editor-color" style="color: black;" value="#FF0000">
                         </div>
                     </div>
                     <div class="row">
@@ -58,6 +58,7 @@
             this.createElements();
 
             setTimeout(() => {
+                CosmoScout.gui.initInputs();
                 this.ready();
             }, 500);
         }
@@ -136,9 +137,10 @@
                 .y1(this._height);
 
             // Access the color selector
-            $("#picker").value = "#0000FF";
-            $("#picker").on("change", function () {
-                me.selected.color = this.value;
+            this.colorPicker = document.querySelector("#tf-editor-color");
+            this.colorPicker.picker.set(255, 0, 0, 255);
+            this.colorPicker.addEventListener("change", () => {
+                me.selected.color = this.colorPicker.value;
                 me.redraw();
             });
             // Export button listener
@@ -336,7 +338,7 @@
                 .on("contextmenu", function (d, i) {
                     // react on right-clicking
                     d3.event.preventDefault();
-                    d.color = $("#picker").value;
+                    d.color = this.colorPicker.value;
                     d.locked = true;
                     me.redraw();
                     me.updateLockButtonState();
