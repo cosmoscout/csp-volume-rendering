@@ -9,6 +9,8 @@
 #include "OSPRayUtility.hpp"
 #include "logger.hpp"
 
+#include <vtk-8.2/vtkPointData.h>
+
 #include <ospray/ospray.h>
 #include <ospray/ospray_cpp.h>
 
@@ -47,7 +49,11 @@ OSPRayRenderer::~OSPRayRenderer() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void OSPRayRenderer::setTransferFunction(std::vector<glm::vec4> colors) {
-  mTransferFunction = OSPRayUtility::createOSPRayTransferFunction(0.85f, 1.f, colors);
+  vtkSmartPointer<vtkUnstructuredGrid> volumeData = getData();
+  volumeData->GetPointData()->SetActiveScalars("T");
+  mTransferFunction = OSPRayUtility::createOSPRayTransferFunction(
+      volumeData->GetPointData()->GetScalars()->GetRange()[0],
+      volumeData->GetPointData()->GetScalars()->GetRange()[1], colors);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -59,8 +65,10 @@ std::future<std::vector<uint8_t>> OSPRayRenderer::getFrame(
       vtkSmartPointer<vtkUnstructuredGrid> volumeData = getData();
       mVolume = OSPRayUtility::createOSPRayVolume(volumeData, "T");
     }
-    ospray::cpp::Camera camera =
-        OSPRayUtility::createOSPRayCamera(resolution, resolution, 22, 2.2, cameraRotation);
+    getData()->GetPoints()->ComputeBounds();
+    ospray::cpp::Camera camera = OSPRayUtility::createOSPRayCamera(resolution, resolution, 22,
+        (getData()->GetPoints()->GetBounds()[3] - getData()->GetPoints()->GetBounds()[2]) / 2,
+        cameraRotation);
 
     ospray::cpp::VolumetricModel volumetricModel(*mVolume);
     volumetricModel.setParam("transferFunction", mTransferFunction);
