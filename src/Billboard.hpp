@@ -33,7 +33,7 @@ class Billboard : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   Billboard& operator=(Billboard const& other) = delete;
   Billboard& operator=(Billboard&& other) = default;
 
-  void setTexture(std::vector<uint8_t> texture, int width, int height);
+  void setTexture(std::vector<uint8_t>& texture, int width, int height);
   void setTransform(glm::mat4 transform);
 
   /// Interface implementation of IVistaOpenGLDraw.

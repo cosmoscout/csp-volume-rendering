@@ -43,13 +43,18 @@ class Plugin : public cs::core::PluginBase {
 
  private:
   struct Frame {
-    int                  mResolution;
-    float                mSamplingRate;
-    glm::mat4            mCameraTransform;
+    int                    mResolution;
+    float                  mSamplingRate;
+    glm::dquat             mCameraRotation;
+    std::vector<glm::vec4> mTransferFunction;
+
     std::vector<uint8_t> mFrameData;
 
     bool operator==(const Frame& other);
   };
+
+  void requestFrame(glm::dquat cameraRotation);
+  void displayFrame(Frame& frame);
 
   Settings mPluginSettings;
 
@@ -59,20 +64,22 @@ class Plugin : public cs::core::PluginBase {
   int              mLastFrameInterval;
   std::vector<int> mFrameIntervals;
   int              mFrameIntervalsLength = 1;
-  int              mFrameIntervalsIndex = 0;
+  int              mFrameIntervalsIndex  = 0;
 
   glm::dquat              mLastCameraRotation;
   std::vector<glm::dquat> mCameraRotations;
   int                     mCameraRotationsLength = 15;
-  int                     mCameraRotationsIndex = 0;
+  int                     mCameraRotationsIndex  = 0;
 
   std::unique_ptr<Renderer>        mRenderer;
   std::shared_ptr<Billboard>       mBillboard;
   std::shared_ptr<VistaOpenGLNode> mVolumeNode;
 
   bool                              mGettingFrame;
-  Frame                             mCurrentFrame;
   std::future<std::vector<uint8_t>> mFutureFrameData;
+  Frame                             mNextFrame;
+  Frame                             mRenderingFrame;
+  Frame                             mDisplayedFrame;
 };
 
 } // namespace csp::volumerendering

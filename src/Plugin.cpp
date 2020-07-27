@@ -71,8 +71,8 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool Plugin::Frame::operator==(const Frame& other) {
-  return mResolution == other.mResolution && mCameraTransform == other.mCameraTransform &&
-         mSamplingRate == other.mSamplingRate;
+  return mResolution == other.mResolution && mCameraRotation == other.mCameraRotation &&
+         mSamplingRate == other.mSamplingRate && mTransferFunction == other.mTransferFunction;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,9 +119,9 @@ void Plugin::init() {
   mGuiManager->getGui()->registerCallback("volumeRendering.setTransferFunction",
       "Sets the transfer function for rendering the volume.",
       std::function([this](std::string json) {
-        logger().trace("Setting transfer function");
         cs::graphics::ColorMap colorMap(json, false);
         mRenderer->setTransferFunction(colorMap.getRawData());
+        mNextFrame.mTransferFunction = colorMap.getRawData();
       }));
 
   // Init volume representation
@@ -165,11 +165,9 @@ void Plugin::update() {
 
   if (mGettingFrame) {
     if (mFutureFrameData.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-      mCurrentFrame.mFrameData = mFutureFrameData.get();
+      mRenderingFrame.mFrameData = mFutureFrameData.get();
 
-      mBillboard->setTexture(
-          mCurrentFrame.mFrameData, mCurrentFrame.mResolution, mCurrentFrame.mResolution);
-      mBillboard->setTransform(mCurrentFrame.mCameraTransform);
+      displayFrame(mRenderingFrame);
 
       mGettingFrame                         = false;
       mFrameIntervals[mFrameIntervalsIndex] = mLastFrameInterval;
@@ -178,41 +176,61 @@ void Plugin::update() {
       }
     }
   } else {
-    Frame newFrame;
+    requestFrame(currentCameraRotation);
+  }
 
-    if (mPluginSettings.mPredictiveRendering.get()) {
-      glm::dquat predictedCameraRotation = currentCameraRotation;
-      for (int i = 0; i < std::accumulate(mFrameIntervals.begin(), mFrameIntervals.end(), 0) /
-                              mFrameIntervalsLength;
-           i++) {
-        predictedCameraRotation = std::accumulate(mCameraRotations.begin(), mCameraRotations.end(),
-                                      glm::dquat(0, 0, 0, 0)) /
-                                  (double)mCameraRotationsLength * predictedCameraRotation;
-      }
-
-      newFrame.mCameraTransform = glm::toMat4(predictedCameraRotation);
-    } else {
-      newFrame.mCameraTransform = glm::toMat4(currentCameraRotation);
-    }
-
-    newFrame.mResolution   = mPluginSettings.mResolution.get();
-    newFrame.mSamplingRate = mPluginSettings.mSamplingRate.get();
-
-    if (!(newFrame == mCurrentFrame)) {
-      mCurrentFrame    = newFrame;
-      mFutureFrameData = mRenderer->getFrame(
-          mCurrentFrame.mCameraTransform, mCurrentFrame.mResolution, mCurrentFrame.mSamplingRate);
-      mGettingFrame      = true;
-      mLastFrameInterval = 0;
-    }
   }
 
   mLastFrameInterval++;
   mCameraRotations[mCameraRotationsIndex] =
-      currentCameraRotation * glm::inverse(mLastCameraRotation);
+      currentCameraRotation * glm::conjugate(mLastCameraRotation);
   mLastCameraRotation = currentCameraRotation;
   if (++mCameraRotationsIndex >= mCameraRotationsLength) {
     mCameraRotationsIndex = 0;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Plugin::requestFrame(glm::dquat cameraRotation) {
+  cs::utils::FrameTimings::ScopedTimer timer("Request frame");
+
+  if (mPluginSettings.mPredictiveRendering.get()) {
+    glm::dquat predictedCameraRotation = cameraRotation;
+    for (int i = 0; i < std::accumulate(mFrameIntervals.begin(), mFrameIntervals.end(), 0) /
+                            mFrameIntervalsLength;
+         i++) {
+      predictedCameraRotation = std::accumulate(mCameraRotations.begin(), mCameraRotations.end(),
+                                    glm::dquat(0, 0, 0, 0)) /
+                                (double)mCameraRotationsLength * predictedCameraRotation;
+    }
+
+    mNextFrame.mCameraRotation = predictedCameraRotation;
+  } else {
+    mNextFrame.mCameraRotation = cameraRotation;
+  }
+
+  mNextFrame.mResolution   = mPluginSettings.mResolution.get();
+  mNextFrame.mSamplingRate = mPluginSettings.mSamplingRate.get();
+
+  if (!(mNextFrame == mRenderingFrame)) {
+    mRenderingFrame    = mNextFrame;
+    mFutureFrameData   = mRenderer->getFrame(glm::toMat4(mRenderingFrame.mCameraRotation),
+        mRenderingFrame.mResolution, mRenderingFrame.mSamplingRate);
+    mGettingFrame      = true;
+    mLastFrameInterval = 0;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Plugin::displayFrame(Frame& frame) {
+  if (!(frame == mDisplayedFrame)) {
+    cs::utils::FrameTimings::ScopedTimer timer("Display volume frame");
+
+    mBillboard->setTexture(frame.mFrameData, frame.mResolution, frame.mResolution);
+    mBillboard->setTransform(glm::toMat4(frame.mCameraRotation));
+    mDisplayedFrame = frame;
   }
 }
 
