@@ -85,7 +85,12 @@ void Plugin::init() {
   mOnSaveConnection = mAllSettings->onSave().connect(
       [this]() { mAllSettings->mPlugins["csp-volume-rendering"] = mPluginSettings; });
 
-  // Add the stars user interface components to the CosmoScout user interface.
+  // Init volume renderer
+  mRenderer = std::make_unique<OSPRayRenderer>();
+  mRenderer->setData("C:/Users/frit_jn/Documents/GAIA_Data/PX_OUT_mars_14564", 0);
+  mGettingFrame = false;
+
+  // Add the volume rendering user interface components to the CosmoScout user interface.
   mGuiManager->addSettingsSectionToSideBarFromHTML(
       "Volume Rendering", "blur_circular", "../share/resources/gui/volume_rendering_settings.html");
 
@@ -111,13 +116,13 @@ void Plugin::init() {
     mGuiManager->setCheckboxValue("volumeRendering.setEnablePredictiveRendering", enable);
   });
 
-  // Init volume renderer
-  mRenderer = std::make_unique<OSPRayRenderer>();
-  mRenderer->setData("", 0);
-  mGettingFrame = false;
-
-  cs::graphics::ColorMap colorMap("../share/resources/transferfunctions/Volume.json");
-  mRenderer->setTransferFunction(colorMap.getRawData());
+  mGuiManager->getGui()->registerCallback("volumeRendering.setTransferFunction",
+      "Sets the transfer function for rendering the volume.",
+      std::function([this](std::string json) {
+        logger().trace("Setting transfer function");
+        cs::graphics::ColorMap colorMap(json, false);
+        mRenderer->setTransferFunction(colorMap.getRawData());
+      }));
 
   // Init volume representation
   auto anchor                           = mAllSettings->mAnchors.find("Mars");
@@ -181,7 +186,7 @@ void Plugin::update() {
                               mFrameIntervalsLength;
            i++) {
         predictedCameraRotation = std::accumulate(mCameraRotations.begin(), mCameraRotations.end(),
-                                     glm::dquat(0, 0, 0, 0)) /
+                                      glm::dquat(0, 0, 0, 0)) /
                                   (double)mCameraRotationsLength * predictedCameraRotation;
       }
 
@@ -203,8 +208,9 @@ void Plugin::update() {
   }
 
   mLastFrameInterval++;
-  mCameraRotations[mCameraRotationsIndex] = currentCameraRotation * glm::inverse(mLastCameraRotation);
-  mLastCameraRotation                     = currentCameraRotation;
+  mCameraRotations[mCameraRotationsIndex] =
+      currentCameraRotation * glm::inverse(mLastCameraRotation);
+  mLastCameraRotation = currentCameraRotation;
   if (++mCameraRotationsIndex >= mCameraRotationsLength) {
     mCameraRotationsIndex = 0;
   }

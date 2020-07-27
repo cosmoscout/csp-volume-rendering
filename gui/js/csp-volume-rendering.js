@@ -307,7 +307,8 @@
                     }
                 }
             });
-            //TODO Trigger tf changed event or something
+
+            CosmoScout.callbacks.volumeRendering.setTransferFunction(this.getJsonString());
 
             var svg = d3.select("#tf-graph").select("g");
             svg.selectAll("path.line").datum(me.controlPoints).attr("d", me.area);
@@ -471,6 +472,46 @@
         mouseup() {
             if (!this.dragged) return;
             this.dragged = null;
+        }
+
+        getJsonString() {
+            // Utility functions for parsing colors
+            function colorHexToComponents(hexString) {
+                const red = parseInt(hexString.substring(1, 3), 16) / 255.0;
+                const green = parseInt(hexString.substring(3, 5), 16) / 255.0;
+                const blue = parseInt(hexString.substring(5, 7), 16) / 255.0;
+                return [red, green, blue];
+            }
+
+            function colorRgbToComponents(rgbString) {
+                return rgbString.substring(4, rgbString.length - 1).split(",").map(s => s.trim() / 255.0);
+            }
+
+            function colorToComponents(colorString) {
+                if (colorString.startsWith("#")) {
+                    return colorHexToComponents(colorString);
+                } else if (colorString.startsWith("rgb")) {
+                    return colorRgbToComponents(colorString);
+                }
+            }
+
+            const exportObject = {};
+            exportObject.RGB = {};
+            exportObject.Alpha = {};
+
+            const min = this.xScale.domain()[0];
+            const max = this.xScale.domain()[1];
+            const range = max - min;
+            this.controlPoints.forEach((controlPoint) => {
+                const position = controlPoint.x;
+                const opacity = controlPoint.opacity;
+                if (controlPoint.locked) {
+                    exportObject.RGB[(position - min) / range] = colorToComponents(controlPoint.color);
+                }
+                exportObject.Alpha[(position - min) / range] = opacity;
+            });
+
+            return JSON.stringify(exportObject);
         }
     }
 
