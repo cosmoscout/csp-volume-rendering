@@ -231,7 +231,7 @@ void Plugin::requestFrame(glm::dquat cameraRotation) {
 void Plugin::tryReuseFrame(glm::dquat cameraRotation) {
   cs::utils::FrameTimings::ScopedTimer timer("Try reuse frame");
 
-  double minDiff = 0;
+  double minDiff   = 0;
   Frame& bestFrame = mRenderedFrames[0];
   for (Frame& f : mRenderedFrames) {
     double diff = glm::extractRealComponent(f.mCameraRotation * glm::conjugate(cameraRotation));
@@ -252,7 +252,10 @@ void Plugin::displayFrame(Frame& frame) {
   if (!(frame == mDisplayedFrame)) {
     cs::utils::FrameTimings::ScopedTimer timer("Display volume frame");
 
-    mBillboard->setTexture(frame.mFrameData, frame.mResolution, frame.mResolution);
+    std::vector<uint8_t> colorData(frame.mFrameData.begin(),
+        frame.mFrameData.begin() + 4 * frame.mResolution * frame.mResolution);
+
+    mBillboard->setTexture(colorData, frame.mResolution, frame.mResolution);
     mBillboard->setTransform(glm::toMat4(frame.mCameraRotation));
     mDisplayedFrame = frame;
   }

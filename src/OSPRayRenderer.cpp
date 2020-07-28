@@ -74,8 +74,18 @@ std::future<std::vector<uint8_t>> OSPRayRenderer::getFrame(
     volumetricModel.setParam("transferFunction", mTransferFunction);
     volumetricModel.commit();
 
+    std::vector<float>    isovalues = {0.9f};
+    ospray::cpp::Geometry isosurface("isosurface");
+    isosurface.setParam("isovalue", ospray::cpp::Data(isovalues));
+    isosurface.setParam("volume", volumetricModel.handle());
+    isosurface.commit();
+
+    ospray::cpp::GeometricModel isoModel(isosurface);
+    isoModel.commit();
+
     ospray::cpp::Group group;
     group.setParam("volume", ospray::cpp::Data(volumetricModel));
+    group.setParam("geometry", ospray::cpp::Data(isoModel));
     group.commit();
 
     ospray::cpp::Instance instance(group);
@@ -97,17 +107,23 @@ std::future<std::vector<uint8_t>> OSPRayRenderer::getFrame(
     ospcommon::math::vec2i imgSize;
     imgSize.x    = resolution;
     imgSize.y    = resolution;
-    int channels = OSP_FB_COLOR;
+    int channels = OSP_FB_COLOR | OSP_FB_DEPTH;
 
     ospray::cpp::FrameBuffer framebuffer(imgSize, OSP_FB_RGBA8, channels);
     framebuffer.clear();
+
+    ospray::cpp::ImageOperation d("denoiser");
+    framebuffer.setParam("imageOperation", ospray::cpp::Data(d));
 
     ospray::cpp::Future renderFuture = framebuffer.renderFrame(renderer, camera, world);
     renderFuture.wait();
     logger().trace("Rendered for {}s", renderFuture.duration());
 
-    void*                frame = framebuffer.map(OSP_FB_COLOR);
-    std::vector<uint8_t> frameData((uint8_t*)frame, (uint8_t*)frame + 4 * resolution * resolution);
+    void*                colorFrame = framebuffer.map(OSP_FB_COLOR);
+    void*                depthFrame = framebuffer.map(OSP_FB_DEPTH);
+    std::vector<uint8_t> frameData(
+        (uint8_t*)colorFrame, (uint8_t*)colorFrame + 4 * resolution * resolution);
+    frameData.insert(frameData.end(), (uint8_t*)depthFrame, (uint8_t*)depthFrame + 4 * resolution * resolution);
     return frameData;
   });
 }
