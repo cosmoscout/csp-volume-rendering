@@ -36,8 +36,8 @@ class OSPRayRenderer : public Renderer {
       glm::mat4 cameraRotation, int resolution, float samplingRate) override;
 
  private:
-  ospray::cpp::TransferFunction      mTransferFunction;
-  std::optional<ospray::cpp::Volume> mVolume;
+  std::shared_future<ospray::cpp::TransferFunction> mTransferFunction;
+  std::optional<ospray::cpp::Volume>                mVolume;
 };
 
 } // namespace csp::volumerendering

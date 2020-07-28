@@ -23,7 +23,8 @@ namespace csp::volumerendering {
 OSPRayRenderer::OSPRayRenderer()
     : Renderer() {
   OSPRayUtility::initOSPRay();
-  mTransferFunction = OSPRayUtility::createOSPRayTransferFunction();
+  mTransferFunction = std::async(
+      std::launch::deferred, [] { return OSPRayUtility::createOSPRayTransferFunction(); });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -49,11 +50,13 @@ OSPRayRenderer::~OSPRayRenderer() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void OSPRayRenderer::setTransferFunction(std::vector<glm::vec4> colors) {
-  vtkSmartPointer<vtkUnstructuredGrid> volumeData = getData();
-  volumeData->GetPointData()->SetActiveScalars("T");
-  mTransferFunction = OSPRayUtility::createOSPRayTransferFunction(
-      volumeData->GetPointData()->GetScalars()->GetRange()[0],
-      volumeData->GetPointData()->GetScalars()->GetRange()[1], colors);
+  mTransferFunction = std::async(std::launch::deferred, [this, colors]() {
+    vtkSmartPointer<vtkUnstructuredGrid> volumeData = getData();
+    volumeData->GetPointData()->SetActiveScalars("T");
+    return OSPRayUtility::createOSPRayTransferFunction(
+        volumeData->GetPointData()->GetScalars()->GetRange()[0],
+        volumeData->GetPointData()->GetScalars()->GetRange()[1], colors);
+  });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -71,7 +74,7 @@ std::future<std::vector<uint8_t>> OSPRayRenderer::getFrame(
         cameraRotation);
 
     ospray::cpp::VolumetricModel volumetricModel(*mVolume);
-    volumetricModel.setParam("transferFunction", mTransferFunction);
+    volumetricModel.setParam("transferFunction", mTransferFunction.get());
     volumetricModel.commit();
 
     std::vector<float>    isovalues = {0.9f};
@@ -123,7 +126,8 @@ std::future<std::vector<uint8_t>> OSPRayRenderer::getFrame(
     void*                depthFrame = framebuffer.map(OSP_FB_DEPTH);
     std::vector<uint8_t> frameData(
         (uint8_t*)colorFrame, (uint8_t*)colorFrame + 4 * resolution * resolution);
-    frameData.insert(frameData.end(), (uint8_t*)depthFrame, (uint8_t*)depthFrame + 4 * resolution * resolution);
+    frameData.insert(
+        frameData.end(), (uint8_t*)depthFrame, (uint8_t*)depthFrame + 4 * resolution * resolution);
     return frameData;
   });
 }
