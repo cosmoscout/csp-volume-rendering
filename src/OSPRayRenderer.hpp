@@ -36,8 +36,6 @@ class OSPRayRenderer : public Renderer {
       glm::mat4 cameraRotation, int resolution, float samplingRate) override;
 
  private:
-  void initOSPRay();
-
   ospray::cpp::TransferFunction      mTransferFunction;
   std::optional<ospray::cpp::Volume> mVolume;
 };

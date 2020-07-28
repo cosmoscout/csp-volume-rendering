@@ -22,7 +22,7 @@ namespace csp::volumerendering {
 
 OSPRayRenderer::OSPRayRenderer()
     : Renderer() {
-  initOSPRay();
+  OSPRayUtility::initOSPRay();
   mTransferFunction = OSPRayUtility::createOSPRayTransferFunction();
 }
 
@@ -30,14 +30,14 @@ OSPRayRenderer::OSPRayRenderer()
 
 OSPRayRenderer::OSPRayRenderer(std::string path)
     : Renderer(path) {
-  initOSPRay();
+  OSPRayUtility::initOSPRay();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 OSPRayRenderer::OSPRayRenderer(std::string path, int timestep)
     : Renderer(path, timestep) {
-  initOSPRay();
+  OSPRayUtility::initOSPRay();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -110,20 +110,6 @@ std::future<std::vector<uint8_t>> OSPRayRenderer::getFrame(
     std::vector<uint8_t> frameData((uint8_t*)frame, (uint8_t*)frame + 4 * resolution * resolution);
     return frameData;
   });
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void OSPRayRenderer::initOSPRay() {
-  int         argc = 1;
-  std::string argStr("--osp::vv");
-  const char* arg = argStr.c_str();
-
-  OSPError init_error = ospInit(&argc, &arg);
-  if (init_error != OSP_NO_ERROR) {
-    logger().error("OSPRay Initialization failed: {}", init_error);
-    throw std::runtime_error("OSPRay Initialization failed.");
-  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

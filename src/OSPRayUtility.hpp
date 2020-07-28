@@ -15,6 +15,7 @@
 #include <glm/gtc/type_ptr.hpp>
 
 namespace csp::volumerendering::OSPRayUtility {
+void initOSPRay();
 
 ospray::cpp::Camera createOSPRayCamera(
     int width, int height, float fov, float modelHeight, glm::mat4 cameraRotation);

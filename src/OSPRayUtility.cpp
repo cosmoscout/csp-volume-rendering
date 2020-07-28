@@ -22,6 +22,22 @@ namespace csp::volumerendering::OSPRayUtility {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void initOSPRay() {
+  int         argc = 1;
+  std::string argStr("--osp::vv");
+  const char* arg = argStr.c_str();
+
+  OSPError init_error = ospInit(&argc, &arg);
+  if (init_error != OSP_NO_ERROR) {
+    logger().error("OSPRay Initialization failed: {}", init_error);
+    throw std::runtime_error("OSPRay Initialization failed.");
+  }
+
+	ospLoadModule("denoiser");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 ospray::cpp::Camera createOSPRayCamera(
     int width, int height, float fov, float modelHeight, glm::mat4 cameraRotation) {
   float     fovRad   = fov / 180 * (float)M_PI;
