@@ -22,8 +22,7 @@ void DataManager::loadData(std::string path, int timestep) {
   DataSet data;
   data.mPath         = path;
   data.mTimestep     = timestep;
-  data.mFutureLoaded = false;
-  data.mFutureData = std::async(std::launch::async,
+  data.mFutureData   = std::async(std::launch::async,
       [](std::string path, int timestep) {
         vtkSmartPointer<vtkUnstructuredGrid> data = vtkUnstructuredGrid::SafeDownCast(
             VrcGenericDataLoader::LoadGaiaDataSet(path.c_str(), timestep, nullptr));
@@ -39,11 +38,9 @@ void DataManager::loadData(std::string path, int timestep) {
 vtkSmartPointer<vtkUnstructuredGrid> DataManager::getData(std::string path, int timestep) {
   auto data = std::find_if(mCache.begin(), mCache.end(),
       [&path, &timestep](const DataSet& d) { return d.mPath == path && d.mTimestep == timestep; });
-  if (!data->mFutureLoaded) {
-    data->mData         = data->mFutureData.get();
-    data->mFutureLoaded = true;
-  }
-  return data->mData;
+
+  std::shared_future<vtkSmartPointer<vtkUnstructuredGrid>> future = data->mFutureData;
+  return future.get();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
