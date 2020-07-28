@@ -83,7 +83,7 @@ Billboard::Billboard(std::string const& sCenterName, std::string const& sFrameNa
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Billboard::setTexture(std::vector<uint8_t>& texture, int width, int height) {
-  mTexture->UploadTexture(width, height, texture.data(), true, GL_RGBA);
+  mTexture->UploadTexture(width, height, texture.data(), false, GL_RGBA);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
