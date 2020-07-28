@@ -20,10 +20,10 @@ namespace csp::volumerendering {
 void DataManager::loadData(std::string path, int timestep) {
   logger().info("Loading data from {}, timestep {}...", path, timestep);
   DataSet data;
-  data.path         = path;
-  data.timestep     = timestep;
-  data.futureLoaded = false;
-  data.futureData = std::async(std::launch::async,
+  data.mPath         = path;
+  data.mTimestep     = timestep;
+  data.mFutureLoaded = false;
+  data.mFutureData = std::async(std::launch::async,
       [](std::string path, int timestep) {
         vtkSmartPointer<vtkUnstructuredGrid> data = vtkUnstructuredGrid::SafeDownCast(
             VrcGenericDataLoader::LoadGaiaDataSet(path.c_str(), timestep, nullptr));
@@ -38,12 +38,12 @@ void DataManager::loadData(std::string path, int timestep) {
 
 vtkSmartPointer<vtkUnstructuredGrid> DataManager::getData(std::string path, int timestep) {
   auto data = std::find_if(mCache.begin(), mCache.end(),
-      [&path, &timestep](const DataSet& d) { return d.path == path && d.timestep == timestep; });
-  if (!data->futureLoaded) {
-    data->data         = data->futureData.get();
-    data->futureLoaded = true;
+      [&path, &timestep](const DataSet& d) { return d.mPath == path && d.mTimestep == timestep; });
+  if (!data->mFutureLoaded) {
+    data->mData         = data->mFutureData.get();
+    data->mFutureLoaded = true;
   }
-  return data->data;
+  return data->mData;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

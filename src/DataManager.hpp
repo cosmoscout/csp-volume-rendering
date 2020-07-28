@@ -23,11 +23,11 @@ class DataManager {
 
  private:
   struct DataSet {
-    std::string                                       path;
-    int                                               timestep;
-    vtkSmartPointer<vtkUnstructuredGrid>              data;
-    std::future<vtkSmartPointer<vtkUnstructuredGrid>> futureData;
-    bool                                              futureLoaded;
+    std::string                                       mPath;
+    int                                               mTimestep;
+    vtkSmartPointer<vtkUnstructuredGrid>              mData;
+    std::future<vtkSmartPointer<vtkUnstructuredGrid>> mFutureData;
+    bool                                              mFutureLoaded;
   };
 
   std::vector<DataSet> mCache;
