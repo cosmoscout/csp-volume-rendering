@@ -7,8 +7,6 @@
 #ifndef CSP_VOLUME_RENDERING_BILLBOARD_HPP
 #define CSP_VOLUME_RENDERING_BILLBOARD_HPP
 
-#include "Plugin.hpp"
-
 #include <VistaKernel/GraphicsManager/VistaOpenGLDraw.h>
 #include <VistaKernel/GraphicsManager/VistaOpenGLNode.h>
 #include <VistaOGLExt/VistaBufferObject.h>

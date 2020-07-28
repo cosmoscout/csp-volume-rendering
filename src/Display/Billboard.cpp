@@ -7,7 +7,7 @@
 #include "Billboard.hpp"
 
 #include "Shaders.hpp"
-#include "logger.hpp"
+#include "../logger.hpp"
 
 #include "../../../src/cs-utils/FrameTimings.hpp"
 #include "../../../src/cs-utils/utils.hpp"

@@ -6,7 +6,7 @@
 
 #include "DataManager.hpp"
 
-#include "logger.hpp"
+#include "../logger.hpp"
 
 #include <ViracochaBackend/DataManager/VrcGenericDataLoader.h>
 

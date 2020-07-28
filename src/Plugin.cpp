@@ -6,8 +6,8 @@
 
 #include "Plugin.hpp"
 
-#include "Billboard.hpp"
-#include "OSPRayRenderer.hpp"
+#include "Display/Billboard.hpp"
+#include "Render/OSPRayRenderer.hpp"
 #include "logger.hpp"
 
 #include "../../../src/cs-core/GuiManager.hpp"

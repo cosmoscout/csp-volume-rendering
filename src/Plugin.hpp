@@ -7,7 +7,7 @@
 #ifndef CSP_VOLUME_RENDERING_PLUGIN_HPP
 #define CSP_VOLUME_RENDERING_PLUGIN_HPP
 
-#include "Renderer.hpp"
+#include "Render/Renderer.hpp"
 
 #include "../../../src/cs-core/PluginBase.hpp"
 #include "../../../src/cs-utils/DefaultProperty.hpp"

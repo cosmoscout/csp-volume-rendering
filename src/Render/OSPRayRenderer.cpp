@@ -7,7 +7,7 @@
 #include "OSPRayRenderer.hpp"
 
 #include "OSPRayUtility.hpp"
-#include "logger.hpp"
+#include "../logger.hpp"
 
 #include <vtk-8.2/vtkPointData.h>
 

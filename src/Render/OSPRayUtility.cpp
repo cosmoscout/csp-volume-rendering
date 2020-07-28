@@ -6,7 +6,7 @@
 
 #include "OSPRayUtility.hpp"
 
-#include "logger.hpp"
+#include "../logger.hpp"
 
 #include <vtk-8.2/vtkCellArray.h>
 #include <vtk-8.2/vtkCellData.h>
