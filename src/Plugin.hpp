@@ -31,7 +31,10 @@ class Plugin : public cs::core::PluginBase {
       std::string mPath;
     };
 
+    cs::utils::DefaultProperty<bool>  mRequestImages{true};
     cs::utils::DefaultProperty<bool>  mPredictiveRendering{true};
+    cs::utils::DefaultProperty<bool>  mReuseImages{true};
+    cs::utils::DefaultProperty<bool>  mDepthData{true};
     cs::utils::DefaultProperty<int>   mResolution{256};
     cs::utils::DefaultProperty<float> mSamplingRate{0.005};
     std::map<std::string, Volume>     mVolumes;

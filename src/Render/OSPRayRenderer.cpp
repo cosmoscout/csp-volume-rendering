@@ -6,8 +6,8 @@
 
 #include "OSPRayRenderer.hpp"
 
-#include "OSPRayUtility.hpp"
 #include "../logger.hpp"
+#include "OSPRayUtility.hpp"
 
 #include <vtk-8.2/vtkPointData.h>
 
@@ -62,74 +62,100 @@ void OSPRayRenderer::setTransferFunction(std::vector<glm::vec4> colors) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::future<std::vector<uint8_t>> OSPRayRenderer::getFrame(
-    glm::mat4 cameraRotation, int resolution, float samplingRate) {
-  return std::async(std::launch::async, [this, cameraRotation, resolution, samplingRate]() {
-    if (!mVolume.has_value()) {
-      vtkSmartPointer<vtkUnstructuredGrid> volumeData = getData();
-      mVolume = OSPRayUtility::createOSPRayVolume(volumeData, "T");
-    }
-    getData()->GetPoints()->ComputeBounds();
-    ospray::cpp::Camera camera = OSPRayUtility::createOSPRayCamera(resolution, resolution, 22,
-        (getData()->GetPoints()->GetBounds()[3] - getData()->GetPoints()->GetBounds()[2]) / 2,
-        cameraRotation);
+    glm::mat4 cameraRotation, int resolution, float samplingRate, Renderer::DepthMode depthMode) {
+  return std::async(
+      std::launch::async, [this, cameraRotation, resolution, samplingRate, depthMode]() {
+        if (!mVolume.has_value()) {
+          vtkSmartPointer<vtkUnstructuredGrid> volumeData = getData();
+          mVolume = OSPRayUtility::createOSPRayVolume(volumeData, "T");
+        }
 
-    ospray::cpp::VolumetricModel volumetricModel(*mVolume);
-    volumetricModel.setParam("transferFunction", mTransferFunction.get());
-    volumetricModel.commit();
+        getData()->GetPoints()->ComputeBounds();
+        float fov = 22;
+        float modelHeight =
+            (getData()->GetPoints()->GetBounds()[3] - getData()->GetPoints()->GetBounds()[2]) / 2;
+        float cameraDistance = modelHeight / sin(fov / 180 * (float)M_PI / 2);
 
-    std::vector<float>    isovalues = {0.9f};
-    ospray::cpp::Geometry isosurface("isosurface");
-    isosurface.setParam("isovalue", ospray::cpp::Data(isovalues));
-    isosurface.setParam("volume", volumetricModel.handle());
-    isosurface.commit();
+        ospray::cpp::Camera camera = OSPRayUtility::createOSPRayCamera(
+            resolution, resolution, fov, cameraDistance, cameraRotation);
 
-    ospray::cpp::GeometricModel isoModel(isosurface);
-    isoModel.commit();
+        ospray::cpp::VolumetricModel volumetricModel(*mVolume);
+        volumetricModel.setParam("transferFunction", mTransferFunction.get());
+        volumetricModel.commit();
 
-    ospray::cpp::Group group;
-    group.setParam("volume", ospray::cpp::Data(volumetricModel));
-    group.setParam("geometry", ospray::cpp::Data(isoModel));
-    group.commit();
+        ospray::cpp::Group group;
+        group.setParam("volume", ospray::cpp::Data(volumetricModel));
 
-    ospray::cpp::Instance instance(group);
-    instance.commit();
+        if (depthMode == Renderer::DepthMode::eIsosurface) {
+          ospray::cpp::Geometry isosurface("isosurface");
+          isosurface.setParam("isovalue", 0.9f);
+          isosurface.setParam("volume", volumetricModel.handle());
+          isosurface.commit();
 
-    ospray::cpp::Light light("ambient");
-    light.commit();
+          ospcommon::math::vec4f      color{1.f, 1.f, 1.f, 0.f};
+          ospray::cpp::GeometricModel isoModel(isosurface);
+          isoModel.setParam("color", ospray::cpp::Data(color));
+          isoModel.commit();
 
-    ospray::cpp::World world;
-    world.setParam("instance", ospray::cpp::Data(instance));
-    world.setParam("light", ospray::cpp::Data(light));
-    world.commit();
+          group.setParam("geometry", ospray::cpp::Data(isoModel));
+        }
 
-    ospray::cpp::Renderer renderer("scivis");
-    renderer.setParam("aoSamples", 0);
-    renderer.setParam("volumeSamplingRate", samplingRate);
-    renderer.commit();
+        group.commit();
 
-    ospcommon::math::vec2i imgSize;
-    imgSize.x    = resolution;
-    imgSize.y    = resolution;
-    int channels = OSP_FB_COLOR | OSP_FB_DEPTH;
+        ospray::cpp::Instance instance(group);
+        instance.commit();
 
-    ospray::cpp::FrameBuffer framebuffer(imgSize, OSP_FB_RGBA8, channels);
-    framebuffer.clear();
+        ospray::cpp::Light light("ambient");
+        light.commit();
 
-    ospray::cpp::ImageOperation d("denoiser");
-    framebuffer.setParam("imageOperation", ospray::cpp::Data(d));
+        ospray::cpp::World world;
+        world.setParam("instance", ospray::cpp::Data(instance));
+        world.setParam("light", ospray::cpp::Data(light));
+        world.commit();
 
-    ospray::cpp::Future renderFuture = framebuffer.renderFrame(renderer, camera, world);
-    renderFuture.wait();
-    logger().trace("Rendered for {}s", renderFuture.duration());
+        ospray::cpp::Renderer renderer("scivis");
+        renderer.setParam("aoSamples", 0);
+        renderer.setParam("volumeSamplingRate", samplingRate);
+        renderer.commit();
 
-    void*                colorFrame = framebuffer.map(OSP_FB_COLOR);
-    void*                depthFrame = framebuffer.map(OSP_FB_DEPTH);
-    std::vector<uint8_t> frameData(
-        (uint8_t*)colorFrame, (uint8_t*)colorFrame + 4 * resolution * resolution);
-    frameData.insert(
-        frameData.end(), (uint8_t*)depthFrame, (uint8_t*)depthFrame + 4 * resolution * resolution);
-    return frameData;
-  });
+        ospcommon::math::vec2i imgSize;
+        imgSize.x    = resolution;
+        imgSize.y    = resolution;
+        int channels = OSP_FB_COLOR;
+        if (depthMode == Renderer::DepthMode::eIsosurface) {
+          channels |= OSP_FB_DEPTH;
+        }
+
+        ospray::cpp::FrameBuffer framebuffer(imgSize, OSP_FB_RGBA8, channels);
+        framebuffer.clear();
+
+        ospray::cpp::ImageOperation d("denoiser");
+        framebuffer.setParam("imageOperation", ospray::cpp::Data(d));
+
+        ospray::cpp::Future renderFuture = framebuffer.renderFrame(renderer, camera, world);
+        renderFuture.wait();
+        logger().trace("Rendered for {}s", renderFuture.duration());
+
+        uint8_t*             colorFrame = (uint8_t*)framebuffer.map(OSP_FB_COLOR);
+        std::vector<uint8_t> frameData(colorFrame, colorFrame + 4 * resolution * resolution);
+        std::vector<float>   depthData(resolution * resolution);
+
+        if (depthMode == Renderer::DepthMode::eIsosurface) {
+          float* depthFrame = (float*)framebuffer.map(OSP_FB_DEPTH);
+
+          for (int i = 0; i < depthData.size(); i++) {
+            float val = depthFrame[i];
+            if (val == INFINITY) {
+              depthData[i] = 0;
+            } else {
+              depthData[i] = val - cameraDistance;
+            }
+          }
+        }
+        frameData.insert(frameData.end(), (uint8_t*)depthData.data(),
+            (uint8_t*)depthData.data() + 4 * resolution * resolution);
+        return frameData;
+      });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

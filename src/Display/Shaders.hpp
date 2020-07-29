@@ -29,7 +29,7 @@ out vec3 vPosition;
 void main()
 {
     vTexCoords  = vec2((iPos.x + 1) / 2, (iPos.y + 1) / 2);
-    vPosition   = uRadii * iPos;
+    vPosition   = uRadii * vec3(iPos.x, iPos.y, -iPos.z / 2);
     vPosition   = (uMatTransform * vec4(vPosition, 1.0)).xyz;
     vPosition   = (uMatModelView * vec4(vPosition, 1.0)).xyz;
     gl_Position = uMatProjection * vec4(vPosition, 1);

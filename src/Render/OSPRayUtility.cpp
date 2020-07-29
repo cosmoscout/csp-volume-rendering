@@ -39,9 +39,7 @@ void initOSPRay() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ospray::cpp::Camera createOSPRayCamera(
-    int width, int height, float fov, float modelHeight, glm::mat4 cameraRotation) {
-  float     fovRad   = fov / 180 * (float)M_PI;
-  float     distance = modelHeight / sin(fovRad / 2);
+    int width, int height, float fov, float distance, glm::mat4 cameraRotation) {
   glm::vec4 camPos(0, 0, distance, 1);
   camPos = cameraRotation * camPos;
   glm::vec4 camUp(0, 1, 0, 1);

@@ -33,7 +33,7 @@ class OSPRayRenderer : public Renderer {
   void setTransferFunction(std::vector<glm::vec4> colors) override;
 
   std::future<std::vector<uint8_t>> getFrame(
-      glm::mat4 cameraRotation, int resolution, float samplingRate) override;
+      glm::mat4 cameraRotation, int resolution, float samplingRate, DepthMode depthMode) override;
 
  private:
   std::shared_future<ospray::cpp::TransferFunction> mTransferFunction;

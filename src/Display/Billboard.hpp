@@ -32,6 +32,7 @@ class Billboard : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   Billboard& operator=(Billboard&& other) = default;
 
   void setTexture(std::vector<uint8_t>& texture, int width, int height);
+  void setDepthTexture(std::vector<float>& texture, int width, int height);
   void setTransform(glm::mat4 transform);
 
   /// Interface implementation of IVistaOpenGLDraw.
@@ -39,12 +40,17 @@ class Billboard : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   bool GetBoundingBox(VistaBoundingBox& bb) override;
 
  private:
-  glm::mat4                     mTransform;
-  std::unique_ptr<VistaTexture> mTexture;
-  VistaGLSLShader               mShader;
-  VistaVertexArrayObject        mVAO;
-  VistaBufferObject             mVBO;
-  VistaBufferObject             mIBO;
+  void createBuffers();
+
+  glm::mat4              mTransform;
+  VistaTexture           mTexture;
+  VistaGLSLShader        mShader;
+  VistaVertexArrayObject mVAO;
+  VistaBufferObject      mVBO;
+  VistaBufferObject      mIBO;
+
+	std::vector<float> mDepthValues;
+  int                mDepthResolution;
 
   glm::dvec3 mRadii;
 

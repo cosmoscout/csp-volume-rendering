@@ -109,11 +109,32 @@ void Plugin::init() {
     mGuiManager->setSliderValue("volumeRendering.setSamplingRate", value);
   });
 
+  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableRequestImages",
+      "If disabled no new images will be rendered.",
+      std::function([this](bool enable) { mPluginSettings.mRequestImages = enable; }));
+  mPluginSettings.mRequestImages.connectAndTouch([this](bool enable) {
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableRequestImages", enable);
+  });
+
   mGuiManager->getGui()->registerCallback("volumeRendering.setEnablePredictiveRendering",
       "Enables predicting the next camera position for rendering.",
       std::function([this](bool enable) { mPluginSettings.mPredictiveRendering = enable; }));
   mPluginSettings.mPredictiveRendering.connectAndTouch([this](bool enable) {
     mGuiManager->setCheckboxValue("volumeRendering.setEnablePredictiveRendering", enable);
+  });
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableReuseImages",
+      "Enables reuse of previously rendered images.",
+      std::function([this](bool enable) { mPluginSettings.mReuseImages = enable; }));
+  mPluginSettings.mReuseImages.connectAndTouch([this](bool enable) {
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableReuseImages", enable);
+  });
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDepthData",
+      "Enables use of depth data for displaying data.",
+      std::function([this](bool enable) { mPluginSettings.mDepthData = enable; }));
+  mPluginSettings.mDepthData.connectAndTouch([this](bool enable) {
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableDepthData", enable);
   });
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setTransferFunction",
@@ -178,10 +199,12 @@ void Plugin::update() {
       }
     }
   } else {
-    requestFrame(currentCameraRotation);
+    if (mPluginSettings.mRequestImages.get()) {
+      requestFrame(currentCameraRotation);
+    }
   }
 
-  if (mRenderedFrames.size() > 0) {
+  if (mPluginSettings.mReuseImages.get() && mRenderedFrames.size() > 0) {
     tryReuseFrame(currentCameraRotation);
   }
 
@@ -220,7 +243,9 @@ void Plugin::requestFrame(glm::dquat cameraRotation) {
   if (!(mNextFrame == mRenderingFrame)) {
     mRenderingFrame    = mNextFrame;
     mFutureFrameData   = mRenderer->getFrame(glm::toMat4(mRenderingFrame.mCameraRotation),
-        mRenderingFrame.mResolution, mRenderingFrame.mSamplingRate);
+        mRenderingFrame.mResolution, mRenderingFrame.mSamplingRate,
+        mPluginSettings.mDepthData.get() ? Renderer::DepthMode::eIsosurface
+                                         : Renderer::DepthMode::eNone);
     mGettingFrame      = true;
     mLastFrameInterval = 0;
   }
@@ -254,8 +279,12 @@ void Plugin::displayFrame(Frame& frame) {
 
     std::vector<uint8_t> colorData(frame.mFrameData.begin(),
         frame.mFrameData.begin() + 4 * frame.mResolution * frame.mResolution);
+    std::vector<float>   depthData(
+        (float*)frame.mFrameData.data() + frame.mResolution * frame.mResolution,
+        (float*)frame.mFrameData.data() + 2 * frame.mResolution * frame.mResolution);
 
     mBillboard->setTexture(colorData, frame.mResolution, frame.mResolution);
+    mBillboard->setDepthTexture(depthData, frame.mResolution, frame.mResolution);
     mBillboard->setTransform(glm::toMat4(frame.mCameraRotation));
     mDisplayedFrame = frame;
   }

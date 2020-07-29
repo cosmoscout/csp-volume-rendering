@@ -18,6 +18,8 @@ namespace csp::volumerendering {
 
 class Renderer {
  public:
+  enum class DepthMode { eNone, eIsosurface };
+
   Renderer();
   Renderer(std::string path);
   Renderer(std::string path, int timestep);
@@ -29,7 +31,7 @@ class Renderer {
   virtual void setTransferFunction(std::vector<glm::vec4> colors) = 0;
 
   virtual std::future<std::vector<uint8_t>> getFrame(
-      glm::mat4 cameraRotation, int resolution, float samplingRate) = 0;
+      glm::mat4 cameraRotation, int resolution, float samplingRate, DepthMode depthMode) = 0;
 
  protected:
   vtkSmartPointer<vtkUnstructuredGrid> getData();
