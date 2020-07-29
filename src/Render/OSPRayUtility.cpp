@@ -129,7 +129,7 @@ ospray::cpp::Volume createOSPRayVolume(
           for (int i = start; i < end; i++) {
             double volume;
             vtkVolume->GetCellData()->GetScalars()->GetTuple(i, &volume);
-            if (volume > 0 && volume < 2.59941e-05) {
+            if (volume > 0.000001 && volume < 2.59941e-05) {
               cellIndices.push_back(allCellIndices[i]);
               cellTypes.push_back(allCellTypes[i]);
             }
