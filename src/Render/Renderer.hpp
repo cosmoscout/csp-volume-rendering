@@ -30,8 +30,8 @@ class Renderer {
 
   virtual void setTransferFunction(std::vector<glm::vec4> colors) = 0;
 
-  virtual std::future<std::vector<uint8_t>> getFrame(
-      glm::mat4 cameraRotation, int resolution, float samplingRate, DepthMode depthMode) = 0;
+  virtual std::future<std::vector<uint8_t>> getFrame(glm::mat4 cameraRotation, int resolution,
+      float samplingRate, DepthMode depthMode, bool denoise) = 0;
 
  protected:
   vtkSmartPointer<vtkUnstructuredGrid> getData();

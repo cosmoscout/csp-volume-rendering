@@ -35,6 +35,7 @@ class Plugin : public cs::core::PluginBase {
     cs::utils::DefaultProperty<bool>  mPredictiveRendering{true};
     cs::utils::DefaultProperty<bool>  mReuseImages{true};
     cs::utils::DefaultProperty<bool>  mDepthData{true};
+    cs::utils::DefaultProperty<bool>  mDenoise{true};
     cs::utils::DefaultProperty<int>   mResolution{256};
     cs::utils::DefaultProperty<float> mSamplingRate{0.005};
     std::map<std::string, Volume>     mVolumes;
@@ -50,6 +51,8 @@ class Plugin : public cs::core::PluginBase {
     float                  mSamplingRate;
     glm::dquat             mCameraRotation;
     std::vector<glm::vec4> mTransferFunction;
+    bool                   mHasDepthData;
+    bool                   mHasDenoise;
 
     std::vector<uint8_t> mFrameData;
 

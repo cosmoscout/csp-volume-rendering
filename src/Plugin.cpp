@@ -72,7 +72,8 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
 
 bool Plugin::Frame::operator==(const Frame& other) {
   return mResolution == other.mResolution && mCameraRotation == other.mCameraRotation &&
-         mSamplingRate == other.mSamplingRate && mTransferFunction == other.mTransferFunction;
+         mSamplingRate == other.mSamplingRate && mTransferFunction == other.mTransferFunction &&
+         mHasDepthData == other.mHasDepthData && mHasDenoise == other.mHasDenoise;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -135,6 +136,13 @@ void Plugin::init() {
       std::function([this](bool enable) { mPluginSettings.mDepthData = enable; }));
   mPluginSettings.mDepthData.connectAndTouch([this](bool enable) {
     mGuiManager->setCheckboxValue("volumeRendering.setEnableDepthData", enable);
+  });
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDenoise",
+      "Enables use of OIDN for displaying data.",
+      std::function([this](bool enable) { mPluginSettings.mDenoise = enable; }));
+  mPluginSettings.mDenoise.connectAndTouch([this](bool enable) {
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoise", enable);
   });
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setTransferFunction",
@@ -239,13 +247,15 @@ void Plugin::requestFrame(glm::dquat cameraRotation) {
 
   mNextFrame.mResolution   = mPluginSettings.mResolution.get();
   mNextFrame.mSamplingRate = mPluginSettings.mSamplingRate.get();
+  mNextFrame.mHasDepthData = mPluginSettings.mDepthData.get();
+  mNextFrame.mHasDenoise   = mPluginSettings.mDenoise.get();
 
   if (!(mNextFrame == mRenderingFrame)) {
     mRenderingFrame    = mNextFrame;
     mFutureFrameData   = mRenderer->getFrame(glm::toMat4(mRenderingFrame.mCameraRotation),
         mRenderingFrame.mResolution, mRenderingFrame.mSamplingRate,
-        mPluginSettings.mDepthData.get() ? Renderer::DepthMode::eIsosurface
-                                         : Renderer::DepthMode::eNone);
+        mNextFrame.mHasDepthData ? Renderer::DepthMode::eIsosurface : Renderer::DepthMode::eNone,
+        mNextFrame.mHasDenoise);
     mGettingFrame      = true;
     mLastFrameInterval = 0;
   }

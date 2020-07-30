@@ -61,10 +61,10 @@ void OSPRayRenderer::setTransferFunction(std::vector<glm::vec4> colors) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::future<std::vector<uint8_t>> OSPRayRenderer::getFrame(
-    glm::mat4 cameraRotation, int resolution, float samplingRate, Renderer::DepthMode depthMode) {
+std::future<std::vector<uint8_t>> OSPRayRenderer::getFrame(glm::mat4 cameraRotation, int resolution,
+    float samplingRate, Renderer::DepthMode depthMode, bool denoise) {
   return std::async(
-      std::launch::async, [this, cameraRotation, resolution, samplingRate, depthMode]() {
+      std::launch::async, [this, cameraRotation, resolution, samplingRate, depthMode, denoise]() {
         if (!mVolume.has_value()) {
           vtkSmartPointer<vtkUnstructuredGrid> volumeData = getData();
           mVolume = OSPRayUtility::createOSPRayVolume(volumeData, "T");
@@ -126,19 +126,29 @@ std::future<std::vector<uint8_t>> OSPRayRenderer::getFrame(
           channels |= OSP_FB_DEPTH;
         }
 
-        ospray::cpp::FrameBuffer framebuffer(imgSize, OSP_FB_RGBA8, channels);
+        ospray::cpp::FrameBuffer framebuffer(imgSize, OSP_FB_RGBA32F, channels);
         framebuffer.clear();
 
-        ospray::cpp::ImageOperation d("denoiser");
-        framebuffer.setParam("imageOperation", ospray::cpp::Data(d));
+        if (denoise) {
+          ospray::cpp::ImageOperation denoise("denoiser");
+          framebuffer.setParam("imageOperation", ospray::cpp::Data(denoise));
+        } else {
+          framebuffer.removeParam("imageOperation");
+        }
+
+        framebuffer.commit();
 
         ospray::cpp::Future renderFuture = framebuffer.renderFrame(renderer, camera, world);
         renderFuture.wait();
         logger().trace("Rendered for {}s", renderFuture.duration());
 
-        uint8_t*             colorFrame = (uint8_t*)framebuffer.map(OSP_FB_COLOR);
-        std::vector<uint8_t> frameData(colorFrame, colorFrame + 4 * resolution * resolution);
+        float*               colorFrame = (float*)framebuffer.map(OSP_FB_COLOR);
+        std::vector<uint8_t> frameData(4 * resolution * resolution);
         std::vector<float>   depthData(resolution * resolution);
+
+				for (int i = 0; i < frameData.size(); i++) {
+          frameData[i] = colorFrame[i] * 255;
+				}
 
         if (depthMode == Renderer::DepthMode::eIsosurface) {
           float* depthFrame = (float*)framebuffer.map(OSP_FB_DEPTH);
