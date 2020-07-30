@@ -6,7 +6,7 @@
 
 #include "OSPRayUtility.hpp"
 
-#include "../logger.hpp"
+#include "../../../src/cs-utils/logger.hpp"
 
 #include <vtk-8.2/vtkCellArray.h>
 #include <vtk-8.2/vtkCellData.h>
@@ -22,18 +22,29 @@ namespace csp::volumerendering::OSPRayUtility {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+spdlog::logger& osprayLogger() {
+  static auto logger = cs::utils::createLogger("OSPRay");
+  return *logger;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void initOSPRay() {
-  int         argc = 1;
-  std::string argStr("--osp::vv");
-  const char* arg = argStr.c_str();
+  int         argc = 0;
+  const char* arg  = "";
 
   OSPError init_error = ospInit(&argc, &arg);
   if (init_error != OSP_NO_ERROR) {
-    logger().error("OSPRay Initialization failed: {}", init_error);
+    osprayLogger().error("OSPRay Initialization failed: {}", init_error);
     throw std::runtime_error("OSPRay Initialization failed.");
   }
 
-	ospLoadModule("denoiser");
+  ospDeviceSetErrorFunc(ospGetCurrentDevice(),
+      [](OSPError e, const char* errorDetails) { osprayLogger().error(errorDetails); });
+  ospDeviceSetStatusFunc(
+      ospGetCurrentDevice(), [](const char* message) { osprayLogger().info(message); });
+
+  ospLoadModule("denoiser");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
