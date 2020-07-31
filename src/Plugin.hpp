@@ -55,6 +55,7 @@ class Plugin : public cs::core::PluginBase {
     bool                   mHasDenoise;
 
     std::vector<uint8_t> mFrameData;
+    glm::mat4            mModelViewProjection;
 
     bool operator==(const Frame& other);
   };
@@ -82,12 +83,13 @@ class Plugin : public cs::core::PluginBase {
   std::shared_ptr<Billboard>       mBillboard;
   std::shared_ptr<VistaOpenGLNode> mVolumeNode;
 
-  bool                              mGettingFrame;
-  std::future<std::vector<uint8_t>> mFutureFrameData;
-  Frame                             mNextFrame;
-  Frame                             mRenderingFrame;
-  Frame                             mDisplayedFrame;
-  std::vector<Frame>                mRenderedFrames;
+  std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> mFutureFrameData;
+
+  bool               mGettingFrame;
+  Frame              mNextFrame;
+  Frame              mRenderingFrame;
+  Frame              mDisplayedFrame;
+  std::vector<Frame> mRenderedFrames;
 };
 
 } // namespace csp::volumerendering

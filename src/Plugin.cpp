@@ -195,7 +195,8 @@ void Plugin::update() {
 
   if (mGettingFrame) {
     if (mFutureFrameData.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-      mRenderingFrame.mFrameData = mFutureFrameData.get();
+      std::tie(mRenderingFrame.mFrameData, mRenderingFrame.mModelViewProjection) =
+          mFutureFrameData.get();
       mRenderedFrames.push_back(mRenderingFrame);
 
       displayFrame(mRenderingFrame);
@@ -296,6 +297,7 @@ void Plugin::displayFrame(Frame& frame) {
     mBillboard->setTexture(colorData, frame.mResolution, frame.mResolution);
     mBillboard->setDepthTexture(depthData, frame.mResolution, frame.mResolution);
     mBillboard->setTransform(glm::toMat4(frame.mCameraRotation));
+    mBillboard->setMVPMatrix(frame.mModelViewProjection);
     mDisplayedFrame = frame;
   }
 }

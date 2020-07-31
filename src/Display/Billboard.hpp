@@ -34,6 +34,7 @@ class Billboard : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   void setTexture(std::vector<uint8_t>& texture, int width, int height);
   void setDepthTexture(std::vector<float>& texture, int width, int height);
   void setTransform(glm::mat4 transform);
+  void setMVPMatrix(glm::mat4 mvp);
 
   /// Interface implementation of IVistaOpenGLDraw.
   bool Do() override;
@@ -49,6 +50,7 @@ class Billboard : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   VistaBufferObject      mVBO;
   VistaBufferObject      mIBO;
 
+	glm::mat4          mRendererMVP;
 	std::vector<float> mDepthValues;
   int                mDepthResolution;
 

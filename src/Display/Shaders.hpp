@@ -18,6 +18,7 @@ uniform vec3 uRadii;
 uniform mat4 uMatModelView;
 uniform mat4 uMatProjection;
 uniform mat4 uMatTransform;
+uniform mat4 uMatRendererMVP;
 
 // inputs
 layout(location = 0) in vec3 iPos;
@@ -29,7 +30,10 @@ out vec3 vPosition;
 void main()
 {
     vTexCoords  = vec2((iPos.x + 1) / 2, (iPos.y + 1) / 2);
-    vPosition   = uRadii * vec3(iPos.x, iPos.y, -iPos.z / 2);
+
+    vec4 objSpacePos = inverse(uMatRendererMVP) * vec4(iPos, 1);
+    vPosition   = objSpacePos.xyz / objSpacePos.w;
+    vPosition   = uRadii * vPosition;
     vPosition   = (uMatTransform * vec4(vPosition, 1.0)).xyz;
     vPosition   = (uMatModelView * vec4(vPosition, 1.0)).xyz;
     gl_Position = uMatProjection * vec4(vPosition, 1);

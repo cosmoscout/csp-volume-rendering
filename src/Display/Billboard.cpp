@@ -67,6 +67,12 @@ void Billboard::setTransform(glm::mat4 transform) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void Billboard::setMVPMatrix(glm::mat4 mvp) {
+  mRendererMVP = mvp;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 bool Billboard::Do() {
   if (!getIsInExistence() || !pVisible.get()) {
     return true;
@@ -97,6 +103,8 @@ bool Billboard::Do() {
   glUniformMatrix4fv(mShader.GetUniformLocation("uMatProjection"), 1, GL_FALSE, glMatP.data());
   glUniformMatrix4fv(
       mShader.GetUniformLocation("uMatTransform"), 1, GL_FALSE, glm::value_ptr(mTransform));
+  glUniformMatrix4fv(
+      mShader.GetUniformLocation("uMatRendererMVP"), 1, GL_FALSE, glm::value_ptr(mRendererMVP));
 
   mShader.SetUniform(mShader.GetUniformLocation("uTexture"), 0);
   mShader.SetUniform(mShader.GetUniformLocation("uRadii"), static_cast<float>(mRadii[0]),
@@ -107,7 +115,7 @@ bool Billboard::Do() {
   mTexture.Bind(GL_TEXTURE0);
 
   glPushAttrib(GL_ENABLE_BIT);
-	glEnable(GL_CULL_FACE);
+  glEnable(GL_CULL_FACE);
   glCullFace(GL_FRONT);
   glEnable(GL_BLEND);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

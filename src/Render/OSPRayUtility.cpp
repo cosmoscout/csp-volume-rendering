@@ -199,7 +199,7 @@ ospray::cpp::TransferFunction createOSPRayTransferFunction(
 
   for (glm::vec4 c : colors) {
     color.push_back(ospcommon::math::vec3f(c[0], c[1], c[2]));
-    opacity.push_back(c[3] * 5);
+    opacity.push_back(c[3] * 2);
   }
 
   ospcommon::math::vec2f valueRange = {min, max};
