@@ -24,6 +24,9 @@ ospray::cpp::Volume createOSPRayVolume(
 ospray::cpp::TransferFunction createOSPRayTransferFunction();
 ospray::cpp::TransferFunction createOSPRayTransferFunction(
     float min, float max, std::vector<glm::vec4> colors);
+ospray::cpp::World createOSPRayWorld(ospray::cpp::VolumetricModel model);
+ospray::cpp::World createOSPRayWorld(ospray::cpp::GeometricModel model);
+ospray::cpp::World createOSPRayWorld(ospray::cpp::Group group);
 
 } // namespace csp::volumerendering::OSPRayUtility
 

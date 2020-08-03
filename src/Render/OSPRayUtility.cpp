@@ -214,4 +214,41 @@ ospray::cpp::TransferFunction createOSPRayTransferFunction(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+ospray::cpp::World createOSPRayWorld(ospray::cpp::VolumetricModel model) {
+  ospray::cpp::Group group;
+  group.setParam("volume", ospray::cpp::Data(model));
+  group.commit();
+
+	return createOSPRayWorld(group);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+ospray::cpp::World createOSPRayWorld(ospray::cpp::GeometricModel model) {
+  ospray::cpp::Group group;
+  group.setParam("geometry", ospray::cpp::Data(model));
+  group.commit();
+
+  return createOSPRayWorld(group);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+ospray::cpp::World createOSPRayWorld(ospray::cpp::Group group) {
+  ospray::cpp::Instance instance(group);
+  instance.commit();
+
+  ospray::cpp::Light light("ambient");
+  light.commit();
+
+  ospray::cpp::World world;
+  world.setParam("instance", ospray::cpp::Data(instance));
+  world.setParam("light", ospray::cpp::Data(light));
+  world.commit();
+
+	return world;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 } // namespace csp::volumerendering::OSPRayUtility

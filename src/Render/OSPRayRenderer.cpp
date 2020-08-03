@@ -87,35 +87,7 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
     volumetricModel.setParam("transferFunction", mTransferFunction.get());
     volumetricModel.commit();
 
-    ospray::cpp::Group group;
-    group.setParam("volume", ospray::cpp::Data(volumetricModel));
-
-    if (depthMode == Renderer::DepthMode::eIsosurface) {
-      ospray::cpp::Geometry isosurface("isosurface");
-      isosurface.setParam("isovalue", 0.8f);
-      isosurface.setParam("volume", volumetricModel.handle());
-      isosurface.commit();
-
-      ospcommon::math::vec4f      color{1.f, 1.f, 1.f, 0.f};
-      ospray::cpp::GeometricModel isoModel(isosurface);
-      isoModel.setParam("color", ospray::cpp::Data(color));
-      isoModel.commit();
-
-      group.setParam("geometry", ospray::cpp::Data(isoModel));
-    }
-
-    group.commit();
-
-    ospray::cpp::Instance instance(group);
-    instance.commit();
-
-    ospray::cpp::Light light("ambient");
-    light.commit();
-
-    ospray::cpp::World world;
-    world.setParam("instance", ospray::cpp::Data(instance));
-    world.setParam("light", ospray::cpp::Data(light));
-    world.commit();
+    ospray::cpp::World world = OSPRayUtility::createOSPRayWorld(volumetricModel);
 
     ospray::cpp::Renderer renderer("scivis");
     renderer.setParam("aoSamples", 0);
@@ -157,7 +129,26 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
 
     float normalizedCameraDistance = 1 / sin(fov / 180 * (float)M_PI / 2);
     if (depthMode == Renderer::DepthMode::eIsosurface) {
-      float* depthFrame = (float*)framebuffer.map(OSP_FB_DEPTH);
+      ospray::cpp::Geometry isosurface("isosurface");
+      isosurface.setParam("isovalue", 0.8f);
+      isosurface.setParam("volume", volumetricModel.handle());
+      isosurface.commit();
+
+      ospcommon::math::vec4f      color{1.f, 1.f, 1.f, 0.f};
+      ospray::cpp::GeometricModel isoModel(isosurface);
+      isoModel.setParam("color", ospray::cpp::Data(color));
+      isoModel.commit();
+
+      ospray::cpp::World isoWorld = OSPRayUtility::createOSPRayWorld(isoModel);
+
+      ospray::cpp::FrameBuffer isoFramebuffer(imgSize, OSP_FB_RGBA32F, channels);
+      isoFramebuffer.clear();
+      isoFramebuffer.commit();
+      ospray::cpp::Future isoRenderFuture = isoFramebuffer.renderFrame(renderer, camera, isoWorld);
+      isoRenderFuture.wait();
+      logger().trace("Rendered for {}s", isoRenderFuture.duration());
+
+      float* depthFrame = (float*)isoFramebuffer.map(OSP_FB_DEPTH);
 
       float maxAbsDepth = 0;
       for (int i = 0; i < depthData.size(); i++) {
