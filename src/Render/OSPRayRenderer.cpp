@@ -73,6 +73,7 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
     renderer.setParam("aoSamples", 0);
     renderer.setParam("volumeSamplingRate", samplingRate);
     renderer.setParam("maxPathLength", 1);
+    renderer.setParam("depthMode", (int)depthMode);
     renderer.commit();
 
     ospcommon::math::vec2i imgSize;

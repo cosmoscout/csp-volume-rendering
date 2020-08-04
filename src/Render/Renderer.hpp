@@ -20,7 +20,7 @@ namespace csp::volumerendering {
 
 class Renderer {
  public:
-  enum class DepthMode { eNone, eIsosurface, eFirstHit, eLastHit };
+  enum DepthMode { eNone = 0, eIsosurface = 1, eFirstHit = 2, eLastHit = 4 };
 
   Renderer();
   Renderer(std::string path);

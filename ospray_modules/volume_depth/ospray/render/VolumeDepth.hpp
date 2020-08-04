@@ -15,12 +15,9 @@ namespace ospray {
 namespace volumedepth {
 
 struct OSPRAY_MODULE_VOLUME_DEPTH_EXPORT VolumeDepth : public Renderer {
-  VolumeDepth(int defaultAOSamples = 1);
+  VolumeDepth();
   std::string toString() const override;
   void        commit() override;
-
- private:
-  int aoSamples{1};
 };
 
 } // namespace volumedepth

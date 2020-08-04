@@ -8,8 +8,6 @@
 
 struct VolumeDepth {
   Renderer super;
-  int      aoSamples;
-  float    aoRadius;
-  float    aoIntensity;
+  int      depthMode;
   float    volumeSamplingRate;
 };

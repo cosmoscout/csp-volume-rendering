@@ -56,7 +56,7 @@ class Billboard : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   std::vector<float> mDepthValues;
   int                mDepthResolution;
   bool               mUseDepth;
-  bool               mDrawDepth;
+  bool               mDrawDepth = false;
 
   glm::dvec3 mRadii;
 

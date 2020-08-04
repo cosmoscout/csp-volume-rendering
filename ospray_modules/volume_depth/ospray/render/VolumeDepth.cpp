@@ -9,8 +9,7 @@ namespace ospray {
 
 namespace volumedepth {
 
-VolumeDepth::VolumeDepth(int defaultNumSamples)
-    : aoSamples(defaultNumSamples) {
+VolumeDepth::VolumeDepth() {
   ispcEquivalent = ispc::VolumeDepth_create(this);
 }
 
@@ -21,9 +20,8 @@ std::string VolumeDepth::toString() const {
 void VolumeDepth::commit() {
   Renderer::commit();
 
-  ispc::VolumeDepth_set(getIE(), getParam<int>("aoSamples", aoSamples),
-      getParam<float>("aoRadius", 1e20f), getParam<float>("aoIntensity", 1.f),
-      getParam<float>("volumeSamplingRate", 1.f));
+  ispc::VolumeDepth_set(
+      getIE(), getParam<float>("volumeSamplingRate", 1.f), getParam<int>("depthMode", 0));
 }
 
 } // namespace volumedepth

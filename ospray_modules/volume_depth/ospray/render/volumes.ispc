@@ -23,6 +23,8 @@ struct VolumeContext {
   uint32 ready; // 1 if sample is ready to be used
 };
 
+enum DepthMode { eNone = 0, eIsosurface = 1, eFirstHit = 2, eLastHit = 4 };
+
 static bool inInterval(const RayIntervals& rayIntervals, VolumeContext& vc) {
   do {
     // Value before the current interval
@@ -146,7 +148,7 @@ const uniform unsigned int Sobol_matrices[Sobol_numDimensions * Sobol_numBits];
 
 vec4f integrateVolumeIntervals(const VolumeIntervals& volumeIntervals,
     const RayIntervals& rayIntervals, Ray& ray, varying LDSampler* uniform ldSampler,
-    const uniform float samplingRate, float& distance) {
+    const uniform float samplingRate, float& distance, const uniform int depthMode) {
   // Keep context for each volume here
   VolumeContext volumeContexts[NUM_VOLUME_INTERVALS_MAX];
 
@@ -222,9 +224,19 @@ vec4f integrateVolumeIntervals(const VolumeIntervals& volumeIntervals,
     // Alpha blend sampled color
     color = color + ((1.f - alpha) * sampledColorOpacity.w * make_vec3f(sampledColorOpacity));
     alpha = alpha + ((1.f - alpha) * sampledColorOpacity.w);
-    if (firstHit) {
-      distance = dist;
-      firstHit = false;
+
+    switch (depthMode) {
+    case eFirstHit:
+      if (firstHit && sampledColorOpacity.w > 0.01f) {
+        distance = dist;
+        firstHit = false;
+      }
+      break;
+    case eLastHit:
+      if (sampledColorOpacity.w > 0.01f) {
+        distance = dist;
+      }
+      break;
     }
   }
 

@@ -125,9 +125,9 @@ void VolumeDepth_renderSample(Renderer* uniform _self, FrameBuffer* uniform fb,
   float distance = inf;
   // Sample volumes across volume intervals (in front of geometry hit)
   if (volumeIntervals.numVolumeIntervals > 0) {
-    vec4f volumeColor = integrateVolumeIntervals(
-        volumeIntervals, rayIntervals, volumeRay, ldSampler, self->volumeSamplingRate, distance);
-    outputColor = outputColor + (1.f - outputColor.w) * volumeColor;
+    vec4f volumeColor = integrateVolumeIntervals(volumeIntervals, rayIntervals, volumeRay,
+        ldSampler, self->volumeSamplingRate, distance, self->depthMode);
+    outputColor       = outputColor + (1.f - outputColor.w) * volumeColor;
   }
 
   sample.z     = distance;
@@ -144,13 +144,9 @@ export void* uniform VolumeDepth_create(void* uniform cppE) {
   return self;
 }
 
-export void VolumeDepth_set(void* uniform _self, uniform int aoSamples, uniform float aoRadius,
-    uniform float aoIntensity, uniform float volumeSamplingRate) {
+export void VolumeDepth_set(void* uniform _self, uniform float volumeSamplingRate, uniform int depthMode) {
   uniform VolumeDepth* uniform self = (uniform VolumeDepth * uniform) _self;
 
-  self->aoSamples   = aoSamples;
-  self->aoRadius    = aoRadius;
-  self->aoIntensity = aoIntensity;
-
   self->volumeSamplingRate = volumeSamplingRate;
+  self->depthMode          = depthMode;
 }
