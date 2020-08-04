@@ -146,7 +146,7 @@ const uniform unsigned int Sobol_matrices[Sobol_numDimensions * Sobol_numBits];
 
 vec4f integrateVolumeIntervals(const VolumeIntervals& volumeIntervals,
     const RayIntervals& rayIntervals, Ray& ray, varying LDSampler* uniform ldSampler,
-    const uniform float samplingRate) {
+    const uniform float samplingRate, float& distance) {
   // Keep context for each volume here
   VolumeContext volumeContexts[NUM_VOLUME_INTERVALS_MAX];
 
@@ -207,6 +207,7 @@ vec4f integrateVolumeIntervals(const VolumeIntervals& volumeIntervals,
   vec3f color = make_vec3f(0.f);
   float alpha = 0.f;
 
+  bool firstHit = true;
   // Propagate ray across all volumes till opaque
   while (alpha < .99f) {
     // Sample across all volumes
@@ -221,6 +222,10 @@ vec4f integrateVolumeIntervals(const VolumeIntervals& volumeIntervals,
     // Alpha blend sampled color
     color = color + ((1.f - alpha) * sampledColorOpacity.w * make_vec3f(sampledColorOpacity));
     alpha = alpha + ((1.f - alpha) * sampledColorOpacity.w);
+    if (firstHit) {
+      distance = dist;
+      firstHit = false;
+    }
   }
 
   // Return final color

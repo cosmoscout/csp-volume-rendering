@@ -122,13 +122,15 @@ void VolumeDepth_renderSample(Renderer* uniform _self, FrameBuffer* uniform fb,
   VolumeIntervals volumeIntervals;
   traceVolumeRay(world, volumeRay, volumeIntervals);
 
+  float distance = inf;
   // Sample volumes across volume intervals (in front of geometry hit)
   if (volumeIntervals.numVolumeIntervals > 0) {
     vec4f volumeColor = integrateVolumeIntervals(
-        volumeIntervals, rayIntervals, volumeRay, ldSampler, self->volumeSamplingRate);
+        volumeIntervals, rayIntervals, volumeRay, ldSampler, self->volumeSamplingRate, distance);
     outputColor = outputColor + (1.f - outputColor.w) * volumeColor;
   }
 
+  sample.z     = distance;
   sample.rgb   = make_vec3f(outputColor);
   sample.alpha = outputColor.w;
 }

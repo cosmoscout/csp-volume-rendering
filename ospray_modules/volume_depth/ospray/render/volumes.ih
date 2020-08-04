@@ -10,4 +10,4 @@ struct LDSampler;
 struct RandomSampler;
 
 vec4f integrateVolumeIntervals(const VolumeIntervals& intervals, const RayIntervals& rayIntervals,
-    Ray& ray, varying LDSampler* uniform ldSampler, const uniform float samplingRate);
+    Ray& ray, varying LDSampler* uniform ldSampler, const uniform float samplingRate, float& distance);
