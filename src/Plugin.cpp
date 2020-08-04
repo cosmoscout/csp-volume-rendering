@@ -98,8 +98,10 @@ void Plugin::init() {
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setResolution",
-      "Sets the resolution of the rendered volume images.",
-      std::function([this](double value) { mPluginSettings.mResolution = value; }));
+      "Sets the resolution of the rendered volume images.", std::function([this](double value) {
+        mPluginSettings.mResolution = value;
+        mRenderer->setResolution(value);
+      }));
   mPluginSettings.mResolution.connectAndTouch(
       [this](int value) { mGuiManager->setSliderValue("volumeRendering.setResolution", value); });
 
@@ -254,7 +256,7 @@ void Plugin::requestFrame(glm::dquat cameraRotation) {
   if (!(mNextFrame == mRenderingFrame)) {
     mRenderingFrame    = mNextFrame;
     mFutureFrameData   = mRenderer->getFrame(glm::toMat4(mRenderingFrame.mCameraRotation),
-        mRenderingFrame.mResolution, mRenderingFrame.mSamplingRate,
+        mRenderingFrame.mSamplingRate,
         mNextFrame.mHasDepthData ? Renderer::DepthMode::eIsosurface : Renderer::DepthMode::eNone,
         mNextFrame.mHasDenoise);
     mGettingFrame      = true;

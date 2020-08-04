@@ -23,8 +23,6 @@ namespace csp::volumerendering {
 class OSPRayRenderer : public Renderer {
  public:
   OSPRayRenderer();
-  OSPRayRenderer(std::string path);
-  OSPRayRenderer(std::string path, int timestep);
   ~OSPRayRenderer();
 
   OSPRayRenderer(const OSPRayRenderer& other) = delete;
@@ -32,12 +30,18 @@ class OSPRayRenderer : public Renderer {
 
   void setTransferFunction(std::vector<glm::vec4> colors) override;
 
-  std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> getFrame(glm::mat4 cameraRotation, int resolution,
-      float samplingRate, DepthMode depthMode, bool denoise) override;
+  std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> getFrame(
+      glm::mat4 cameraRotation, float samplingRate, DepthMode depthMode, bool denoise) override;
 
  private:
+  void               recalculateCameraDistances();
+  std::vector<float> normalizeDepthBuffer(std::vector<float> buffer, glm::mat4 mvp);
+
   std::shared_future<ospray::cpp::TransferFunction> mTransferFunction;
   std::optional<ospray::cpp::Volume>                mVolume;
+
+  std::shared_future<float> mCameraDistance;
+  float                     mNormalizedCameraDistance;
 };
 
 } // namespace csp::volumerendering

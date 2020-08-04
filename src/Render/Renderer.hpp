@@ -9,6 +9,8 @@
 
 #include "DataManager.hpp"
 
+#include "../../../src/cs-utils/DefaultProperty.hpp"
+
 #include <glm/gtc/type_ptr.hpp>
 
 #include <future>
@@ -18,7 +20,7 @@ namespace csp::volumerendering {
 
 class Renderer {
  public:
-  enum class DepthMode { eNone, eIsosurface };
+  enum class DepthMode { eNone, eIsosurface, eFirstHit, eLastHit };
 
   Renderer();
   Renderer(std::string path);
@@ -28,14 +30,21 @@ class Renderer {
   void setTime(int timestep);
   void setFile(std::string path);
 
+  void setFov(float fov);
+  void setResolution(int resolution);
+
   virtual void setTransferFunction(std::vector<glm::vec4> colors) = 0;
 
   virtual std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> getFrame(
-      glm::mat4 cameraRotation, int resolution,
-      float samplingRate, DepthMode depthMode, bool denoise) = 0;
+      glm::mat4 cameraRotation, float samplingRate, DepthMode depthMode, bool denoise) = 0;
 
  protected:
   vtkSmartPointer<vtkUnstructuredGrid> getData();
+
+  cs::utils::DefaultProperty<bool> mRendering{false};
+
+  cs::utils::DefaultProperty<float> mFov{22};
+  cs::utils::DefaultProperty<int>   mResolution{256};
 
  private:
   void updateData();

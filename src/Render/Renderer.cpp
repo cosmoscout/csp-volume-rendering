@@ -55,6 +55,36 @@ void Renderer::setFile(std::string path) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void Renderer::setFov(float fov) {
+  if (mRendering.get()) {
+    int con = mRendering.connect([this, fov, con](bool val) {
+      if (!val) {
+        mFov = fov;
+        mRendering.disconnect(con);
+      }
+    });
+  } else {
+    mFov = fov;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Renderer::setResolution(int resolution) {
+  if (mRendering.get()) {
+    int con = mRendering.connect([this, resolution, con](bool val) {
+      if (!val) {
+        mResolution = resolution;
+        mRendering.disconnect(con);
+      }
+    });
+  } else {
+    mResolution = resolution;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 vtkSmartPointer<vtkUnstructuredGrid> Renderer::getData() {
   return mDataManager.getData(mCurrentFile, mCurrentTimestep);
 }
