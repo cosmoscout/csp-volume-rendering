@@ -45,6 +45,7 @@ void initOSPRay() {
       ospGetCurrentDevice(), [](const char* message) { osprayLogger().info(message); });
 
   ospLoadModule("denoiser");
+  ospLoadModule("volume_depth");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

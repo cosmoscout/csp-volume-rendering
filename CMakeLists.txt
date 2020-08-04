@@ -60,6 +60,12 @@ else()
   SET(OSPCOMMON_TBB_ROOT ${COSMOSCOUT_EXTERNALS_DIR})
 endif()
 
+if (DEFINED ENV{ISPC_EXECUTABLE})
+  SET(ISPC_EXECUTABLE "$ENV{ISPC_EXECUTABLE}")
+else()
+  SET(ISPC_EXECUTABLE ${COSMOSCOUT_EXTERNALS_DIR}/bin/ispc.exe)
+endif()
+
 find_package(ospray REQUIRED)
 find_package(VTK REQUIRED)
 find_package(VIRACOCHA REQUIRED)
@@ -80,14 +86,14 @@ add_library(csp-volume-rendering SHARED
 target_link_libraries(csp-volume-rendering
   PUBLIC
     cs-core
-	ospray::ospray
-	viracocha::viracochabackend
-	${VTK_LIBRARIES}
+	  ospray::ospray
+	  viracocha::viracochabackend
+	  ${VTK_LIBRARIES}
 )
 
 target_include_directories(csp-volume-rendering
   PUBLIC
-	${VTK_INCLUDE_DIRS}
+	  ${VTK_INCLUDE_DIRS}
 )
 
 # Add this Plugin to a "plugins" folder in your IDE.
@@ -101,7 +107,40 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
   ${SOURCE_FILES} ${HEADER_FILES} ${RESOUCRE_FILES}
 )
 
-# install plugin -----------------------------------------------------------------------------------
-
 install(TARGETS csp-volume-rendering DESTINATION "share/plugins")
 install(DIRECTORY "gui" DESTINATION "share/resources")
+
+# build ospray module ------------------------------------------------------------------------------
+
+list(APPEND CMAKE_MODULE_PATH ${ospray_DIR})
+include(ispc)
+include(GenerateExportHeader)
+
+get_target_property(OSPRAY_ISPC_MODULE_INCLUDE_DIRS ospray::ospray_module_ispc INTERFACE_INCLUDE_DIRECTORIES)
+
+ispc_include_directories(${OSPRAY_ISPC_MODULE_INCLUDE_DIRS})
+
+file(GLOB_RECURSE MODULE_SOURCE_FILES ospray_modules/volume_depth/*.cpp ospray_modules/volume_depth/*.ispc)
+file(GLOB_RECURSE MODULE_HEADER_FILES ospray_modules/volume_depth/*.hpp ospray_modules/volume_depth/*.ih)
+
+add_library(ospray_module_volume_depth SHARED)
+
+ispc_target_add_sources(ospray_module_volume_depth
+  ${MODULE_SOURCE_FILES}
+	${MODULE_HEADER_FILES}
+)
+
+target_sources(ospray_module_volume_depth PRIVATE ${MODULE_SOURCE_FILES})
+
+generate_export_header(ospray_module_volume_depth)
+
+target_link_libraries(ospray_module_volume_depth
+  PUBLIC
+	  ospray::ospray_module_ispc
+)
+
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/ospray_modules/volume_depth FILES
+  ${MODULE_SOURCE_FILES} ${MODULE_HEADER_FILES}
+)
+
+install(TARGETS ospray_module_volume_depth DESTINATION "lib")
