@@ -73,7 +73,8 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
 bool Plugin::Frame::operator==(const Frame& other) {
   return mResolution == other.mResolution && mCameraRotation == other.mCameraRotation &&
          mSamplingRate == other.mSamplingRate && mTransferFunction == other.mTransferFunction &&
-         mHasDepthData == other.mHasDepthData && mHasDenoise == other.mHasDenoise;
+         mHasDepthData == other.mHasDepthData && mHasDenoise == other.mHasDenoise &&
+         mDepthMode == other.mDepthMode;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -140,6 +141,16 @@ void Plugin::init() {
     mGuiManager->setCheckboxValue("volumeRendering.setEnableDepthData", enable);
   });
 
+  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDrawDepth",
+      "Enables displaying the depth buffer instead of the color buffer.",
+      std::function([this](bool enable) {
+        mPluginSettings.mDrawDepth = enable;
+        mBillboard->setDrawDepth(enable);
+      }));
+  mPluginSettings.mDrawDepth.connectAndTouch([this](bool enable) {
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableDrawDepth", enable);
+  });
+
   mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDenoise",
       "Enables use of OIDN for displaying data.",
       std::function([this](bool enable) { mPluginSettings.mDenoise = enable; }));
@@ -155,6 +166,30 @@ void Plugin::init() {
         mNextFrame.mTransferFunction = colorMap.getRawData();
         mRenderedFrames.clear();
       }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode0",
+      "Don't calculate a depth value.",
+      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eNone; }));
+  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode1",
+      "Calculate depth of isosurface.",
+      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eIsosurface; }));
+  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode2",
+      "Uses first hit as depth value.",
+      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eFirstHit; }));
+  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode3",
+      "Uses last hit as depth value.",
+      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eLastHit; }));
+  mPluginSettings.mDepthMode.connect([this](Renderer::DepthMode drawMode) {
+    if (drawMode == Renderer::DepthMode::eNone) {
+      mGuiManager->setRadioChecked("stars.setDrawMode0");
+    } else if (drawMode == Renderer::DepthMode::eIsosurface) {
+      mGuiManager->setRadioChecked("stars.setDrawMode1");
+    } else if (drawMode == Renderer::DepthMode::eFirstHit) {
+      mGuiManager->setRadioChecked("stars.setDrawMode2");
+    } else if (drawMode == Renderer::DepthMode::eLastHit) {
+      mGuiManager->setRadioChecked("stars.setDrawMode3");
+    }
+  });
 
   // Init volume representation
   auto anchor                           = mAllSettings->mAnchors.find("Mars");
@@ -251,14 +286,13 @@ void Plugin::requestFrame(glm::dquat cameraRotation) {
   mNextFrame.mResolution   = mPluginSettings.mResolution.get();
   mNextFrame.mSamplingRate = mPluginSettings.mSamplingRate.get();
   mNextFrame.mHasDepthData = mPluginSettings.mDepthData.get();
+  mNextFrame.mDepthMode    = mPluginSettings.mDepthMode.get();
   mNextFrame.mHasDenoise   = mPluginSettings.mDenoise.get();
 
   if (!(mNextFrame == mRenderingFrame)) {
     mRenderingFrame    = mNextFrame;
     mFutureFrameData   = mRenderer->getFrame(glm::toMat4(mRenderingFrame.mCameraRotation),
-        mRenderingFrame.mSamplingRate,
-        mNextFrame.mHasDepthData ? Renderer::DepthMode::eIsosurface : Renderer::DepthMode::eNone,
-        mNextFrame.mHasDenoise);
+        mRenderingFrame.mSamplingRate, mRenderingFrame.mDepthMode, mNextFrame.mHasDenoise);
     mGettingFrame      = true;
     mLastFrameInterval = 0;
   }
@@ -300,6 +334,7 @@ void Plugin::displayFrame(Frame& frame) {
     mBillboard->setDepthTexture(depthData, frame.mResolution, frame.mResolution);
     mBillboard->setTransform(glm::toMat4(frame.mCameraRotation));
     mBillboard->setMVPMatrix(frame.mModelViewProjection);
+    mBillboard->setUseDepth(frame.mHasDepthData);
     mDisplayedFrame = frame;
   }
 }

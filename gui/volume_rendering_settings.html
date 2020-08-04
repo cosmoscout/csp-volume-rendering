@@ -52,6 +52,44 @@
 
 <div class="col-7 offset-5">
   <label class="checklabel">
+    <input type="checkbox" data-callback="volumeRendering.setEnableDrawDepth" />
+    <i class="material-icons"></i>
+    <span>Draw depth data</span>
+  </label>
+</div>
+
+<div class="row">
+  <div class="col-5">
+    Depth source
+  </div>
+  <div class="col-7">
+    <label class="radiolabel">
+      <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode0" checked />
+      <span>None</span>
+    </label>
+  </div>
+  <div class="col-7 offset-5">
+    <label class="radiolabel">
+      <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode1" />
+      <span>Isosurface</span>
+    </label>
+  </div>
+  <div class="col-7 offset-5">
+    <label class="radiolabel">
+      <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode2" />
+      <span>First hit</span>
+    </label>
+  </div>
+  <div class="col-7 offset-5">
+    <label class="radiolabel">
+      <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode3" />
+      <span>Last hit</span>
+    </label>
+  </div>
+</div>
+
+<div class="col-7 offset-5">
+  <label class="checklabel">
     <input type="checkbox" data-callback="volumeRendering.setEnableDenoise" />
     <i class="material-icons"></i>
     <span>Use OIDN</span>

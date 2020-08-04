@@ -69,7 +69,7 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
 
     ospray::cpp::World world = OSPRayUtility::createOSPRayWorld(volumetricModel);
 
-    ospray::cpp::Renderer renderer("scivis");
+    ospray::cpp::Renderer renderer("volume_depth");
     renderer.setParam("aoSamples", 0);
     renderer.setParam("volumeSamplingRate", samplingRate);
     renderer.setParam("maxPathLength", 1);

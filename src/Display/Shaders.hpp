@@ -19,6 +19,7 @@ uniform mat4 uMatModelView;
 uniform mat4 uMatProjection;
 uniform mat4 uMatTransform;
 uniform mat4 uMatRendererMVP;
+uniform bool uUseDepth;
 
 // inputs
 layout(location = 0) in vec3 iPos;
@@ -26,12 +27,20 @@ layout(location = 0) in vec3 iPos;
 // outputs
 out vec2 vTexCoords;
 out vec3 vPosition;
+out float vDepth;
 
 void main()
 {
+		vDepth = (iPos.z + 1) / 2;
+
     vTexCoords  = vec2((iPos.x + 1) / 2, (iPos.y + 1) / 2);
 
-    vec4 objSpacePos = inverse(uMatRendererMVP) * vec4(iPos, 1);
+    vec4 objSpacePos = vec4(iPos, 1);
+		if (!uUseDepth) {
+      objSpacePos.z = 0;
+    }
+
+    objSpacePos = inverse(uMatRendererMVP) * objSpacePos;
     vPosition   = objSpacePos.xyz / objSpacePos.w;
     vPosition   = uRadii * vPosition;
     vPosition   = (uMatTransform * vec4(vPosition, 1.0)).xyz;
@@ -54,10 +63,12 @@ constexpr char* BILLBOARD_FRAG = R"(
 
 uniform sampler2D uTexture;
 uniform float uFarClip;
+uniform bool uDrawDepth;
 
 // inputs
 in vec2 vTexCoords;
 in vec3 vPosition;
+in float vDepth;
 
 // outputs
 layout(location = 0) out vec4 oColor;
@@ -69,6 +80,9 @@ void main()
 	{
 		discard;
 	}
+  if (uDrawDepth) {
+    oColor = vec4(vDepth, vDepth, vDepth, 1);
+  }
 
 	gl_FragDepth = length(vPosition) / uFarClip;
 }

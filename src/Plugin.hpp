@@ -31,14 +31,16 @@ class Plugin : public cs::core::PluginBase {
       std::string mPath;
     };
 
-    cs::utils::DefaultProperty<bool>  mRequestImages{true};
-    cs::utils::DefaultProperty<bool>  mPredictiveRendering{true};
-    cs::utils::DefaultProperty<bool>  mReuseImages{true};
-    cs::utils::DefaultProperty<bool>  mDepthData{true};
-    cs::utils::DefaultProperty<bool>  mDenoise{true};
-    cs::utils::DefaultProperty<int>   mResolution{256};
-    cs::utils::DefaultProperty<float> mSamplingRate{0.005};
-    std::map<std::string, Volume>     mVolumes;
+    cs::utils::DefaultProperty<bool>                mRequestImages{true};
+    cs::utils::DefaultProperty<bool>                mPredictiveRendering{false};
+    cs::utils::DefaultProperty<bool>                mReuseImages{false};
+    cs::utils::DefaultProperty<bool>                mDepthData{true};
+    cs::utils::DefaultProperty<bool>                mDrawDepth{false};
+    cs::utils::DefaultProperty<Renderer::DepthMode> mDepthMode{Renderer::DepthMode::eNone};
+    cs::utils::DefaultProperty<bool>                mDenoise{true};
+    cs::utils::DefaultProperty<int>                 mResolution{256};
+    cs::utils::DefaultProperty<float>               mSamplingRate{0.005};
+    std::map<std::string, Volume>                   mVolumes;
   };
 
   void init() override;
@@ -52,6 +54,7 @@ class Plugin : public cs::core::PluginBase {
     glm::dquat             mCameraRotation;
     std::vector<glm::vec4> mTransferFunction;
     bool                   mHasDepthData;
+    Renderer::DepthMode    mDepthMode;
     bool                   mHasDenoise;
 
     std::vector<uint8_t> mFrameData;

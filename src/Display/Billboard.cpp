@@ -73,6 +73,18 @@ void Billboard::setMVPMatrix(glm::mat4 mvp) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void Billboard::setUseDepth(bool useDepth) {
+  mUseDepth = useDepth;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Billboard::setDrawDepth(bool drawDepth) {
+  mDrawDepth = drawDepth;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 bool Billboard::Do() {
   if (!getIsInExistence() || !pVisible.get()) {
     return true;
@@ -111,6 +123,8 @@ bool Billboard::Do() {
       static_cast<float>(mRadii[0]), static_cast<float>(mRadii[0]));
   mShader.SetUniform(
       mShader.GetUniformLocation("uFarClip"), cs::utils::getCurrentFarClipDistance());
+  mShader.SetUniform(mShader.GetUniformLocation("uUseDepth"), mUseDepth);
+  mShader.SetUniform(mShader.GetUniformLocation("uDrawDepth"), mDrawDepth);
 
   mTexture.Bind(GL_TEXTURE0);
 
