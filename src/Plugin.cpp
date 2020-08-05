@@ -73,8 +73,7 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
 bool Plugin::Frame::operator==(const Frame& other) {
   return mResolution == other.mResolution && mCameraRotation == other.mCameraRotation &&
          mSamplingRate == other.mSamplingRate && mTransferFunction == other.mTransferFunction &&
-         mHasDepthData == other.mHasDepthData && mHasDenoise == other.mHasDenoise &&
-         mDepthMode == other.mDepthMode;
+         mHasDenoise == other.mHasDenoise && mDepthMode == other.mDepthMode;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -135,8 +134,10 @@ void Plugin::init() {
   });
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDepthData",
-      "Enables use of depth data for displaying data.",
-      std::function([this](bool enable) { mPluginSettings.mDepthData = enable; }));
+      "Enables use of depth data for displaying data.", std::function([this](bool enable) {
+        mPluginSettings.mDepthData = enable;
+        mBillboard->setUseDepth(enable);
+      }));
   mPluginSettings.mDepthData.connectAndTouch([this](bool enable) {
     mGuiManager->setCheckboxValue("volumeRendering.setEnableDepthData", enable);
   });
@@ -285,7 +286,6 @@ void Plugin::requestFrame(glm::dquat cameraRotation) {
 
   mNextFrame.mResolution   = mPluginSettings.mResolution.get();
   mNextFrame.mSamplingRate = mPluginSettings.mSamplingRate.get();
-  mNextFrame.mHasDepthData = mPluginSettings.mDepthData.get();
   mNextFrame.mDepthMode    = mPluginSettings.mDepthMode.get();
   mNextFrame.mHasDenoise   = mPluginSettings.mDenoise.get();
 
@@ -334,7 +334,6 @@ void Plugin::displayFrame(Frame& frame) {
     mBillboard->setDepthTexture(depthData, frame.mResolution, frame.mResolution);
     mBillboard->setTransform(glm::toMat4(frame.mCameraRotation));
     mBillboard->setMVPMatrix(frame.mModelViewProjection);
-    mBillboard->setUseDepth(frame.mHasDepthData);
     mDisplayedFrame = frame;
   }
 }

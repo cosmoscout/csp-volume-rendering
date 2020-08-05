@@ -25,8 +25,7 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const uint32_t GRID_RESOLUTION_X = 64;
-const uint32_t GRID_RESOLUTION_Y = 64;
+const uint32_t GRID_RESOLUTION = 32;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -35,8 +34,8 @@ Billboard::Billboard(std::string const& sCenterName, std::string const& sFrameNa
     : cs::scene::CelestialObject(sCenterName, sFrameName, tStartExistence, tEndExistence)
     , mRadii(radii)
     , mTexture(GL_TEXTURE_2D)
-    , mDepthValues(GRID_RESOLUTION_X * GRID_RESOLUTION_Y)
-    , mDepthResolution(GRID_RESOLUTION_X) {
+    , mDepthValues(GRID_RESOLUTION * GRID_RESOLUTION)
+    , mDepthResolution(GRID_RESOLUTION) {
   pVisibleRadius = mRadii[0];
 
   createBuffers();
@@ -136,7 +135,7 @@ bool Billboard::Do() {
 
   // Draw.
   mVAO.Bind();
-  glDrawElements(GL_TRIANGLE_STRIP, (GRID_RESOLUTION_X - 1) * (2 + 2 * GRID_RESOLUTION_Y),
+  glDrawElements(GL_TRIANGLE_STRIP, (GRID_RESOLUTION - 1) * (2 + 2 * GRID_RESOLUTION),
       GL_UNSIGNED_INT, nullptr);
   mVAO.Release();
 
@@ -157,26 +156,26 @@ bool Billboard::GetBoundingBox(VistaBoundingBox& bb) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Billboard::createBuffers() {
-  std::vector<float>    vertices(GRID_RESOLUTION_X * GRID_RESOLUTION_Y * 3);
-  std::vector<unsigned> indices((GRID_RESOLUTION_X - 1) * (2 + 2 * GRID_RESOLUTION_Y));
+  std::vector<float>    vertices(GRID_RESOLUTION * GRID_RESOLUTION * 3);
+  std::vector<unsigned> indices((GRID_RESOLUTION - 1) * (2 + 2 * GRID_RESOLUTION));
 
-  for (uint32_t x = 0; x < GRID_RESOLUTION_X; ++x) {
-    for (uint32_t y = 0; y < GRID_RESOLUTION_Y; ++y) {
-      vertices[(x * GRID_RESOLUTION_Y + y) * 3 + 0] = 2.f / (GRID_RESOLUTION_X - 1) * x - 1.f;
-      vertices[(x * GRID_RESOLUTION_Y + y) * 3 + 1] = 2.f / (GRID_RESOLUTION_Y - 1) * y - 1.f;
-      vertices[(x * GRID_RESOLUTION_Y + y) * 3 + 2] =
-          mDepthValues[x * mDepthResolution / GRID_RESOLUTION_X * mDepthResolution +
-                       y * mDepthResolution / GRID_RESOLUTION_Y];
+  for (uint32_t x = 0; x < GRID_RESOLUTION; ++x) {
+    for (uint32_t y = 0; y < GRID_RESOLUTION; ++y) {
+      vertices[(x * GRID_RESOLUTION + y) * 3 + 0] = 2.f / (GRID_RESOLUTION - 1) * x - 1.f;
+      vertices[(x * GRID_RESOLUTION + y) * 3 + 1]   = 2.f / (GRID_RESOLUTION - 1) * y - 1.f;
+      vertices[(x * GRID_RESOLUTION + y) * 3 + 2] =
+          mDepthValues[x * mDepthResolution / GRID_RESOLUTION * mDepthResolution +
+                       y * mDepthResolution / GRID_RESOLUTION];
     }
   }
 
   uint32_t index = 0;
 
-  for (uint32_t x = 0; x < GRID_RESOLUTION_X - 1; ++x) {
-    indices[index++] = x * GRID_RESOLUTION_Y;
-    for (uint32_t y = 0; y < GRID_RESOLUTION_Y; ++y) {
-      indices[index++] = x * GRID_RESOLUTION_Y + y;
-      indices[index++] = (x + 1) * GRID_RESOLUTION_Y + y;
+  for (uint32_t x = 0; x < GRID_RESOLUTION - 1; ++x) {
+    indices[index++] = x * GRID_RESOLUTION;
+    for (uint32_t y = 0; y < GRID_RESOLUTION; ++y) {
+      indices[index++] = x * GRID_RESOLUTION + y;
+      indices[index++] = (x + 1) * GRID_RESOLUTION + y;
     }
     indices[index] = indices[index - 1];
     ++index;

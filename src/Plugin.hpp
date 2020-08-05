@@ -53,7 +53,6 @@ class Plugin : public cs::core::PluginBase {
     float                  mSamplingRate;
     glm::dquat             mCameraRotation;
     std::vector<glm::vec4> mTransferFunction;
-    bool                   mHasDepthData;
     Renderer::DepthMode    mDepthMode;
     bool                   mHasDenoise;
 
