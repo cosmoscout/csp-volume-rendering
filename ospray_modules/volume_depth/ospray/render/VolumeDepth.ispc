@@ -129,6 +129,12 @@ void VolumeDepth_renderSample(Renderer* uniform _self, FrameBuffer* uniform fb,
         ldSampler, self->volumeSamplingRate, distance, self->depthMode);
     outputColor       = outputColor + (1.f - outputColor.w) * volumeColor;
   }
+  if (self->depthMode == eIsosurface) {
+    traceGeometryRayIntervals(world, ray, rayIntervals);
+    if (hadHit(ray)) {
+      distance = ray.t;
+    }
+  }
 
   sample.z     = distance;
   sample.rgb   = make_vec3f(outputColor);
@@ -144,7 +150,8 @@ export void* uniform VolumeDepth_create(void* uniform cppE) {
   return self;
 }
 
-export void VolumeDepth_set(void* uniform _self, uniform float volumeSamplingRate, uniform int depthMode) {
+export void VolumeDepth_set(
+    void* uniform _self, uniform float volumeSamplingRate, uniform int depthMode) {
   uniform VolumeDepth* uniform self = (uniform VolumeDepth * uniform) _self;
 
   self->volumeSamplingRate = volumeSamplingRate;

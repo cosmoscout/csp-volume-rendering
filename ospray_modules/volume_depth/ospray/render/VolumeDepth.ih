@@ -6,6 +6,8 @@
 #include "common/World.ih"
 #include "render/Renderer.ih"
 
+enum DepthMode { eNone = 0, eIsosurface = 1, eFirstHit = 2, eLastHit = 4 };
+
 struct VolumeDepth {
   Renderer super;
   int      depthMode;

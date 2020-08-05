@@ -67,7 +67,24 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
     volumetricModel.setParam("transferFunction", mTransferFunction.get());
     volumetricModel.commit();
 
-    ospray::cpp::World world = OSPRayUtility::createOSPRayWorld(volumetricModel);
+    ospray::cpp::Group group;
+    group.setParam("volume", ospray::cpp::Data(volumetricModel));
+    if (depthMode == Renderer::DepthMode::eIsosurface) {
+      ospray::cpp::Geometry isosurface("isosurface");
+      isosurface.setParam("isovalue", 0.8f);
+      isosurface.setParam("volume", volumetricModel.handle());
+      isosurface.commit();
+
+      ospcommon::math::vec4f      color{1.f, 1.f, 1.f, 0.f};
+      ospray::cpp::GeometricModel isoModel(isosurface);
+      isoModel.setParam("color", ospray::cpp::Data(color));
+      isoModel.commit();
+
+      group.setParam("geometry", ospray::cpp::Data(isoModel));
+    }
+    group.commit();
+
+    ospray::cpp::World world = OSPRayUtility::createOSPRayWorld(group);
 
     ospray::cpp::Renderer renderer("volume_depth");
     renderer.setParam("aoSamples", 0);
@@ -108,37 +125,9 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
       frameData[i] = colorFrame[i] * 255;
     }
 
-    switch (depthMode) {
-    case Renderer::DepthMode::eIsosurface: {
-      ospray::cpp::Geometry isosurface("isosurface");
-      isosurface.setParam("isovalue", 0.8f);
-      isosurface.setParam("volume", volumetricModel.handle());
-      isosurface.commit();
-
-      ospcommon::math::vec4f      color{1.f, 1.f, 1.f, 0.f};
-      ospray::cpp::GeometricModel isoModel(isosurface);
-      isoModel.setParam("color", ospray::cpp::Data(color));
-      isoModel.commit();
-
-      ospray::cpp::World isoWorld = OSPRayUtility::createOSPRayWorld(isoModel);
-
-      ospray::cpp::FrameBuffer isoFramebuffer(imgSize, OSP_FB_RGBA32F, channels);
-      isoFramebuffer.clear();
-      isoFramebuffer.commit();
-      ospray::cpp::Future isoRenderFuture = isoFramebuffer.renderFrame(renderer, camera, isoWorld);
-      isoRenderFuture.wait();
-      logger().trace("Rendered iso surface for {}s", isoRenderFuture.duration());
-
-      float* depthFrame = (float*)isoFramebuffer.map(OSP_FB_DEPTH);
-      depthData         = std::vector(depthFrame, depthFrame + depthData.size());
-      break;
-    }
-    case Renderer::DepthMode::eFirstHit:
-    case Renderer::DepthMode::eLastHit: {
+    if (depthMode != Renderer::DepthMode::eNone) {
       float* depthFrame = (float*)framebuffer.map(OSP_FB_DEPTH);
       depthData         = std::vector(depthFrame, depthFrame + depthData.size());
-      break;
-    }
     }
 
     glm::mat4 projection = glm::perspective(mFov.get() / 180 * (float)M_PI, 1.f,
@@ -187,7 +176,7 @@ std::vector<float> OSPRayRenderer::normalizeDepthBuffer(std::vector<float> buffe
       float normalizedDist  = val / mCameraDistance.get() * mNormalizedCameraDistance;
       float normalizedDepth = sqrtf(normalizedDist * normalizedDist - ndcX * ndcX + ndcY * ndcY);
       float normalizedZ     = normalizedDepth - mNormalizedCameraDistance;
-      depthData[i]          = (normalizedZ * mvp[2][2] + mvp[2][3]) / (normalizedZ * mvp[3][2] + mvp[3][3]);
+      depthData[i] = (normalizedZ * mvp[2][2] + mvp[2][3]) / (normalizedZ * mvp[3][2] + mvp[3][3]);
     }
   }
 

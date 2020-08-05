@@ -23,8 +23,6 @@ struct VolumeContext {
   uint32 ready; // 1 if sample is ready to be used
 };
 
-enum DepthMode { eNone = 0, eIsosurface = 1, eFirstHit = 2, eLastHit = 4 };
-
 static bool inInterval(const RayIntervals& rayIntervals, VolumeContext& vc) {
   do {
     // Value before the current interval
