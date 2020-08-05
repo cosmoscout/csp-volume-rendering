@@ -37,7 +37,7 @@ void main()
 
     vec4 objSpacePos = vec4(iPos, 1);
 		if (!uUseDepth) {
-      objSpacePos.z = uMatRendererMVP[2][2] / uMatRendererMVP[3][3];
+      objSpacePos.z = uMatRendererMVP[2][3] / uMatRendererMVP[3][3];
     }
     objSpacePos.z *= -1;
 

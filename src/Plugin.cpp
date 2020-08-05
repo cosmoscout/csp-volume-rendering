@@ -180,6 +180,13 @@ void Plugin::init() {
   mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode3",
       "Uses last hit as depth value.",
       std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eLastHit; }));
+  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode4",
+      "Uses depth, at which an opacity threshold was reached.",
+      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eThreshold; }));
+  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode5",
+      "Uses depth, at which the last of multiple opacity thresholds was reached.",
+      std::function(
+          [this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eMultiThreshold; }));
   mPluginSettings.mDepthMode.connect([this](Renderer::DepthMode drawMode) {
     if (drawMode == Renderer::DepthMode::eNone) {
       mGuiManager->setRadioChecked("stars.setDrawMode0");
@@ -189,6 +196,10 @@ void Plugin::init() {
       mGuiManager->setRadioChecked("stars.setDrawMode2");
     } else if (drawMode == Renderer::DepthMode::eLastHit) {
       mGuiManager->setRadioChecked("stars.setDrawMode3");
+    } else if (drawMode == Renderer::DepthMode::eThreshold) {
+      mGuiManager->setRadioChecked("stars.setDrawMode4");
+    } else if (drawMode == Renderer::DepthMode::eMultiThreshold) {
+      mGuiManager->setRadioChecked("stars.setDrawMode5");
     }
   });
 
