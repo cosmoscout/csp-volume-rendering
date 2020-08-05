@@ -175,19 +175,10 @@ void OSPRayRenderer::recalculateCameraDistances() {
 std::vector<float> OSPRayRenderer::normalizeDepthBuffer(std::vector<float> buffer, glm::mat4 mvp) {
   std::vector<float> depthData(mResolution.get() * mResolution.get());
 
-  float maxAbsDepth = 0;
-  for (int i = 0; i < depthData.size(); i++) {
-    float val = buffer[i] - mCameraDistance.get();
-    if (val != INFINITY && fabsf(val) > maxAbsDepth) {
-      maxAbsDepth = fabsf(val);
-    }
-  }
-  float normalizedMaxAbsDepth = maxAbsDepth / mCameraDistance.get() * mNormalizedCameraDistance;
-
   for (int i = 0; i < depthData.size(); i++) {
     float val = buffer[i];
     if (val == INFINITY) {
-      depthData[i] = 0;
+      depthData[i] = mvp[2][3] / mvp[3][3];
     } else {
       int   x               = i % mResolution.get();
       float ndcX            = ((float)x / mResolution.get() - 0.5f) * 2;
@@ -195,11 +186,8 @@ std::vector<float> OSPRayRenderer::normalizeDepthBuffer(std::vector<float> buffe
       float ndcY            = ((float)y / mResolution.get() - 0.5f) * 2;
       float normalizedDist  = val / mCameraDistance.get() * mNormalizedCameraDistance;
       float normalizedDepth = sqrtf(normalizedDist * normalizedDist - ndcX * ndcX + ndcY * ndcY);
-      float normalizedZ =
-          normalizedMaxAbsDepth == 0
-              ? 0
-              : (normalizedDepth - mNormalizedCameraDistance) / normalizedMaxAbsDepth;
-      depthData[i] = normalizedZ;
+      float normalizedZ     = normalizedDepth - mNormalizedCameraDistance;
+      depthData[i]          = (normalizedZ * mvp[2][2] + mvp[2][3]) / (normalizedZ * mvp[3][2] + mvp[3][3]);
     }
   }
 

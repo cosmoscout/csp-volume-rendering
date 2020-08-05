@@ -39,6 +39,7 @@ void main()
 		if (!uUseDepth) {
       objSpacePos.z = 0;
     }
+    objSpacePos.z *= -1;
 
     objSpacePos = inverse(uMatRendererMVP) * objSpacePos;
     vPosition   = objSpacePos.xyz / objSpacePos.w;
