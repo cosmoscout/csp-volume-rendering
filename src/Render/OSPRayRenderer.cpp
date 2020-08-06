@@ -137,6 +137,14 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
     glm::mat4 transform = projection * modelView;
 
     depthData = normalizeDepthBuffer(depthData, transform);
+    if (depthMode != Renderer::DepthMode::eNone && denoise) {
+      auto               timer          = std::chrono::high_resolution_clock::now();
+      std::vector<float> depthGrayscale = OSPRayUtility::depthToGrayscale(depthData);
+      std::vector<float> denoised = OSPRayUtility::denoiseImage(depthGrayscale, mResolution.get());
+      depthData                   = OSPRayUtility::grayscaleToDepth(denoised);
+      logger().trace("Denoised depth for {}s",
+          (float)(std::chrono::high_resolution_clock::now() - timer).count() / 1000000000);
+    }
     frameData.insert(frameData.end(), (uint8_t*)depthData.data(),
         (uint8_t*)depthData.data() + 4 * mResolution.get() * mResolution.get());
 

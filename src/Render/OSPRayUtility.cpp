@@ -8,6 +8,8 @@
 
 #include "../../../src/cs-utils/logger.hpp"
 
+#include <OpenImageDenoise/oidn.hpp>
+
 #include <vtk-8.2/vtkCellArray.h>
 #include <vtk-8.2/vtkCellData.h>
 #include <vtk-8.2/vtkCellSizeFilter.h>
@@ -24,6 +26,13 @@ namespace csp::volumerendering::OSPRayUtility {
 
 spdlog::logger& osprayLogger() {
   static auto logger = cs::utils::createLogger("OSPRay");
+  return *logger;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+spdlog::logger& oidnLogger() {
+  static auto logger = cs::utils::createLogger("OIDN");
   return *logger;
 }
 
@@ -221,7 +230,7 @@ ospray::cpp::World createOSPRayWorld(ospray::cpp::VolumetricModel model) {
   group.setParam("volume", ospray::cpp::Data(model));
   group.commit();
 
-	return createOSPRayWorld(group);
+  return createOSPRayWorld(group);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -248,7 +257,58 @@ ospray::cpp::World createOSPRayWorld(ospray::cpp::Group group) {
   world.setParam("light", ospray::cpp::Data(light));
   world.commit();
 
-	return world;
+  return world;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::vector<float> depthToGrayscale(const std::vector<float>& depth) {
+  std::vector<float> grayscale;
+  grayscale.reserve(depth.size() * 3);
+
+  for (const float& val : depth) {
+    for (int i = 0; i < 3; i++) {
+      grayscale.push_back((val + 1) / 2);
+    }
+  }
+
+  return grayscale;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::vector<float> grayscaleToDepth(const std::vector<float>& grayscale) {
+  std::vector<float> depth;
+  depth.reserve(grayscale.size() / 3);
+
+  for (int i = 0; i < grayscale.size() / 3; i++) {
+    depth.push_back(grayscale[i * 3] * 2 - 1);
+  }
+
+  return depth;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::vector<float> denoiseImage(std::vector<float>& image, int resolution) {
+  oidn::DeviceRef device = oidn::newDevice();
+  device.setErrorFunction([](void* userPtr, oidn::Error e, const char* errorDetails) {
+    oidnLogger().error(errorDetails);
+  });
+  device.commit();
+
+  std::vector<float> output(image.size());
+
+  oidn::FilterRef filter = device.newFilter("RT");
+  filter.setImage("color", image.data(), oidn::Format::Float3, resolution, resolution, 0,
+      sizeof(float) * 3, sizeof(float) * 3 * resolution);
+  filter.setImage("output", output.data(), oidn::Format::Float3, resolution, resolution, 0,
+      sizeof(float) * 3, sizeof(float) * 3 * resolution);
+  filter.commit();
+
+  filter.execute();
+
+  return output;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

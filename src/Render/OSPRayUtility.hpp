@@ -28,6 +28,10 @@ ospray::cpp::World createOSPRayWorld(ospray::cpp::VolumetricModel model);
 ospray::cpp::World createOSPRayWorld(ospray::cpp::GeometricModel model);
 ospray::cpp::World createOSPRayWorld(ospray::cpp::Group group);
 
+std::vector<float> depthToGrayscale(const std::vector<float>& depth);
+std::vector<float> grayscaleToDepth(const std::vector<float>& grayscale);
+std::vector<float> denoiseImage(std::vector<float>& image, int resolution);
+
 } // namespace csp::volumerendering::OSPRayUtility
 
 #endif // CSP_VOLUME_RENDERING_OSPRAYUTILITY_HPP

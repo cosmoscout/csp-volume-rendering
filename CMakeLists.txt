@@ -49,9 +49,9 @@ else()
 endif()
 
 if (DEFINED ENV{OIDN_CMAKE_CONFIG_DIR})
-  SET(OpenImageDenoiseConfig_DIR "$ENV{OIDN_CMAKE_CONFIG_DIR}")
+  SET(OpenImageDenoise_DIR "$ENV{OIDN_CMAKE_CONFIG_DIR}")
 else()
-  SET(OpenImageDenoiseConfig_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/OpenImageDenoise)
+  SET(OpenImageDenoise_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/OpenImageDenoise)
 endif()
 
 if (DEFINED ENV{OSPCOMMON_TBB_ROOT})
@@ -67,6 +67,7 @@ else()
 endif()
 
 find_package(ospray REQUIRED)
+find_package(OpenImageDenoise REQUIRED)
 find_package(VTK REQUIRED)
 find_package(VIRACOCHA REQUIRED)
 
@@ -86,9 +87,10 @@ add_library(csp-volume-rendering SHARED
 target_link_libraries(csp-volume-rendering
   PUBLIC
     cs-core
-	  ospray::ospray
-	  viracocha::viracochabackend
-	  ${VTK_LIBRARIES}
+    ospray::ospray
+    OpenImageDenoise
+    viracocha::viracochabackend
+    ${VTK_LIBRARIES}
 )
 
 target_include_directories(csp-volume-rendering
