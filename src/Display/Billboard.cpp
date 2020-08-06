@@ -162,10 +162,10 @@ void Billboard::createBuffers() {
   for (uint32_t x = 0; x < GRID_RESOLUTION; ++x) {
     for (uint32_t y = 0; y < GRID_RESOLUTION; ++y) {
       vertices[(x * GRID_RESOLUTION + y) * 3 + 0] = 2.f / (GRID_RESOLUTION - 1) * x - 1.f;
-      vertices[(x * GRID_RESOLUTION + y) * 3 + 1]   = 2.f / (GRID_RESOLUTION - 1) * y - 1.f;
+      vertices[(x * GRID_RESOLUTION + y) * 3 + 1] = 2.f / (GRID_RESOLUTION - 1) * y - 1.f;
       vertices[(x * GRID_RESOLUTION + y) * 3 + 2] =
-          mDepthValues[x * mDepthResolution / GRID_RESOLUTION * mDepthResolution +
-                       y * mDepthResolution / GRID_RESOLUTION];
+          mDepthValues[y * mDepthResolution / GRID_RESOLUTION * mDepthResolution +
+                       x * mDepthResolution / GRID_RESOLUTION];
     }
   }
 
