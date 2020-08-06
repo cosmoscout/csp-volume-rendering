@@ -43,7 +43,7 @@ class Renderer {
   virtual void setTransferFunction(std::vector<glm::vec4> colors) = 0;
 
   virtual std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> getFrame(
-      glm::mat4 cameraRotation, float samplingRate, DepthMode depthMode, bool denoiseColor,
+      glm::mat4 cameraTransform, float samplingRate, DepthMode depthMode, bool denoiseColor,
       bool denoiseDepth) = 0;
 
  protected:

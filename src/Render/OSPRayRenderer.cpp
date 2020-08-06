@@ -52,18 +52,33 @@ void OSPRayRenderer::setTransferFunction(std::vector<glm::vec4> colors) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFrame(
-    glm::mat4 cameraRotation, float samplingRate, Renderer::DepthMode depthMode, bool denoiseColor,
+    glm::mat4 cameraTransform, float samplingRate, Renderer::DepthMode depthMode, bool denoiseColor,
     bool denoiseDepth) {
   mRendering = true;
-  return std::async(std::launch::async, [this, cameraRotation, samplingRate, depthMode,
+  return std::async(std::launch::async, [this, cameraTransform, samplingRate, depthMode,
                                             denoiseColor, denoiseDepth]() {
     if (!mVolume.has_value()) {
       vtkSmartPointer<vtkUnstructuredGrid> volumeData = getData();
       mVolume = OSPRayUtility::createOSPRayVolume(volumeData, "T");
     }
 
-    ospray::cpp::Camera camera = OSPRayUtility::createOSPRayCamera(
-        mResolution.get(), mResolution.get(), mFov.get(), mCameraDistance.get(), cameraRotation);
+    getData()->GetPoints()->ComputeBounds();
+    glm::mat4 cameraTransformScaled = cameraTransform;
+    cameraTransformScaled[3] =
+        cameraTransform[3] *
+        glm::vec4(
+            (getData()->GetPoints()->GetBounds()[1] - getData()->GetPoints()->GetBounds()[0]) / 2,
+            (getData()->GetPoints()->GetBounds()[3] - getData()->GetPoints()->GetBounds()[2]) / 2,
+            (getData()->GetPoints()->GetBounds()[5] - getData()->GetPoints()->GetBounds()[4]) / 2,
+            1);
+    logger().trace("Scale   : {}, {}, {}",
+        (getData()->GetPoints()->GetBounds()[1] - getData()->GetPoints()->GetBounds()[0]) / 2,
+        (getData()->GetPoints()->GetBounds()[3] - getData()->GetPoints()->GetBounds()[2]) / 2,
+        (getData()->GetPoints()->GetBounds()[5] - getData()->GetPoints()->GetBounds()[4]) / 2);
+    logger().trace("Tranform: {}, {}, {}", cameraTransformScaled[3][0], cameraTransformScaled[3][1],
+        cameraTransformScaled[3][2]);
+    ospray::cpp::Camera camera = OSPRayUtility::createOSPRayCamera(mResolution.get(),
+        mResolution.get(), mFov.get(), mCameraDistance.get(), cameraTransformScaled);
 
     ospray::cpp::VolumetricModel volumetricModel(*mVolume);
     volumetricModel.setParam("transferFunction", mTransferFunction.get());

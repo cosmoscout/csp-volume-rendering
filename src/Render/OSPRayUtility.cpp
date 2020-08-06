@@ -6,6 +6,8 @@
 
 #include "OSPRayUtility.hpp"
 
+#include "../logger.hpp"
+
 #include "../../../src/cs-utils/logger.hpp"
 
 #include <OpenImageDenoise/oidn.hpp>
@@ -61,17 +63,23 @@ void initOSPRay() {
 
 ospray::cpp::Camera createOSPRayCamera(
     int width, int height, float fov, float distance, glm::mat4 cameraRotation) {
-  cameraRotation = glm::scale(cameraRotation, glm::vec3(1, 1, 1));
-  glm::vec4 camPos(0, 0, distance, 1);
+  glm::vec4 camPos(0, 0, 0, 1);
   camPos = cameraRotation * camPos;
-  glm::vec4 camUp(0, 1, 0, 1);
+  glm::vec4 camUp(0, 1, 0, 0);
   camUp = cameraRotation * camUp;
-  glm::vec4 camView(0, 0, -1, 1);
+  glm::vec4 camView(0, 0, -1, 0);
   camView = cameraRotation * camView;
+
+  logger().trace("Cam pos : {}, {}, {}", camPos[0], camPos[1], camPos[2]);
+  logger().trace("Cam up  : {}, {}, {}", camUp[0], camUp[1], camUp[2]);
+  logger().trace("Cam view: {}, {}, {}", camView[0], camView[1], camView[2]);
 
   ospcommon::math::vec3f camPosOsp{camPos[0], camPos[1], camPos[2]};
   ospcommon::math::vec3f camUpOsp{camUp[0], camUp[1], camUp[2]};
   ospcommon::math::vec3f camViewOsp{camView[0], camView[1], camView[2]};
+
+  ospcommon::math::vec2f camImageStartOsp{0, 0};
+  ospcommon::math::vec2f camImageEndOsp{1, 1};
 
   ospray::cpp::Camera camera("perspective");
   camera.setParam("aspect", width / (float)height);
@@ -79,6 +87,8 @@ ospray::cpp::Camera createOSPRayCamera(
   camera.setParam("up", camUpOsp);
   camera.setParam("direction", camViewOsp);
   camera.setParam("fovy", fov);
+  camera.setParam("imageStart", camImageStartOsp);
+  camera.setParam("imageEnd", camImageEndOsp);
   camera.commit();
   return camera;
 }
