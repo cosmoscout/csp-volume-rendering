@@ -19,7 +19,6 @@
 
             const html = `
                 <div>
-                    <h1>Transfer function</h1>
                     <div>
                         <svg id="tf-graph" width="420" height="150"></svg>
                     </div>

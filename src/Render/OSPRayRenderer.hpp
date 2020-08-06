@@ -30,8 +30,8 @@ class OSPRayRenderer : public Renderer {
 
   void setTransferFunction(std::vector<glm::vec4> colors) override;
 
-  std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> getFrame(
-      glm::mat4 cameraRotation, float samplingRate, DepthMode depthMode, bool denoise) override;
+  std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> getFrame(glm::mat4 cameraRotation,
+      float samplingRate, DepthMode depthMode, bool denoiseColor, bool denoiseDepth) override;
 
  private:
   void               recalculateCameraDistances();

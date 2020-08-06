@@ -37,7 +37,8 @@ class Plugin : public cs::core::PluginBase {
     cs::utils::DefaultProperty<bool>                mDepthData{true};
     cs::utils::DefaultProperty<bool>                mDrawDepth{false};
     cs::utils::DefaultProperty<Renderer::DepthMode> mDepthMode{Renderer::DepthMode::eNone};
-    cs::utils::DefaultProperty<bool>                mDenoise{true};
+    cs::utils::DefaultProperty<bool>                mDenoiseColor{true};
+    cs::utils::DefaultProperty<bool>                mDenoiseDepth{true};
     cs::utils::DefaultProperty<int>                 mResolution{256};
     cs::utils::DefaultProperty<float>               mSamplingRate{0.005};
     std::map<std::string, Volume>                   mVolumes;
@@ -54,7 +55,8 @@ class Plugin : public cs::core::PluginBase {
     glm::dquat             mCameraRotation;
     std::vector<glm::vec4> mTransferFunction;
     Renderer::DepthMode    mDepthMode;
-    bool                   mHasDenoise;
+    bool                   mDenoiseColor;
+    bool                   mDenoiseDepth;
 
     std::vector<uint8_t> mFrameData;
     glm::mat4            mModelViewProjection;

@@ -52,9 +52,11 @@ void OSPRayRenderer::setTransferFunction(std::vector<glm::vec4> colors) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFrame(
-    glm::mat4 cameraRotation, float samplingRate, Renderer::DepthMode depthMode, bool denoise) {
+    glm::mat4 cameraRotation, float samplingRate, Renderer::DepthMode depthMode, bool denoiseColor,
+    bool denoiseDepth) {
   mRendering = true;
-  return std::async(std::launch::async, [this, cameraRotation, samplingRate, depthMode, denoise]() {
+  return std::async(std::launch::async, [this, cameraRotation, samplingRate, depthMode,
+                                            denoiseColor, denoiseDepth]() {
     if (!mVolume.has_value()) {
       vtkSmartPointer<vtkUnstructuredGrid> volumeData = getData();
       mVolume = OSPRayUtility::createOSPRayVolume(volumeData, "T");
@@ -104,7 +106,7 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
     ospray::cpp::FrameBuffer framebuffer(imgSize, OSP_FB_RGBA32F, channels);
     framebuffer.clear();
 
-    if (denoise) {
+    if (denoiseColor) {
       ospray::cpp::ImageOperation denoise("denoiser");
       framebuffer.setParam("imageOperation", ospray::cpp::Data(denoise));
     } else {
@@ -137,7 +139,7 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
     glm::mat4 transform = projection * modelView;
 
     depthData = normalizeDepthBuffer(depthData, transform);
-    if (depthMode != Renderer::DepthMode::eNone && denoise) {
+    if (depthMode != Renderer::DepthMode::eNone && denoiseDepth) {
       auto               timer          = std::chrono::high_resolution_clock::now();
       std::vector<float> depthGrayscale = OSPRayUtility::depthToGrayscale(depthData);
       std::vector<float> denoised = OSPRayUtility::denoiseImage(depthGrayscale, mResolution.get());

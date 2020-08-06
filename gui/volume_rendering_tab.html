@@ -2,8 +2,12 @@
   <label class="checklabel">
     <input type="checkbox" data-callback="volumeRendering.setEnableRequestImages" />
     <i class="material-icons"></i>
-    <span>Request images</span>
+    <span>Request new images</span>
   </label>
+</div>
+
+<div class="strike">
+  <span>Rendering</span>
 </div>
 
 <div class="row">
@@ -26,20 +30,8 @@
   </div>
 </div>
 
-<div class="col-7 offset-5">
-  <label class="checklabel">
-    <input type="checkbox" data-callback="volumeRendering.setEnablePredictiveRendering" />
-    <i class="material-icons"></i>
-    <span>Predictive Rendering</span>
-  </label>
-</div>
-
-<div class="col-7 offset-5">
-  <label class="checklabel">
-    <input type="checkbox" data-callback="volumeRendering.setEnableReuseImages" />
-    <i class="material-icons"></i>
-    <span>Reuse images</span>
-  </label>
+<div class="strike">
+  <span>Depth</span>
 </div>
 
 <div class="col-7 offset-5">
@@ -100,12 +92,48 @@
   </div>
 </div>
 
+<div class="strike">
+  <span>Denoising</span>
+</div>
+
 <div class="col-7 offset-5">
   <label class="checklabel">
-    <input type="checkbox" data-callback="volumeRendering.setEnableDenoise" />
+    <input type="checkbox" data-callback="volumeRendering.setEnableDenoiseColor" />
     <i class="material-icons"></i>
-    <span>Use OIDN</span>
+    <span>Denoise color image</span>
   </label>
+</div>
+
+<div class="col-7 offset-5">
+  <label class="checklabel">
+    <input type="checkbox" data-callback="volumeRendering.setEnableDenoiseDepth" />
+    <i class="material-icons"></i>
+    <span>Denoise depth image</span>
+  </label>
+</div>
+
+<div class="strike">
+  <span>Latency Compensation</span>
+</div>
+
+<div class="col-7 offset-5">
+  <label class="checklabel">
+    <input type="checkbox" data-callback="volumeRendering.setEnablePredictiveRendering" />
+    <i class="material-icons"></i>
+    <span>Predictive Rendering</span>
+  </label>
+</div>
+
+<div class="col-7 offset-5">
+  <label class="checklabel">
+    <input type="checkbox" data-callback="volumeRendering.setEnableReuseImages" />
+    <i class="material-icons"></i>
+    <span>Reuse images</span>
+  </label>
+</div>
+
+<div class="strike">
+  <span>Transfer Function</span>
 </div>
 
 <div id="tf-editor-container">

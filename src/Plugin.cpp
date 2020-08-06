@@ -73,7 +73,8 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
 bool Plugin::Frame::operator==(const Frame& other) {
   return mResolution == other.mResolution && mCameraRotation == other.mCameraRotation &&
          mSamplingRate == other.mSamplingRate && mTransferFunction == other.mTransferFunction &&
-         mHasDenoise == other.mHasDenoise && mDepthMode == other.mDepthMode;
+         mDenoiseColor == other.mDenoiseColor && mDenoiseDepth == other.mDenoiseDepth &&
+         mDepthMode == other.mDepthMode;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -92,8 +93,8 @@ void Plugin::init() {
   mGettingFrame = false;
 
   // Add the volume rendering user interface components to the CosmoScout user interface.
-  mGuiManager->addSettingsSectionToSideBarFromHTML(
-      "Volume Rendering", "blur_circular", "../share/resources/gui/volume_rendering_settings.html");
+  mGuiManager->addPluginTabToSideBarFromHTML(
+      "Volume Rendering", "blur_circular", "../share/resources/gui/volume_rendering_tab.html");
 
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
 
@@ -152,11 +153,18 @@ void Plugin::init() {
     mGuiManager->setCheckboxValue("volumeRendering.setEnableDrawDepth", enable);
   });
 
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDenoise",
-      "Enables use of OIDN for displaying data.",
-      std::function([this](bool enable) { mPluginSettings.mDenoise = enable; }));
-  mPluginSettings.mDenoise.connectAndTouch([this](bool enable) {
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoise", enable);
+  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDenoiseColor",
+      "Enables use of OIDN for displaying color data.",
+      std::function([this](bool enable) { mPluginSettings.mDenoiseColor = enable; }));
+  mPluginSettings.mDenoiseColor.connectAndTouch([this](bool enable) {
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseColor", enable);
+  });
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDenoiseDepth",
+      "Enables use of OIDN for displaying depth data.",
+      std::function([this](bool enable) { mPluginSettings.mDenoiseDepth = enable; }));
+  mPluginSettings.mDenoiseDepth.connectAndTouch([this](bool enable) {
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseDepth", enable);
   });
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setTransferFunction",
@@ -298,12 +306,14 @@ void Plugin::requestFrame(glm::dquat cameraRotation) {
   mNextFrame.mResolution   = mPluginSettings.mResolution.get();
   mNextFrame.mSamplingRate = mPluginSettings.mSamplingRate.get();
   mNextFrame.mDepthMode    = mPluginSettings.mDepthMode.get();
-  mNextFrame.mHasDenoise   = mPluginSettings.mDenoise.get();
+  mNextFrame.mDenoiseColor = mPluginSettings.mDenoiseColor.get();
+  mNextFrame.mDenoiseDepth = mPluginSettings.mDenoiseDepth.get();
 
   if (!(mNextFrame == mRenderingFrame)) {
     mRenderingFrame    = mNextFrame;
     mFutureFrameData   = mRenderer->getFrame(glm::toMat4(mRenderingFrame.mCameraRotation),
-        mRenderingFrame.mSamplingRate, mRenderingFrame.mDepthMode, mNextFrame.mHasDenoise);
+        mRenderingFrame.mSamplingRate, mRenderingFrame.mDepthMode, mNextFrame.mDenoiseColor,
+        mNextFrame.mDenoiseDepth);
     mGettingFrame      = true;
     mLastFrameInterval = 0;
   }
