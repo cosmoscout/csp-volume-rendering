@@ -41,6 +41,7 @@ class Plugin : public cs::core::PluginBase {
     cs::utils::DefaultProperty<bool>                mDenoiseDepth{true};
     cs::utils::DefaultProperty<int>                 mResolution{256};
     cs::utils::DefaultProperty<float>               mSamplingRate{0.005};
+    cs::utils::DefaultProperty<float>               mFov{22};
     std::map<std::string, Volume>                   mVolumes;
   };
 
@@ -52,6 +53,7 @@ class Plugin : public cs::core::PluginBase {
   struct Frame {
     int                    mResolution;
     float                  mSamplingRate;
+    float                  mFov;
     glm::dquat             mCameraRotation;
     std::vector<glm::vec4> mTransferFunction;
     Renderer::DepthMode    mDepthMode;

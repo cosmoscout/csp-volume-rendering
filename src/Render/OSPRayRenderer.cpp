@@ -28,7 +28,7 @@ OSPRayRenderer::OSPRayRenderer()
   OSPRayUtility::initOSPRay();
   mTransferFunction = std::async(
       std::launch::deferred, [] { return OSPRayUtility::createOSPRayTransferFunction(); });
-  mFov.connectAndTouch([this](float fov) { recalculateCameraDistances(); });
+  mFov.connectAndTouch([this](float fov) { recalculateCameraDistances(fov); });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -158,15 +158,15 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void OSPRayRenderer::recalculateCameraDistances() {
-  mCameraDistance = std::async(std::launch::deferred, [this]() {
+void OSPRayRenderer::recalculateCameraDistances(float fov) {
+  mCameraDistance = std::async(std::launch::deferred, [this, fov]() {
     getData()->GetPoints()->ComputeBounds();
     float modelHeight =
         (getData()->GetPoints()->GetBounds()[3] - getData()->GetPoints()->GetBounds()[2]) / 2;
-    return modelHeight / sin(mFov.get() / 180 * (float)M_PI / 2);
+    return modelHeight / sin(fov / 180 * (float)M_PI / 2);
   });
 
-  mNormalizedCameraDistance = 1 / sin(mFov.get() / 180 * (float)M_PI / 2);
+  mNormalizedCameraDistance = 1 / sin(fov / 180 * (float)M_PI / 2);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

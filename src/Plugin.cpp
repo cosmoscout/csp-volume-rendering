@@ -72,9 +72,9 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
 
 bool Plugin::Frame::operator==(const Frame& other) {
   return mResolution == other.mResolution && mCameraRotation == other.mCameraRotation &&
-         mSamplingRate == other.mSamplingRate && mTransferFunction == other.mTransferFunction &&
-         mDenoiseColor == other.mDenoiseColor && mDenoiseDepth == other.mDenoiseDepth &&
-         mDepthMode == other.mDepthMode;
+         mSamplingRate == other.mSamplingRate && mFov == other.mFov &&
+         mTransferFunction == other.mTransferFunction && mDenoiseColor == other.mDenoiseColor &&
+         mDenoiseDepth == other.mDenoiseDepth && mDepthMode == other.mDepthMode;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -105,6 +105,14 @@ void Plugin::init() {
       }));
   mPluginSettings.mResolution.connectAndTouch(
       [this](int value) { mGuiManager->setSliderValue("volumeRendering.setResolution", value); });
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setFov",
+      "Sets the field of view of the rendered volume images.", std::function([this](double value) {
+        mPluginSettings.mFov = value;
+        mRenderer->setFov(value);
+      }));
+  mPluginSettings.mFov.connectAndTouch(
+      [this](int value) { mGuiManager->setSliderValue("volumeRendering.setFov", value); });
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setSamplingRate",
       "Sets the sampling rate for volume rendering.",
@@ -305,6 +313,7 @@ void Plugin::requestFrame(glm::dquat cameraRotation) {
 
   mNextFrame.mResolution   = mPluginSettings.mResolution.get();
   mNextFrame.mSamplingRate = mPluginSettings.mSamplingRate.get();
+  mNextFrame.mFov          = mPluginSettings.mFov.get();
   mNextFrame.mDepthMode    = mPluginSettings.mDepthMode.get();
   mNextFrame.mDenoiseColor = mPluginSettings.mDenoiseColor.get();
   mNextFrame.mDenoiseDepth = mPluginSettings.mDenoiseDepth.get();
