@@ -63,8 +63,7 @@ void initOSPRay() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ospray::cpp::Camera createOSPRayCamera(
-    int width, int height, float fov, float modelHeight, glm::mat4 cameraTransform) {
+ospray::cpp::Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 cameraTransform) {
   glm::vec4 camPos(0, 0, 0, 1);
   camPos = cameraTransform * camPos;
   glm::vec4 camUp(0, 1, 0, 0);
@@ -80,37 +79,96 @@ ospray::cpp::Camera createOSPRayCamera(
   ospcommon::math::vec3f camUpOsp{camUp[0], camUp[1], camUp[2]};
   ospcommon::math::vec3f camViewOsp{camView[0], camView[1], camView[2]};
 
-  glm::vec3 camPos3      = camPos;
-  glm::vec3 camUp3       = camUp;
-  glm::vec3 camView3     = camView;
-  float     fovRad       = fov / 180 * (float)M_PI;
-  glm::vec3 camRight     = glm::cross(camView3, camUp3);
-  glm::vec3 camPosX      = glm::dot(camPos3, glm::normalize(camRight)) * glm::normalize(camRight);
-  glm::vec3 camPosY      = glm::dot(camPos3, glm::normalize(camUp3)) * glm::normalize(camUp3);
-  glm::vec3 camPosZ      = glm::dot(camPos3, glm::normalize(camView3)) * glm::normalize(camView3);
-  float     cameraAngleX = acos(glm::dot(camView3, -(camPosZ + camPosX)) /
-                            (glm::length(camView3) * glm::length(camPosZ + camPosX)));
-  float     cameraAngleY = acos(glm::dot(camView3, -(camPosZ + camPosY)) /
-                            (glm::length(camView3) * glm::length(camPosZ + camPosY)));
-  float     modelAngle   = asin(modelHeight / glm::length(camPos3));
-  float     leftAngle    = fovRad / 2 - cameraAngleX - modelAngle;
-  float     rightAngle   = fovRad / 2 - cameraAngleX + modelAngle;
-  float     downAngle      = fovRad / 2 - cameraAngleY - modelAngle;
-  float     upAngle    = fovRad / 2 - cameraAngleY + modelAngle;
+  glm::vec3 camPos3  = camPos;
+  glm::vec3 camUp3   = glm::normalize(camUp);
+  glm::vec3 camView3 = glm::normalize(camView);
+  float     fovRad   = fov / 180 * (float)M_PI;
+  glm::vec3 camRight = glm::cross(camView3, camUp3);
+  glm::vec3 camPosX  = glm::dot(camPos3, glm::normalize(camRight)) * glm::normalize(camRight);
+  glm::vec3 camPosY  = glm::dot(camPos3, glm::normalize(camUp3)) * glm::normalize(camUp3);
+  glm::vec3 camPosZ  = glm::dot(camPos3, glm::normalize(camView3)) * glm::normalize(camView3);
 
+  float cameraAngleXCos = glm::dot(camView3, -(camPosZ + camPosX)) /
+                          (glm::length(camView3) * glm::length(camPosZ + camPosX));
+  float cameraAngleX    = acos(cameraAngleXCos <= 1 ? cameraAngleXCos : 1);
+  float cameraAngleYCos = glm::dot(camView3, -(camPosZ + camPosY)) /
+                          (glm::length(camView3) * glm::length(camPosZ + camPosY));
+  float cameraAngleY = acos(cameraAngleYCos <= 1 ? cameraAngleYCos : 1);
+
+  float modelAngle = asin(modelHeight / glm::length(camPos3));
+  float leftAngle, rightAngle, downAngle, upAngle;
+  float leftPercent, rightPercent, downPercent, upPercent;
+
+  if (glm::dot(camPos3, glm::normalize(camRight)) > 0) {
+    leftAngle  = -cameraAngleX - modelAngle;
+    rightAngle = -cameraAngleX + modelAngle;
+  } else {
+    leftAngle  = cameraAngleX - modelAngle;
+    rightAngle = cameraAngleX + modelAngle;
+  }
+  if (glm::dot(camPos3, glm::normalize(camUp3)) > 0) {
+    downAngle = -cameraAngleY - modelAngle;
+    upAngle   = -cameraAngleY + modelAngle;
+  } else {
+    downAngle = cameraAngleY - modelAngle;
+    upAngle   = cameraAngleY + modelAngle;
+  }
+  if (leftAngle < 0) {
+    leftPercent = (tan(fovRad / 2) - tan(abs(leftAngle))) / (2 * tan(fovRad / 2));
+  } else {
+    leftPercent = (tan(fovRad / 2) + tan(leftAngle)) / (2 * tan(fovRad / 2));
+  }
+  if (rightAngle < 0) {
+    rightPercent = (tan(fovRad / 2) - tan(abs(rightAngle))) / (2 * tan(fovRad / 2));
+  } else {
+    rightPercent = (tan(fovRad / 2) + tan(rightAngle)) / (2 * tan(fovRad / 2));
+  }
+  if (downAngle < 0) {
+    downPercent = (tan(fovRad / 2) - tan(abs(downAngle))) / (2 * tan(fovRad / 2));
+  } else {
+    downPercent = (tan(fovRad / 2) + tan(downAngle)) / (2 * tan(fovRad / 2));
+  }
+  if (upAngle < 0) {
+    upPercent = (tan(fovRad / 2) - tan(abs(upAngle))) / (2 * tan(fovRad / 2));
+  } else {
+    upPercent = (tan(fovRad / 2) + tan(upAngle)) / (2 * tan(fovRad / 2));
+  }
+
+  logger().trace("Cam posX: {}, {}, {}", camPosX[0], camPosX[1], camPosX[2]);
+  logger().trace("Cam posY: {}, {}, {}", camPosY[0], camPosY[1], camPosY[2]);
+  logger().trace("Cam posZ: {}, {}, {}", camPosZ[0], camPosZ[1], camPosZ[2]);
+  logger().trace("Cam rght: {}, {}, {}", camRight[0], camRight[1], camRight[2]);
   logger().trace("Cam angX: {}", cameraAngleX);
   logger().trace("Cam angY: {}", cameraAngleY);
   logger().trace("Mod ang : {}", modelAngle);
   logger().trace("Lft ang : {}", leftAngle);
   logger().trace("Rgt ang : {}", rightAngle);
-  logger().trace("Up  ang : {}", upAngle);
   logger().trace("Dwn ang : {}", downAngle);
+  logger().trace("Up  ang : {}", upAngle);
+  logger().trace("Lft %   : {}", leftPercent);
+  logger().trace("Rgt %   : {}", rightPercent);
+  logger().trace("Dwn %   : {}", downPercent);
+  logger().trace("Up  %   : {}", upPercent);
 
-  ospcommon::math::vec2f camImageStartOsp{0, 0};
-  ospcommon::math::vec2f camImageEndOsp{1, 1};
+  float width  = rightPercent - leftPercent;
+  float height = upPercent - downPercent;
+  float aspect = height / width;
+
+  logger().trace("Aspect  : {}", aspect);
+
+  if (aspect > 1) {
+    leftPercent  = (1 / aspect) * leftPercent + 0.5f - 1 / (2 * aspect);
+    rightPercent = (1 / aspect) * rightPercent + 0.5f - 1 / (2 * aspect);
+    logger().trace("Lft %   : {}", leftPercent);
+    logger().trace("Rgt %   : {}", rightPercent);
+  } else {
+  }
+
+  ospcommon::math::vec2f camImageStartOsp{leftPercent, downPercent};
+  ospcommon::math::vec2f camImageEndOsp{rightPercent, upPercent};
 
   ospray::cpp::Camera camera("perspective");
-  camera.setParam("aspect", width / (float)height);
+  camera.setParam("aspect", aspect);
   camera.setParam("position", camPosOsp);
   camera.setParam("up", camUpOsp);
   camera.setParam("direction", camViewOsp);

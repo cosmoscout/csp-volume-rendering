@@ -79,7 +79,8 @@ void main()
 	oColor = texture(uTexture, vTexCoords);
 	if(oColor.a <= 0)
 	{
-		discard;
+oColor = vec4(1,1,1,1);
+		//discard;
 	}
   if (uDrawDepth) {
     oColor = vec4(vDepth, vDepth, vDepth, 1);

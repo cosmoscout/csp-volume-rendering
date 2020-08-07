@@ -17,8 +17,7 @@
 namespace csp::volumerendering::OSPRayUtility {
 void initOSPRay();
 
-ospray::cpp::Camera createOSPRayCamera(
-    int width, int height, float fov, float modelHeight, glm::mat4 cameraTransform);
+ospray::cpp::Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 cameraTransform);
 ospray::cpp::Volume createOSPRayVolume(
     vtkSmartPointer<vtkUnstructuredGrid> vtkVolume, std::string scalar);
 ospray::cpp::TransferFunction createOSPRayTransferFunction();
