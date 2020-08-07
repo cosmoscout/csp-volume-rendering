@@ -10,6 +10,8 @@
 
 #include "../../../src/cs-utils/logger.hpp"
 
+#include <glm/geometric.hpp>
+
 #include <OpenImageDenoise/oidn.hpp>
 
 #include <vtk-8.2/vtkCellArray.h>
@@ -62,13 +64,13 @@ void initOSPRay() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ospray::cpp::Camera createOSPRayCamera(
-    int width, int height, float fov, float distance, glm::mat4 cameraRotation) {
+    int width, int height, float fov, float modelHeight, glm::mat4 cameraTransform) {
   glm::vec4 camPos(0, 0, 0, 1);
-  camPos = cameraRotation * camPos;
+  camPos = cameraTransform * camPos;
   glm::vec4 camUp(0, 1, 0, 0);
-  camUp = cameraRotation * camUp;
+  camUp = cameraTransform * camUp;
   glm::vec4 camView(0, 0, -1, 0);
-  camView = cameraRotation * camView;
+  camView = cameraTransform * camView;
 
   logger().trace("Cam pos : {}, {}, {}", camPos[0], camPos[1], camPos[2]);
   logger().trace("Cam up  : {}, {}, {}", camUp[0], camUp[1], camUp[2]);
@@ -77,6 +79,32 @@ ospray::cpp::Camera createOSPRayCamera(
   ospcommon::math::vec3f camPosOsp{camPos[0], camPos[1], camPos[2]};
   ospcommon::math::vec3f camUpOsp{camUp[0], camUp[1], camUp[2]};
   ospcommon::math::vec3f camViewOsp{camView[0], camView[1], camView[2]};
+
+  glm::vec3 camPos3      = camPos;
+  glm::vec3 camUp3       = camUp;
+  glm::vec3 camView3     = camView;
+  float     fovRad       = fov / 180 * (float)M_PI;
+  glm::vec3 camRight     = glm::cross(camView3, camUp3);
+  glm::vec3 camPosX      = glm::dot(camPos3, glm::normalize(camRight)) * glm::normalize(camRight);
+  glm::vec3 camPosY      = glm::dot(camPos3, glm::normalize(camUp3)) * glm::normalize(camUp3);
+  glm::vec3 camPosZ      = glm::dot(camPos3, glm::normalize(camView3)) * glm::normalize(camView3);
+  float     cameraAngleX = acos(glm::dot(camView3, -(camPosZ + camPosX)) /
+                            (glm::length(camView3) * glm::length(camPosZ + camPosX)));
+  float     cameraAngleY = acos(glm::dot(camView3, -(camPosZ + camPosY)) /
+                            (glm::length(camView3) * glm::length(camPosZ + camPosY)));
+  float     modelAngle   = asin(modelHeight / glm::length(camPos3));
+  float     leftAngle    = fovRad / 2 - cameraAngleX - modelAngle;
+  float     rightAngle   = fovRad / 2 - cameraAngleX + modelAngle;
+  float     downAngle      = fovRad / 2 - cameraAngleY - modelAngle;
+  float     upAngle    = fovRad / 2 - cameraAngleY + modelAngle;
+
+  logger().trace("Cam angX: {}", cameraAngleX);
+  logger().trace("Cam angY: {}", cameraAngleY);
+  logger().trace("Mod ang : {}", modelAngle);
+  logger().trace("Lft ang : {}", leftAngle);
+  logger().trace("Rgt ang : {}", rightAngle);
+  logger().trace("Up  ang : {}", upAngle);
+  logger().trace("Dwn ang : {}", downAngle);
 
   ospcommon::math::vec2f camImageStartOsp{0, 0};
   ospcommon::math::vec2f camImageEndOsp{1, 1};
