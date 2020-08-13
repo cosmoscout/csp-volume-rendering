@@ -71,10 +71,6 @@ ospray::cpp::Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 c
   glm::vec4 camView(0, 0, -1, 0);
   camView = cameraTransform * camView;
 
-  logger().trace("Cam pos : {}, {}, {}", camPos[0], camPos[1], camPos[2]);
-  logger().trace("Cam up  : {}, {}, {}", camUp[0], camUp[1], camUp[2]);
-  logger().trace("Cam view: {}, {}, {}", camView[0], camView[1], camView[2]);
-
   ospcommon::math::vec3f camPosOsp{camPos[0], camPos[1], camPos[2]};
   ospcommon::math::vec3f camUpOsp{camUp[0], camUp[1], camUp[2]};
   ospcommon::math::vec3f camViewOsp{camView[0], camView[1], camView[2]};
@@ -95,23 +91,25 @@ ospray::cpp::Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 c
                           (glm::length(camView3) * glm::length(camPosZ + camPosY));
   float cameraAngleY = acos(cameraAngleYCos <= 1 ? cameraAngleYCos : 1);
 
-  float modelAngle = asin(modelHeight / glm::length(camPos3));
+  float modelAngleX = asin(modelHeight / glm::length(camPosX + camPosZ));
+  float modelAngleY = asin(modelHeight / glm::length(camPosY + camPosZ));
+
   float leftAngle, rightAngle, downAngle, upAngle;
   float leftPercent, rightPercent, downPercent, upPercent;
 
   if (glm::dot(camPos3, glm::normalize(camRight)) > 0) {
-    leftAngle  = -cameraAngleX - modelAngle;
-    rightAngle = -cameraAngleX + modelAngle;
+    leftAngle  = -cameraAngleX - modelAngleX;
+    rightAngle = -cameraAngleX + modelAngleX;
   } else {
-    leftAngle  = cameraAngleX - modelAngle;
-    rightAngle = cameraAngleX + modelAngle;
+    leftAngle  = cameraAngleX - modelAngleX;
+    rightAngle = cameraAngleX + modelAngleX;
   }
   if (glm::dot(camPos3, glm::normalize(camUp3)) > 0) {
-    downAngle = -cameraAngleY - modelAngle;
-    upAngle   = -cameraAngleY + modelAngle;
+    downAngle = -cameraAngleY - modelAngleY;
+    upAngle   = -cameraAngleY + modelAngleY;
   } else {
-    downAngle = cameraAngleY - modelAngle;
-    upAngle   = cameraAngleY + modelAngle;
+    downAngle = cameraAngleY - modelAngleY;
+    upAngle   = cameraAngleY + modelAngleY;
   }
   if (leftAngle < 0) {
     leftPercent = (tan(fovRad / 2) - tan(abs(leftAngle))) / (2 * tan(fovRad / 2));
@@ -134,41 +132,11 @@ ospray::cpp::Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 c
     upPercent = (tan(fovRad / 2) + tan(upAngle)) / (2 * tan(fovRad / 2));
   }
 
-  logger().trace("Cam posX: {}, {}, {}", camPosX[0], camPosX[1], camPosX[2]);
-  logger().trace("Cam posY: {}, {}, {}", camPosY[0], camPosY[1], camPosY[2]);
-  logger().trace("Cam posZ: {}, {}, {}", camPosZ[0], camPosZ[1], camPosZ[2]);
-  logger().trace("Cam rght: {}, {}, {}", camRight[0], camRight[1], camRight[2]);
-  logger().trace("Cam angX: {}", cameraAngleX);
-  logger().trace("Cam angY: {}", cameraAngleY);
-  logger().trace("Mod ang : {}", modelAngle);
-  logger().trace("Lft ang : {}", leftAngle);
-  logger().trace("Rgt ang : {}", rightAngle);
-  logger().trace("Dwn ang : {}", downAngle);
-  logger().trace("Up  ang : {}", upAngle);
-  logger().trace("Lft %   : {}", leftPercent);
-  logger().trace("Rgt %   : {}", rightPercent);
-  logger().trace("Dwn %   : {}", downPercent);
-  logger().trace("Up  %   : {}", upPercent);
-
-  float width  = rightPercent - leftPercent;
-  float height = upPercent - downPercent;
-  float aspect = height / width;
-
-  logger().trace("Aspect  : {}", aspect);
-
-  if (aspect > 1) {
-    leftPercent  = (1 / aspect) * leftPercent + 0.5f - 1 / (2 * aspect);
-    rightPercent = (1 / aspect) * rightPercent + 0.5f - 1 / (2 * aspect);
-    logger().trace("Lft %   : {}", leftPercent);
-    logger().trace("Rgt %   : {}", rightPercent);
-  } else {
-  }
-
   ospcommon::math::vec2f camImageStartOsp{leftPercent, downPercent};
   ospcommon::math::vec2f camImageEndOsp{rightPercent, upPercent};
 
   ospray::cpp::Camera camera("perspective");
-  camera.setParam("aspect", aspect);
+  camera.setParam("aspect", 1);
   camera.setParam("position", camPosOsp);
   camera.setParam("up", camUpOsp);
   camera.setParam("direction", camViewOsp);

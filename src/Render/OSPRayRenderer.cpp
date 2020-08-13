@@ -71,12 +71,6 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
             (getData()->GetPoints()->GetBounds()[3] - getData()->GetPoints()->GetBounds()[2]) / 2,
             (getData()->GetPoints()->GetBounds()[5] - getData()->GetPoints()->GetBounds()[4]) / 2,
             1);
-    /*logger().trace("Scale   : {}, {}, {}",
-        (getData()->GetPoints()->GetBounds()[1] - getData()->GetPoints()->GetBounds()[0]) / 2,
-        (getData()->GetPoints()->GetBounds()[3] - getData()->GetPoints()->GetBounds()[2]) / 2,
-        (getData()->GetPoints()->GetBounds()[5] - getData()->GetPoints()->GetBounds()[4]) / 2);*/
-    /*logger().trace("Tranform: {}, {}, {}", cameraTransformScaled[3][0],
-       cameraTransformScaled[3][1], cameraTransformScaled[3][2]);*/
     ospray::cpp::Camera camera = OSPRayUtility::createOSPRayCamera(mFov.get(),
         (getData()->GetPoints()->GetBounds()[1] - getData()->GetPoints()->GetBounds()[0]) / 2,
         cameraTransformScaled);

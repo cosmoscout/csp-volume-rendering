@@ -328,11 +328,6 @@ void Plugin::requestFrame(glm::dquat cameraRotation) {
 		}
     mFutureFrameData = mRenderer->getFrame(t, mRenderingFrame.mSamplingRate,
         mRenderingFrame.mDepthMode, mNextFrame.mDenoiseColor, mNextFrame.mDenoiseDepth);
-    //logger().trace("= Transform =");
-    //logger().trace("{}, {}, {}, {}", t[0][0], t[0][1], t[0][2], t[0][3]);
-    //logger().trace("{}, {}, {}, {}", t[1][0], t[1][1], t[1][2], t[1][3]);
-    //logger().trace("{}, {}, {}, {}", t[2][0], t[2][1], t[2][2], t[2][3]);
-    //logger().trace("{}, {}, {}, {}", t[3][0], t[3][1], t[3][2], t[3][3]);
     mGettingFrame      = true;
     mLastFrameInterval = 0;
   }
