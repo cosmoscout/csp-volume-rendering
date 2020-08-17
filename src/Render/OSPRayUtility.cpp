@@ -157,11 +157,12 @@ Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 cameraTransfor
       fovRad, 1.f, camera.distance / modelHeight - 1, camera.distance / modelHeight + 1);
   glm::mat4 view = glm::translate(glm::mat4(1.f),
       -glm::vec3(camXLen, camYLen, -camZLen) / modelHeight);
+
   glm::mat4 fitToView(1);
   fitToView[0][0] = 1 / (rightPercent - leftPercent);
   fitToView[1][1] = 1 / (upPercent - downPercent);
-  fitToView[3][0] = -2 * leftPercent * fitToView[0][0];
-  fitToView[3][1] = -2 * downPercent * fitToView[1][1];
+  fitToView[3][0] = -(projection * view)[3][0] * fitToView[0][0] / (projection * view)[3][3];
+  fitToView[3][1] = -(projection * view)[3][1] * fitToView[1][1] / (projection * view)[3][3];
 
   camera.transformationMatrix = fitToView * projection * view;
   return camera;
