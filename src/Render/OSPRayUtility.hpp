@@ -15,9 +15,15 @@
 #include <glm/gtc/type_ptr.hpp>
 
 namespace csp::volumerendering::OSPRayUtility {
+struct Camera {
+  ospray::cpp::Camera osprayCamera;
+  float               distance;
+  glm::mat4           transformationMatrix;
+};
+
 void initOSPRay();
 
-ospray::cpp::Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 cameraTransform);
+Camera              createOSPRayCamera(float fov, float modelHeight, glm::mat4 cameraTransform);
 ospray::cpp::Volume createOSPRayVolume(
     vtkSmartPointer<vtkUnstructuredGrid> vtkVolume, std::string scalar);
 ospray::cpp::TransferFunction createOSPRayTransferFunction();

@@ -28,7 +28,6 @@ OSPRayRenderer::OSPRayRenderer()
   OSPRayUtility::initOSPRay();
   mTransferFunction = std::async(
       std::launch::deferred, [] { return OSPRayUtility::createOSPRayTransferFunction(); });
-  mFov.connectAndTouch([this](float fov) { recalculateCameraDistances(fov); });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -71,7 +70,8 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
             (getData()->GetPoints()->GetBounds()[3] - getData()->GetPoints()->GetBounds()[2]) / 2,
             (getData()->GetPoints()->GetBounds()[5] - getData()->GetPoints()->GetBounds()[4]) / 2,
             1);
-    ospray::cpp::Camera camera = OSPRayUtility::createOSPRayCamera(mFov.get(),
+
+    OSPRayUtility::Camera camera = OSPRayUtility::createOSPRayCamera(mFov.get(),
         (getData()->GetPoints()->GetBounds()[1] - getData()->GetPoints()->GetBounds()[0]) / 2,
         cameraTransformScaled);
 
@@ -125,7 +125,8 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
 
     framebuffer.commit();
 
-    ospray::cpp::Future renderFuture = framebuffer.renderFrame(renderer, camera, world);
+    ospray::cpp::Future renderFuture =
+        framebuffer.renderFrame(renderer, camera.osprayCamera, world);
     renderFuture.wait();
     logger().trace("Rendered for {}s", renderFuture.duration());
 
@@ -142,13 +143,10 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
       depthData         = std::vector(depthFrame, depthFrame + depthData.size());
     }
 
-    glm::mat4 projection = glm::perspective(mFov.get() / 180 * (float)M_PI, 1.f,
-        mNormalizedCameraDistance - 1.f, mNormalizedCameraDistance + 1.f);
-    glm::mat4 modelView =
-        glm::translate(glm::mat4(1.f), glm::vec3(0.f, 0.f, -mNormalizedCameraDistance));
-    glm::mat4 transform = projection * modelView;
+    depthData = normalizeDepthBuffer(depthData, camera.transformationMatrix,
+        (getData()->GetPoints()->GetBounds()[1] - getData()->GetPoints()->GetBounds()[0]) / 2,
+        camera.distance);
 
-    depthData = normalizeDepthBuffer(depthData, transform);
     if (depthMode != Renderer::DepthMode::eNone && denoiseDepth) {
       auto               timer          = std::chrono::high_resolution_clock::now();
       std::vector<float> depthGrayscale = OSPRayUtility::depthToGrayscale(depthData);
@@ -160,7 +158,7 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
     frameData.insert(frameData.end(), (uint8_t*)depthData.data(),
         (uint8_t*)depthData.data() + 4 * mResolution.get() * mResolution.get());
 
-    std::tuple<std::vector<uint8_t>, glm::mat4> result(frameData, transform);
+    std::tuple<std::vector<uint8_t>, glm::mat4> result(frameData, camera.transformationMatrix);
     mRendering = false;
     return result;
   });
@@ -168,20 +166,8 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void OSPRayRenderer::recalculateCameraDistances(float fov) {
-  mCameraDistance = std::async(std::launch::deferred, [this, fov]() {
-    getData()->GetPoints()->ComputeBounds();
-    float modelHeight =
-        (getData()->GetPoints()->GetBounds()[3] - getData()->GetPoints()->GetBounds()[2]) / 2;
-    return modelHeight / sin(fov / 180 * (float)M_PI / 2);
-  });
-
-  mNormalizedCameraDistance = 1 / sin(fov / 180 * (float)M_PI / 2);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-std::vector<float> OSPRayRenderer::normalizeDepthBuffer(std::vector<float> buffer, glm::mat4 mvp) {
+std::vector<float> OSPRayRenderer::normalizeDepthBuffer(
+    std::vector<float> buffer, glm::mat4 mvp, float modelRadius, float cameraDistance) {
   std::vector<float> depthData(mResolution.get() * mResolution.get());
 
   for (int i = 0; i < depthData.size(); i++) {
@@ -189,14 +175,13 @@ std::vector<float> OSPRayRenderer::normalizeDepthBuffer(std::vector<float> buffe
     if (val == INFINITY) {
       depthData[i] = mvp[2][3] / mvp[3][3];
     } else {
-      int   x               = i % mResolution.get();
-      float ndcX            = ((float)x / mResolution.get() - 0.5f) * 2;
-      int   y               = i / mResolution.get();
-      float ndcY            = ((float)y / mResolution.get() - 0.5f) * 2;
-      float normalizedDist  = val / mCameraDistance.get() * mNormalizedCameraDistance;
-      float normalizedDepth = sqrtf(normalizedDist * normalizedDist - ndcX * ndcX + ndcY * ndcY);
-      float normalizedZ     = normalizedDepth - mNormalizedCameraDistance;
-      depthData[i] = (normalizedZ * mvp[2][2] + mvp[2][3]) / (normalizedZ * mvp[3][2] + mvp[3][3]);
+      int   x      = i % mResolution.get();
+      float ndcX   = ((float)x / mResolution.get() - 0.5f) * 2;
+      int   y      = i / mResolution.get();
+      float ndcY   = ((float)y / mResolution.get() - 0.5f) * 2;
+      float depth  = sqrtf(val * val - ndcX * ndcX + ndcY * ndcY);
+      float z      = (depth - cameraDistance) / modelRadius;
+      depthData[i] = (z * mvp[2][2] + mvp[2][3]) / (z * mvp[3][2] + mvp[3][3]);
     }
   }
 

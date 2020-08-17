@@ -63,7 +63,9 @@ void initOSPRay() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ospray::cpp::Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 cameraTransform) {
+Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 cameraTransform) {
+  Camera camera;
+
   glm::vec4 camPos(0, 0, 0, 1);
   camPos = cameraTransform * camPos;
   glm::vec4 camUp(0, 1, 0, 0);
@@ -80,9 +82,12 @@ ospray::cpp::Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 c
   glm::vec3 camView3 = glm::normalize(camView);
   float     fovRad   = fov / 180 * (float)M_PI;
   glm::vec3 camRight = glm::cross(camView3, camUp3);
-  glm::vec3 camPosX  = glm::dot(camPos3, glm::normalize(camRight)) * glm::normalize(camRight);
-  glm::vec3 camPosY  = glm::dot(camPos3, glm::normalize(camUp3)) * glm::normalize(camUp3);
-  glm::vec3 camPosZ  = glm::dot(camPos3, glm::normalize(camView3)) * glm::normalize(camView3);
+  float     camXLen  = glm::dot(camPos3, glm::normalize(camRight));
+  float     camYLen  = glm::dot(camPos3, glm::normalize(camUp3));
+  float     camZLen  = glm::dot(camPos3, glm::normalize(camView3));
+  glm::vec3 camPosX  = camXLen * glm::normalize(camRight);
+  glm::vec3 camPosY  = camYLen * glm::normalize(camUp3);
+  glm::vec3 camPosZ  = camZLen * glm::normalize(camView3);
 
   float cameraAngleXCos = glm::dot(camView3, -(camPosZ + camPosX)) /
                           (glm::length(camView3) * glm::length(camPosZ + camPosX));
@@ -135,15 +140,30 @@ ospray::cpp::Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 c
   ospcommon::math::vec2f camImageStartOsp{leftPercent, downPercent};
   ospcommon::math::vec2f camImageEndOsp{rightPercent, upPercent};
 
-  ospray::cpp::Camera camera("perspective");
-  camera.setParam("aspect", 1);
-  camera.setParam("position", camPosOsp);
-  camera.setParam("up", camUpOsp);
-  camera.setParam("direction", camViewOsp);
-  camera.setParam("fovy", fov);
-  camera.setParam("imageStart", camImageStartOsp);
-  camera.setParam("imageEnd", camImageEndOsp);
-  camera.commit();
+  ospray::cpp::Camera osprayCamera("perspective");
+  osprayCamera.setParam("aspect", 1);
+  osprayCamera.setParam("position", camPosOsp);
+  osprayCamera.setParam("up", camUpOsp);
+  osprayCamera.setParam("direction", camViewOsp);
+  osprayCamera.setParam("fovy", fov);
+  osprayCamera.setParam("imageStart", camImageStartOsp);
+  osprayCamera.setParam("imageEnd", camImageEndOsp);
+  osprayCamera.commit();
+
+  camera.osprayCamera = osprayCamera;
+  camera.distance     = glm::length(camPosZ);
+
+  glm::mat4 projection = glm::perspective(
+      fovRad, 1.f, camera.distance / modelHeight - 1, camera.distance / modelHeight + 1);
+  glm::mat4 view = glm::translate(glm::mat4(1.f),
+      -glm::vec3(camXLen, camYLen, -camZLen) / modelHeight);
+  glm::mat4 fitToView(1);
+  fitToView[0][0] = 1 / (rightPercent - leftPercent);
+  fitToView[1][1] = 1 / (upPercent - downPercent);
+  fitToView[3][0] = -2 * leftPercent * fitToView[0][0];
+  fitToView[3][1] = -2 * downPercent * fitToView[1][1];
+
+  camera.transformationMatrix = fitToView * projection * view;
   return camera;
 }
 

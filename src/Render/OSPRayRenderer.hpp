@@ -34,14 +34,11 @@ class OSPRayRenderer : public Renderer {
       float samplingRate, DepthMode depthMode, bool denoiseColor, bool denoiseDepth) override;
 
  private:
-  void               recalculateCameraDistances(float fov);
-  std::vector<float> normalizeDepthBuffer(std::vector<float> buffer, glm::mat4 mvp);
+  std::vector<float> normalizeDepthBuffer(
+      std::vector<float> buffer, glm::mat4 mvp, float modelRadius, float cameraDistance);
 
   std::shared_future<ospray::cpp::TransferFunction> mTransferFunction;
   std::optional<ospray::cpp::Volume>                mVolume;
-
-  std::shared_future<float> mCameraDistance;
-  float                     mNormalizedCameraDistance;
 };
 
 } // namespace csp::volumerendering
