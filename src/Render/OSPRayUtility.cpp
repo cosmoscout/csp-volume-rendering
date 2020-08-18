@@ -375,25 +375,23 @@ std::vector<float> grayscaleToDepth(const std::vector<float>& grayscale) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::vector<float> denoiseImage(std::vector<float>& image, int resolution) {
+std::vector<float> denoiseImage(std::vector<float>& image, int componentCount, int resolution) {
   oidn::DeviceRef device = oidn::newDevice();
   device.setErrorFunction([](void* userPtr, oidn::Error e, const char* errorDetails) {
     oidnLogger().error(errorDetails);
   });
   device.commit();
 
-  std::vector<float> output(image.size());
-
   oidn::FilterRef filter = device.newFilter("RT");
   filter.setImage("color", image.data(), oidn::Format::Float3, resolution, resolution, 0,
-      sizeof(float) * 3, sizeof(float) * 3 * resolution);
-  filter.setImage("output", output.data(), oidn::Format::Float3, resolution, resolution, 0,
-      sizeof(float) * 3, sizeof(float) * 3 * resolution);
+      sizeof(float) * componentCount, sizeof(float) * componentCount * resolution);
+  filter.setImage("output", image.data(), oidn::Format::Float3, resolution, resolution, 0,
+      sizeof(float) * componentCount, sizeof(float) * componentCount * resolution);
   filter.commit();
 
   filter.execute();
 
-  return output;
+  return image;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

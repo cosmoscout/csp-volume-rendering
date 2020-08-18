@@ -116,13 +116,6 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
     ospray::cpp::FrameBuffer framebuffer(imgSize, OSP_FB_RGBA32F, channels);
     framebuffer.clear();
 
-    if (denoiseColor) {
-      ospray::cpp::ImageOperation denoise("denoiser");
-      framebuffer.setParam("imageOperation", ospray::cpp::Data(denoise));
-    } else {
-      framebuffer.removeParam("imageOperation");
-    }
-
     framebuffer.commit();
 
     ospray::cpp::Future renderFuture =
@@ -130,12 +123,18 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
     renderFuture.wait();
     logger().trace("Rendered for {}s", renderFuture.duration());
 
-    float*               colorFrame = (float*)framebuffer.map(OSP_FB_COLOR);
-    std::vector<uint8_t> frameData(4 * mResolution.get() * mResolution.get());
+    std::vector<float>   colorData((float*)framebuffer.map(OSP_FB_COLOR),
+        (float*)framebuffer.map(OSP_FB_COLOR) + 4 * mResolution.get() * mResolution.get());
     std::vector<float>   depthData(mResolution.get() * mResolution.get(), INFINITY);
+    std::vector<uint8_t> frameData(4 * mResolution.get() * mResolution.get());
+
+
+		if (denoiseColor) {
+      colorData = OSPRayUtility::denoiseImage(colorData, 4, mResolution.get());
+    }
 
     for (int i = 0; i < frameData.size(); i++) {
-      frameData[i] = colorFrame[i] * 255;
+      frameData[i] = colorData[i] * 255;
     }
 
     if (depthMode != Renderer::DepthMode::eNone) {
@@ -150,7 +149,7 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
     if (depthMode != Renderer::DepthMode::eNone && denoiseDepth) {
       auto               timer          = std::chrono::high_resolution_clock::now();
       std::vector<float> depthGrayscale = OSPRayUtility::depthToGrayscale(depthData);
-      std::vector<float> denoised = OSPRayUtility::denoiseImage(depthGrayscale, mResolution.get());
+      std::vector<float> denoised = OSPRayUtility::denoiseImage(depthGrayscale, 3, mResolution.get());
       depthData                   = OSPRayUtility::grayscaleToDepth(denoised);
       logger().trace("Denoised depth for {}s",
           (float)(std::chrono::high_resolution_clock::now() - timer).count() / 1000000000);
