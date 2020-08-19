@@ -7,7 +7,6 @@
 #include "OSPRayRenderer.hpp"
 
 #include "../logger.hpp"
-#include "OSPRayUtility.hpp"
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -128,8 +127,7 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
     std::vector<float>   depthData(mResolution.get() * mResolution.get(), INFINITY);
     std::vector<uint8_t> frameData(4 * mResolution.get() * mResolution.get());
 
-
-		if (denoiseColor) {
+    if (denoiseColor) {
       colorData = OSPRayUtility::denoiseImage(colorData, 4, mResolution.get());
     }
 
@@ -142,15 +140,16 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
       depthData         = std::vector(depthFrame, depthFrame + depthData.size());
     }
 
-    depthData = normalizeDepthBuffer(depthData, camera.transformationMatrix,
+    depthData = normalizeDepthBuffer(depthData,
         (getData()->GetPoints()->GetBounds()[1] - getData()->GetPoints()->GetBounds()[0]) / 2,
-        camera.distance);
+        camera);
 
     if (depthMode != Renderer::DepthMode::eNone && denoiseDepth) {
       auto               timer          = std::chrono::high_resolution_clock::now();
       std::vector<float> depthGrayscale = OSPRayUtility::depthToGrayscale(depthData);
-      std::vector<float> denoised = OSPRayUtility::denoiseImage(depthGrayscale, 3, mResolution.get());
-      depthData                   = OSPRayUtility::grayscaleToDepth(denoised);
+      std::vector<float> denoised =
+          OSPRayUtility::denoiseImage(depthGrayscale, 3, mResolution.get());
+      depthData = OSPRayUtility::grayscaleToDepth(denoised);
       logger().trace("Denoised depth for {}s",
           (float)(std::chrono::high_resolution_clock::now() - timer).count() / 1000000000);
     }
@@ -166,21 +165,24 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::vector<float> OSPRayRenderer::normalizeDepthBuffer(
-    std::vector<float> buffer, glm::mat4 mvp, float modelRadius, float cameraDistance) {
+    std::vector<float> buffer, float modelRadius, OSPRayUtility::Camera camera) {
   std::vector<float> depthData(mResolution.get() * mResolution.get());
 
   for (int i = 0; i < depthData.size(); i++) {
     float val = buffer[i];
     if (val == INFINITY) {
-      depthData[i] = mvp[2][3] / mvp[3][3];
+      depthData[i] = camera.transformationMatrix[3][2] / camera.transformationMatrix[3][3];
     } else {
-      int   x      = i % mResolution.get();
-      float ndcX   = ((float)x / mResolution.get() - 0.5f) * 2;
-      int   y      = i / mResolution.get();
-      float ndcY   = ((float)y / mResolution.get() - 0.5f) * 2;
-      float depth  = sqrtf(val * val - ndcX * ndcX + ndcY * ndcY);
-      float z      = (depth - cameraDistance) / modelRadius;
-      depthData[i] = (z * mvp[2][2] + mvp[2][3]) / (z * mvp[3][2] + mvp[3][3]);
+      val /= modelRadius;
+      int       x       = i % mResolution.get();
+      float     ndcX    = ((float)x / mResolution.get() - 0.5f) * 2;
+      int       y       = i / mResolution.get();
+      float     ndcY    = ((float)y / mResolution.get() - 0.5f) * 2;
+      glm::vec3 posPix  = glm::vec3(ndcX, ndcY, 0);
+      float     dist0   = glm::length(camera.positionRotated - posPix);
+      glm::vec3 pos     = (dist0 - val) * glm::normalize(camera.positionRotated - posPix) + posPix;
+      glm::vec4 posClip = camera.transformationMatrix * glm::vec4(pos, 1);
+      depthData[i]      = posClip.z / posClip.w;
     }
   }
 

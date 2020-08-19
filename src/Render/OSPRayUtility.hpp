@@ -17,7 +17,7 @@
 namespace csp::volumerendering::OSPRayUtility {
 struct Camera {
   ospray::cpp::Camera osprayCamera;
-  float               distance;
+  glm::vec3           positionRotated;
   glm::mat4           transformationMatrix;
 };
 

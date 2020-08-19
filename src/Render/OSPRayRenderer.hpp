@@ -8,6 +8,7 @@
 #define CSP_VOLUME_RENDERING_OSPRAYRENDERER_HPP
 
 #include "Renderer.hpp"
+#include "OSPRayUtility.hpp"
 
 #include <ospray/ospray_cpp.h>
 // Boost defines a function called likely so this macro from platform.h has to be undeffed
@@ -35,7 +36,7 @@ class OSPRayRenderer : public Renderer {
 
  private:
   std::vector<float> normalizeDepthBuffer(
-      std::vector<float> buffer, glm::mat4 mvp, float modelRadius, float cameraDistance);
+      std::vector<float> buffer, float modelRadius, OSPRayUtility::Camera camera);
 
   std::shared_future<ospray::cpp::TransferFunction> mTransferFunction;
   std::optional<ospray::cpp::Volume>                mVolume;
