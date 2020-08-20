@@ -63,79 +63,46 @@ void initOSPRay() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 cameraTransform) {
-  Camera camera;
+Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 observerTransform) {
+  float fovRad = fov / 180 * (float)M_PI;
 
-  glm::vec4 camPos(0, 0, 0, 1);
-  camPos = cameraTransform * camPos;
-  glm::vec4 camUp(0, 1, 0, 0);
-  camUp = cameraTransform * camUp;
-  glm::vec4 camView(0, 0, -1, 0);
-  camView = cameraTransform * camView;
+  // Create a transformation matrix for a camera placed on (0,0,0) looking along the negative z axis
+  glm::mat4 cameraTransform(1);
+  cameraTransform[2][2] = -1;
 
-  ospcommon::math::vec3f camPosOsp{camPos[0], camPos[1], camPos[2]};
-  ospcommon::math::vec3f camUpOsp{camUp[0], camUp[1], camUp[2]};
-  ospcommon::math::vec3f camViewOsp{camView[0], camView[1], camView[2]};
+  cameraTransform = observerTransform * cameraTransform;
 
-  glm::vec3 camPos3  = camPos;
-  glm::vec3 camUp3   = glm::normalize(camUp);
-  glm::vec3 camView3 = glm::normalize(camView);
-  float     fovRad   = fov / 180 * (float)M_PI;
-  glm::vec3 camRight = glm::cross(camView3, camUp3);
-  float     camXLen  = glm::dot(camPos3, glm::normalize(camRight));
-  float     camYLen  = glm::dot(camPos3, glm::normalize(camUp3));
-  float     camZLen  = glm::dot(camPos3, glm::normalize(camView3));
-  glm::vec3 camPosX  = camXLen * glm::normalize(camRight);
-  glm::vec3 camPosY  = camYLen * glm::normalize(camUp3);
-  glm::vec3 camPosZ  = camZLen * glm::normalize(camView3);
+  glm::vec3 camRight(cameraTransform[0].xyz);
+  camRight = glm::normalize(camRight);
+  glm::vec3 camUp(cameraTransform[1].xyz);
+  camUp = glm::normalize(camUp);
+  glm::vec3 camDir(cameraTransform[2].xyz);
+  camDir = glm::normalize(camDir);
+  glm::vec3 camPos(cameraTransform[3].xyz);
 
-  float cameraAngleXCos = glm::dot(camView3, -(camPosZ + camPosX)) /
-                          (glm::length(camView3) * glm::length(camPosZ + camPosX));
-  float cameraAngleX    = acos(cameraAngleXCos <= 1 ? cameraAngleXCos : 1);
-  float cameraAngleYCos = glm::dot(camView3, -(camPosZ + camPosY)) /
-                          (glm::length(camView3) * glm::length(camPosZ + camPosY));
-  float cameraAngleY = acos(cameraAngleYCos <= 1 ? cameraAngleYCos : 1);
+  float camXLen = glm::dot(camPos, camRight);
+  float camYLen = glm::dot(camPos, camUp);
+  float camZLen = glm::dot(camPos, camDir);
 
-  float modelAngleX = asin(modelHeight / glm::length(camPosX + camPosZ));
-  float modelAngleY = asin(modelHeight / glm::length(camPosY + camPosZ));
+  float cameraAngleX = atan(camXLen / camZLen);
+  float cameraAngleY = atan(camYLen / camZLen);
 
-  float leftAngle, rightAngle, downAngle, upAngle;
-  float leftPercent, rightPercent, downPercent, upPercent;
+  float modelAngleX = asin(modelHeight / sqrt(camXLen * camXLen + camZLen * camZLen));
+  float modelAngleY = asin(modelHeight / sqrt(camYLen * camYLen + camZLen * camZLen));
 
-  if (glm::dot(camPos3, glm::normalize(camRight)) > 0) {
-    leftAngle  = -cameraAngleX - modelAngleX;
-    rightAngle = -cameraAngleX + modelAngleX;
-  } else {
-    leftAngle  = cameraAngleX - modelAngleX;
-    rightAngle = cameraAngleX + modelAngleX;
-  }
-  if (glm::dot(camPos3, glm::normalize(camUp3)) > 0) {
-    downAngle = -cameraAngleY - modelAngleY;
-    upAngle   = -cameraAngleY + modelAngleY;
-  } else {
-    downAngle = cameraAngleY - modelAngleY;
-    upAngle   = cameraAngleY + modelAngleY;
-  }
-  if (leftAngle < 0) {
-    leftPercent = (tan(fovRad / 2) - tan(abs(leftAngle))) / (2 * tan(fovRad / 2));
-  } else {
-    leftPercent = (tan(fovRad / 2) + tan(leftAngle)) / (2 * tan(fovRad / 2));
-  }
-  if (rightAngle < 0) {
-    rightPercent = (tan(fovRad / 2) - tan(abs(rightAngle))) / (2 * tan(fovRad / 2));
-  } else {
-    rightPercent = (tan(fovRad / 2) + tan(rightAngle)) / (2 * tan(fovRad / 2));
-  }
-  if (downAngle < 0) {
-    downPercent = (tan(fovRad / 2) - tan(abs(downAngle))) / (2 * tan(fovRad / 2));
-  } else {
-    downPercent = (tan(fovRad / 2) + tan(downAngle)) / (2 * tan(fovRad / 2));
-  }
-  if (upAngle < 0) {
-    upPercent = (tan(fovRad / 2) - tan(abs(upAngle))) / (2 * tan(fovRad / 2));
-  } else {
-    upPercent = (tan(fovRad / 2) + tan(upAngle)) / (2 * tan(fovRad / 2));
-  }
+  float leftAngle  = cameraAngleX - modelAngleX;
+  float rightAngle = cameraAngleX + modelAngleX;
+  float downAngle  = cameraAngleY - modelAngleY;
+  float upAngle    = cameraAngleY + modelAngleY;
+
+  float leftPercent  = 0.5f + tan(leftAngle) / (2 * tan(fovRad / 2));
+  float rightPercent = 0.5f + tan(rightAngle) / (2 * tan(fovRad / 2));
+  float downPercent  = 0.5f + tan(downAngle) / (2 * tan(fovRad / 2));
+  float upPercent    = 0.5f + tan(upAngle) / (2 * tan(fovRad / 2));
+
+  ospcommon::math::vec3f camPosOsp{camPos.x, camPos.y, camPos.z};
+  ospcommon::math::vec3f camUpOsp{camUp.x, camUp.y, camUp.z};
+  ospcommon::math::vec3f camViewOsp{camDir.x, camDir.y, camDir.z};
 
   ospcommon::math::vec2f camImageStartOsp{leftPercent, downPercent};
   ospcommon::math::vec2f camImageEndOsp{rightPercent, upPercent};
@@ -150,6 +117,7 @@ Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 cameraTransfor
   osprayCamera.setParam("imageEnd", camImageEndOsp);
   osprayCamera.commit();
 
+  Camera camera;
   camera.osprayCamera    = osprayCamera;
   camera.positionRotated = glm::vec3(camXLen, camYLen, -camZLen) / modelHeight;
 
@@ -166,7 +134,7 @@ Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 cameraTransfor
 
   camera.transformationMatrix = fitToView * projection * view;
   return camera;
-}
+} // namespace csp::volumerendering::OSPRayUtility
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 

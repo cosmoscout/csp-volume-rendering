@@ -23,7 +23,7 @@ struct Camera {
 
 void initOSPRay();
 
-Camera              createOSPRayCamera(float fov, float modelHeight, glm::mat4 cameraTransform);
+Camera              createOSPRayCamera(float fov, float modelHeight, glm::mat4 observerTransform);
 ospray::cpp::Volume createOSPRayVolume(
     vtkSmartPointer<vtkUnstructuredGrid> vtkVolume, std::string scalar);
 ospray::cpp::TransferFunction createOSPRayTransferFunction();
