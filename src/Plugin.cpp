@@ -323,10 +323,10 @@ void Plugin::requestFrame(glm::dquat cameraRotation) {
     glm::mat4 t     = mBillboard->getRelativeTransform(
         mTimeControl->pSimulationTime.get(), mSolarSystem->getObserver());
     glm::vec3 r = cs::core::SolarSystem::getRadii(mBillboard->getCenterName());
-		for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < 4; i++) {
       t[i] *= glm::vec4(1 / r[0], 1 / r[1], 1 / r[2], 1);
-		}
-    mFutureFrameData = mRenderer->getFrame(t, mRenderingFrame.mSamplingRate,
+    }
+    mFutureFrameData   = mRenderer->getFrame(t, mRenderingFrame.mSamplingRate,
         mRenderingFrame.mDepthMode, mNextFrame.mDenoiseColor, mNextFrame.mDenoiseDepth);
     mGettingFrame      = true;
     mLastFrameInterval = 0;
@@ -368,6 +368,20 @@ void Plugin::displayFrame(Frame& frame) {
     mBillboard->setTexture(colorData, frame.mResolution, frame.mResolution);
     mBillboard->setDepthTexture(depthData, frame.mResolution, frame.mResolution);
     mBillboard->setTransform(glm::toMat4(frame.mCameraRotation));
+    logger().trace("MVP");
+    logger().trace("{}, {}, {}, {}", frame.mModelViewProjection[0][0],
+        frame.mModelViewProjection[1][0], frame.mModelViewProjection[2][0],
+        frame.mModelViewProjection[3][0]);
+    logger().trace("{}, {}, {}, {}", frame.mModelViewProjection[0][1],
+        frame.mModelViewProjection[1][1], frame.mModelViewProjection[2][1],
+        frame.mModelViewProjection[3][1]);
+    logger().trace("{}, {}, {}, {}", frame.mModelViewProjection[0][2],
+        frame.mModelViewProjection[1][2], frame.mModelViewProjection[2][2],
+        frame.mModelViewProjection[3][2]);
+    logger().trace("{}, {}, {}, {}", frame.mModelViewProjection[0][3],
+        frame.mModelViewProjection[1][3], frame.mModelViewProjection[2][3],
+        frame.mModelViewProjection[3][3]);
+
     mBillboard->setMVPMatrix(frame.mModelViewProjection);
     mDisplayedFrame = frame;
   }

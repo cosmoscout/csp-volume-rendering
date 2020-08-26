@@ -171,18 +171,23 @@ std::vector<float> OSPRayRenderer::normalizeDepthBuffer(
   for (int i = 0; i < depthData.size(); i++) {
     float val = buffer[i];
     if (val == INFINITY) {
-      depthData[i] = camera.transformationMatrix[3][2] / camera.transformationMatrix[3][3];
+      depthData[i] = 0; // camera.transformationMatrix[3][2] / camera.transformationMatrix[3][3];
     } else {
       val /= modelRadius;
-      int       x       = i % mResolution.get();
-      float     ndcX    = ((float)x / mResolution.get() - 0.5f) * 2;
-      int       y       = i / mResolution.get();
-      float     ndcY    = ((float)y / mResolution.get() - 0.5f) * 2;
-      glm::vec3 posPix  = glm::vec3(ndcX, ndcY, 0);
-      float     dist0   = glm::length(camera.positionRotated - posPix);
-      glm::vec3 pos     = (dist0 - val) * glm::normalize(camera.positionRotated - posPix) + posPix;
-      glm::vec4 posClip = camera.transformationMatrix * glm::vec4(pos, 1);
-      depthData[i]      = posClip.z / posClip.w;
+      int       x          = i % mResolution.get();
+      float     ndcX       = ((float)x / mResolution.get() - 0.5f) * 2;
+      int       y          = i / mResolution.get();
+      float     ndcY       = ((float)y / mResolution.get() - 0.5f) * 2;
+      glm::vec4 posPixClip = glm::vec4(ndcX, ndcY, 0, 1);
+      glm::vec4 posPix     = glm::inverse(camera.transformationMatrix) * posPixClip;
+      glm::vec3 posPixNorm = posPix.xyz * (1 / posPix.w);
+      // float     dist0      = glm::length(camera.positionRotated - posPixNorm);
+      glm::vec3 pos = (/*dist0 - */ val) *
+                          glm::normalize(posPixNorm - camera.positionRotated /* - posPixNorm*/) +
+                      camera.positionRotated; // + posPixNorm;
+      glm::vec4 posClip     = camera.transformationMatrix * glm::vec4(pos, 1);
+      glm::vec3 posClipNorm = posClip.xyz * (1 / posClip.w);
+      depthData[i]          = posClipNorm.z;
     }
   }
 

@@ -66,12 +66,14 @@ void initOSPRay() {
 Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 observerTransform) {
   float fovRad = fov / 180 * (float)M_PI;
 
-  // Create a transformation matrix for a camera placed on (0,0,0) looking along the negative z axis
+  // Create camera transform looking along negative z
   glm::mat4 cameraTransform(1);
   cameraTransform[2][2] = -1;
 
+  // Move camera to observer position relative to planet
   cameraTransform = observerTransform * cameraTransform;
 
+  // Get base vectors of rotated coordinate system
   glm::vec3 camRight(cameraTransform[0].xyz);
   camRight = glm::normalize(camRight);
   glm::vec3 camUp(cameraTransform[1].xyz);
@@ -80,21 +82,26 @@ Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 observerTransf
   camDir = glm::normalize(camDir);
   glm::vec3 camPos(cameraTransform[3].xyz);
 
+  // Get position of camera in rotated coordinate system
   float camXLen = glm::dot(camPos, camRight);
   float camYLen = glm::dot(camPos, camUp);
   float camZLen = glm::dot(camPos, camDir);
 
+  // Get angle between camera position and forward vector
   float cameraAngleX = atan(camXLen / camZLen);
   float cameraAngleY = atan(camYLen / camZLen);
 
+  // Get angle between ray towards center of volume and ray at edge of volume
   float modelAngleX = asin(modelHeight / sqrt(camXLen * camXLen + camZLen * camZLen));
   float modelAngleY = asin(modelHeight / sqrt(camYLen * camYLen + camZLen * camZLen));
 
+  // Get angle between rays at edges of volume and forward vector
   float leftAngle  = cameraAngleX - modelAngleX;
   float rightAngle = cameraAngleX + modelAngleX;
   float downAngle  = cameraAngleY - modelAngleY;
   float upAngle    = cameraAngleY + modelAngleY;
 
+  // Get edges of volume in image space coordinates
   float leftPercent  = 0.5f + tan(leftAngle) / (2 * tan(fovRad / 2));
   float rightPercent = 0.5f + tan(rightAngle) / (2 * tan(fovRad / 2));
   float downPercent  = 0.5f + tan(downAngle) / (2 * tan(fovRad / 2));
@@ -118,23 +125,68 @@ Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 observerTransf
   osprayCamera.commit();
 
   Camera camera;
-  camera.osprayCamera    = osprayCamera;
+  camera.osprayCamera = osprayCamera;
+  logger().trace("CamPos: {}, {}, {}", camXLen, camYLen, camZLen);
   camera.positionRotated = glm::vec3(camXLen, camYLen, -camZLen) / modelHeight;
 
-  glm::mat4 projection =
-      glm::perspective(fovRad, 1.f, -camZLen / modelHeight - 1, -camZLen / modelHeight + 1);
   glm::mat4 view =
       glm::translate(glm::mat4(1.f), -glm::vec3(camXLen, camYLen, -camZLen) / modelHeight);
+  glm::mat4 projection =
+      glm::perspective(fovRad, 1.f, -camZLen / modelHeight - 1, -camZLen / modelHeight + 1);
+
+  leftPercent  = (leftPercent - 0.5f) * 2;
+  rightPercent = (rightPercent - 0.5f) * 2;
+  downPercent  = (downPercent - 0.5f) * 2;
+  upPercent    = (upPercent - 0.5f) * 2;
 
   glm::mat4 fitToView(1);
-  fitToView[0][0] = (projection * view)[3][3] / (projection * view)[0][0];
-  fitToView[1][1] = (projection * view)[3][3] / (projection * view)[1][1];
-  fitToView[3][0] = -(projection * view)[3][0] * fitToView[0][0] / (projection * view)[3][3];
-  fitToView[3][1] = -(projection * view)[3][1] * fitToView[1][1] / (projection * view)[3][3];
+  fitToView[0][0] = 2 / (rightPercent - leftPercent);
+  fitToView[1][1] = 2 / (upPercent - downPercent);
+  fitToView[3][0] = -leftPercent * fitToView[0][0] - 1;
+  fitToView[3][1] = -downPercent * fitToView[1][1] - 1;
 
-  camera.transformationMatrix = fitToView * projection * view;
+  float     nearClip  = -camZLen / modelHeight - 1;
+  float     farClip   = -camZLen / modelHeight + 1;
+  float     leftClip  = tan(leftAngle) * nearClip;
+  float     rightClip = tan(rightAngle) * nearClip;
+  float     downClip  = tan(downAngle) * nearClip;
+  float     upClip    = tan(upAngle) * nearClip;
+  glm::mat4 projection2(0);
+  projection2[0][0] = 2 * nearClip / (rightClip - leftClip);
+  projection2[1][1] = 2 * nearClip / (upClip - downClip);
+  projection2[2][0] = (rightClip + leftClip) / (rightClip - leftClip);
+  projection2[2][1] = (upClip + downClip) / (upClip - downClip);
+  projection2[2][2] = -(farClip + nearClip) / (farClip - nearClip);
+  projection2[2][3] = -1;
+  projection2[3][2] = -2 * farClip * nearClip / (farClip - nearClip);
+  logger().trace("Near%: {}", nearClip);
+  logger().trace("Faar%: {}", farClip);
+  logger().trace("Left%: {}", leftClip);
+  logger().trace("Rght%: {}", rightClip);
+  logger().trace("Down%: {}", downClip);
+  logger().trace("UUpp%: {}", upClip);
+  logger().trace("view");
+  logger().trace("{}, {}, {}, {}", view[0][0], view[1][0],
+      view[2][0], view[3][0]);
+  logger().trace("{}, {}, {}, {}", view[0][1], view[1][1],
+      view[2][1], view[3][1]);
+  logger().trace("{}, {}, {}, {}", view[0][2], view[1][2],
+      view[2][2], view[3][2]);
+  logger().trace("{}, {}, {}, {}", view[0][3], view[1][3],
+      view[2][3], view[3][3]);
+  logger().trace("projection");
+  logger().trace("{}, {}, {}, {}", projection2[0][0], projection2[1][0],
+      projection2[2][0], projection2[3][0]);
+  logger().trace("{}, {}, {}, {}", projection2[0][1], projection2[1][1],
+      projection2[2][1], projection2[3][1]);
+  logger().trace("{}, {}, {}, {}", projection2[0][2], projection2[1][2],
+      projection2[2][2], projection2[3][2]);
+  logger().trace("{}, {}, {}, {}", projection2[0][3], projection2[1][3],
+      projection2[2][3], projection2[3][3]);
+
+  camera.transformationMatrix = projection2 * view;
   return camera;
-} // namespace csp::volumerendering::OSPRayUtility
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 

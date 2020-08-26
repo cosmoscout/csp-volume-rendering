@@ -39,6 +39,15 @@ void main()
 		if (!uUseDepth) {
       objSpacePos.z = uMatRendererMVP[3][2] / uMatRendererMVP[3][3];
     }
+    /*float z = (inverse(uMatRendererMVP) * vec4(0,0,objSpacePos.z,1)).z;
+    vec4 minPos = uMatRendererMVP * vec4(-1,-1,z,1);
+    vec4 maxPos = uMatRendererMVP * vec4(1,1,z,1);
+    float minX = minPos.x / minPos.w;
+    float maxX = maxPos.x / minPos.w;
+    float minY = minPos.y / minPos.w;
+    float maxY = maxPos.y / minPos.w;
+    objSpacePos.x = (objSpacePos.x + 1.f) / 2.f * (maxX - minX) + minX;
+    objSpacePos.y = (objSpacePos.y + 1.f) / 2.f * (maxY - minY) + minY;*/
 
     objSpacePos = inverse(uMatRendererMVP) * objSpacePos;
     vPosition   = objSpacePos.xyz / objSpacePos.w;
@@ -78,7 +87,8 @@ void main()
 	oColor = texture(uTexture, vTexCoords);
 	if(oColor.a <= 0)
 	{
-		discard;
+oColor = vec4(1,1,1,0.5);
+		//discard;
 	}
   if (uDrawDepth) {
     oColor = vec4(vDepth, vDepth, vDepth, 1);
