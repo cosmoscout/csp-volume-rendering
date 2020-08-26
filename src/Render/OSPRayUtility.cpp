@@ -126,24 +126,10 @@ Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 observerTransf
 
   Camera camera;
   camera.osprayCamera = osprayCamera;
-  logger().trace("CamPos: {}, {}, {}", camXLen, camYLen, camZLen);
   camera.positionRotated = glm::vec3(camXLen, camYLen, -camZLen) / modelHeight;
 
   glm::mat4 view =
       glm::translate(glm::mat4(1.f), -glm::vec3(camXLen, camYLen, -camZLen) / modelHeight);
-  glm::mat4 projection =
-      glm::perspective(fovRad, 1.f, -camZLen / modelHeight - 1, -camZLen / modelHeight + 1);
-
-  leftPercent  = (leftPercent - 0.5f) * 2;
-  rightPercent = (rightPercent - 0.5f) * 2;
-  downPercent  = (downPercent - 0.5f) * 2;
-  upPercent    = (upPercent - 0.5f) * 2;
-
-  glm::mat4 fitToView(1);
-  fitToView[0][0] = 2 / (rightPercent - leftPercent);
-  fitToView[1][1] = 2 / (upPercent - downPercent);
-  fitToView[3][0] = -leftPercent * fitToView[0][0] - 1;
-  fitToView[3][1] = -downPercent * fitToView[1][1] - 1;
 
   float     nearClip  = -camZLen / modelHeight - 1;
   float     farClip   = -camZLen / modelHeight + 1;
@@ -151,40 +137,16 @@ Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 observerTransf
   float     rightClip = tan(rightAngle) * nearClip;
   float     downClip  = tan(downAngle) * nearClip;
   float     upClip    = tan(upAngle) * nearClip;
-  glm::mat4 projection2(0);
-  projection2[0][0] = 2 * nearClip / (rightClip - leftClip);
-  projection2[1][1] = 2 * nearClip / (upClip - downClip);
-  projection2[2][0] = (rightClip + leftClip) / (rightClip - leftClip);
-  projection2[2][1] = (upClip + downClip) / (upClip - downClip);
-  projection2[2][2] = -(farClip + nearClip) / (farClip - nearClip);
-  projection2[2][3] = -1;
-  projection2[3][2] = -2 * farClip * nearClip / (farClip - nearClip);
-  logger().trace("Near%: {}", nearClip);
-  logger().trace("Faar%: {}", farClip);
-  logger().trace("Left%: {}", leftClip);
-  logger().trace("Rght%: {}", rightClip);
-  logger().trace("Down%: {}", downClip);
-  logger().trace("UUpp%: {}", upClip);
-  logger().trace("view");
-  logger().trace("{}, {}, {}, {}", view[0][0], view[1][0],
-      view[2][0], view[3][0]);
-  logger().trace("{}, {}, {}, {}", view[0][1], view[1][1],
-      view[2][1], view[3][1]);
-  logger().trace("{}, {}, {}, {}", view[0][2], view[1][2],
-      view[2][2], view[3][2]);
-  logger().trace("{}, {}, {}, {}", view[0][3], view[1][3],
-      view[2][3], view[3][3]);
-  logger().trace("projection");
-  logger().trace("{}, {}, {}, {}", projection2[0][0], projection2[1][0],
-      projection2[2][0], projection2[3][0]);
-  logger().trace("{}, {}, {}, {}", projection2[0][1], projection2[1][1],
-      projection2[2][1], projection2[3][1]);
-  logger().trace("{}, {}, {}, {}", projection2[0][2], projection2[1][2],
-      projection2[2][2], projection2[3][2]);
-  logger().trace("{}, {}, {}, {}", projection2[0][3], projection2[1][3],
-      projection2[2][3], projection2[3][3]);
+  glm::mat4 projection(0);
+  projection[0][0] = 2 * nearClip / (rightClip - leftClip);
+  projection[1][1] = 2 * nearClip / (upClip - downClip);
+  projection[2][0] = (rightClip + leftClip) / (rightClip - leftClip);
+  projection[2][1] = (upClip + downClip) / (upClip - downClip);
+  projection[2][2] = -(farClip + nearClip) / (farClip - nearClip);
+  projection[2][3] = -1;
+  projection[3][2] = -2 * farClip * nearClip / (farClip - nearClip);
 
-  camera.transformationMatrix = projection2 * view;
+  camera.transformationMatrix = projection * view;
   return camera;
 }
 
