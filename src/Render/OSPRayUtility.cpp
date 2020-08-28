@@ -125,7 +125,7 @@ Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 observerTransf
   osprayCamera.commit();
 
   Camera camera;
-  camera.osprayCamera = osprayCamera;
+  camera.osprayCamera    = osprayCamera;
   camera.positionRotated = glm::vec3(camXLen, camYLen, -camZLen) / modelHeight;
 
   glm::mat4 view =
@@ -277,7 +277,7 @@ ospray::cpp::TransferFunction createOSPRayTransferFunction(
 
   for (glm::vec4 c : colors) {
     color.push_back(ospcommon::math::vec3f(c[0], c[1], c[2]));
-    opacity.push_back(c[3] * 2);
+      opacity.push_back(powf(10, c[3]) - 1);
   }
 
   ospcommon::math::vec2f valueRange = {min, max};

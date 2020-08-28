@@ -54,7 +54,7 @@ class Plugin : public cs::core::PluginBase {
     int                    mResolution;
     float                  mSamplingRate;
     float                  mFov;
-    glm::dquat             mCameraRotation;
+    glm::mat4              mCameraTransform;
     std::vector<glm::vec4> mTransferFunction;
     Renderer::DepthMode    mDepthMode;
     bool                   mDenoiseColor;
@@ -66,8 +66,8 @@ class Plugin : public cs::core::PluginBase {
     bool operator==(const Frame& other);
   };
 
-  void requestFrame(glm::dquat cameraRotation);
-  void tryReuseFrame(glm::dquat cameraRotation);
+  void requestFrame(glm::mat4 cameraTransform);
+  void tryReuseFrame(glm::mat4 cameraTransform);
   void displayFrame(Frame& frame);
 
   Settings mPluginSettings;
@@ -80,10 +80,10 @@ class Plugin : public cs::core::PluginBase {
   int              mFrameIntervalsLength = 1;
   int              mFrameIntervalsIndex  = 0;
 
-  glm::dquat              mLastCameraRotation;
-  std::vector<glm::dquat> mCameraRotations;
-  int                     mCameraRotationsLength = 15;
-  int                     mCameraRotationsIndex  = 0;
+  glm::mat4              mLastCameraTransform;
+  std::vector<glm::mat4> mCameraTransforms;
+  int                    mCameraTransformsLength = 15;
+  int                    mCameraTransformsIndex  = 0;
 
   std::unique_ptr<Renderer>        mRenderer;
   std::shared_ptr<Billboard>       mBillboard;

@@ -171,7 +171,7 @@ std::vector<float> OSPRayRenderer::normalizeDepthBuffer(
   for (int i = 0; i < depthData.size(); i++) {
     float val = buffer[i];
     if (val == INFINITY) {
-      depthData[i] = 0;
+      depthData[i] = -camera.transformationMatrix[3][2] / camera.transformationMatrix[2][2];
     } else {
       val /= modelRadius;
       int       x          = i % mResolution.get();

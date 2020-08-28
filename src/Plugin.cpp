@@ -22,6 +22,7 @@
 #include <VistaKernelOpenSGExt/VistaOpenSGMaterialTools.h>
 
 #include "glm/gtx/quaternion.hpp"
+#include "glm/gtc/epsilon.hpp"
 
 #include <numeric>
 #include <thread>
@@ -71,7 +72,11 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool Plugin::Frame::operator==(const Frame& other) {
-  return mResolution == other.mResolution && mCameraRotation == other.mCameraRotation &&
+  return mResolution == other.mResolution &&
+         glm::all(glm::epsilonEqual(mCameraTransform[0], other.mCameraTransform[0], 0.0001f)) &&
+         glm::all(glm::epsilonEqual(mCameraTransform[1], other.mCameraTransform[1], 0.0001f)) &&
+         glm::all(glm::epsilonEqual(mCameraTransform[2], other.mCameraTransform[2], 0.0001f)) &&
+         glm::all(glm::epsilonEqual(mCameraTransform[3], other.mCameraTransform[3], 0.0001f)) &&
          mSamplingRate == other.mSamplingRate && mFov == other.mFov &&
          mTransferFunction == other.mTransferFunction && mDenoiseColor == other.mDenoiseColor &&
          mDenoiseDepth == other.mDenoiseDepth && mDepthMode == other.mDepthMode;
@@ -233,7 +238,7 @@ void Plugin::init() {
 
   // Init buffers for predictive rendering
   mFrameIntervals.resize(mFrameIntervalsLength);
-  mCameraRotations.resize(mCameraRotationsLength);
+  mCameraTransforms.resize(mCameraTransformsLength);
 
   logger().info("Loading plugin done.");
 }
@@ -255,8 +260,13 @@ void Plugin::deInit() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Plugin::update() {
-  glm::dquat currentCameraRotation = mBillboard->getRelativeRotation(
+  glm::mat4 currentCameraTransform = mBillboard->getRelativeTransform(
       mTimeControl->pSimulationTime.get(), mSolarSystem->getObserver());
+  float     scale = (float)mBillboard->getRelativeScale(mSolarSystem->getObserver());
+  glm::vec3 r     = cs::core::SolarSystem::getRadii(mBillboard->getCenterName());
+  currentCameraTransform =
+      glm::scale(currentCameraTransform, glm::vec3(1.f / scale, 1.f / scale, 1.f / scale));
+  currentCameraTransform[3] *= glm::vec4(1 / r[0], 1 / r[1], 1 / r[2], 1);
 
   if (mGettingFrame) {
     if (mFutureFrameData.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
@@ -274,41 +284,49 @@ void Plugin::update() {
     }
   } else {
     if (mPluginSettings.mRequestImages.get()) {
-      requestFrame(currentCameraRotation);
+      requestFrame(currentCameraTransform);
     }
   }
 
   if (mPluginSettings.mReuseImages.get() && mRenderedFrames.size() > 0) {
-    tryReuseFrame(currentCameraRotation);
+    tryReuseFrame(currentCameraTransform);
   }
 
   mLastFrameInterval++;
-  mCameraRotations[mCameraRotationsIndex] =
-      currentCameraRotation * glm::conjugate(mLastCameraRotation);
-  mLastCameraRotation = currentCameraRotation;
-  if (++mCameraRotationsIndex >= mCameraRotationsLength) {
-    mCameraRotationsIndex = 0;
+  mCameraTransforms[mCameraTransformsIndex] =
+      currentCameraTransform * glm::inverse(mLastCameraTransform);
+  mLastCameraTransform = currentCameraTransform;
+  if (++mCameraTransformsIndex >= mCameraTransformsLength) {
+    mCameraTransformsIndex = 0;
   }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Plugin::requestFrame(glm::dquat cameraRotation) {
+void Plugin::requestFrame(glm::mat4 cameraTransform) {
   cs::utils::FrameTimings::ScopedTimer timer("Request frame");
 
   if (mPluginSettings.mPredictiveRendering.get()) {
-    glm::dquat predictedCameraRotation = cameraRotation;
-    for (int i = 0; i < std::accumulate(mFrameIntervals.begin(), mFrameIntervals.end(), 0) /
-                            mFrameIntervalsLength;
-         i++) {
-      predictedCameraRotation = std::accumulate(mCameraRotations.begin(), mCameraRotations.end(),
-                                    glm::dquat(0, 0, 0, 0)) /
-                                (double)mCameraRotationsLength * predictedCameraRotation;
+    glm::mat4 predictedCameraTransform = cameraTransform;
+    int       meanFrameInterval =
+        std::accumulate(mFrameIntervals.begin(), mFrameIntervals.end(), 0) / mFrameIntervalsLength;
+    glm::mat4 meanTranslation = std::accumulate(mCameraTransforms.begin(), mCameraTransforms.end(),
+        glm::mat4(1), [this](glm::mat4 transform, glm::mat4 acc) {
+          return glm::translate(acc, glm::vec3(transform[3][0], transform[3][1], transform[3][2]) *
+                                         (1.f / mCameraTransformsLength));
+        });
+    glm::mat4 meanRotation    = std::accumulate(mCameraTransforms.begin(), mCameraTransforms.end(),
+        glm::mat4(1), [this](glm::mat4 transform, glm::mat4 acc) {
+          glm::quat rotation = glm::toQuat(transform) / (float)mCameraTransformsLength;
+          return acc * glm::toMat4(rotation);
+        });
+    for (int i = 0; i < meanFrameInterval; i++) {
+      predictedCameraTransform = meanTranslation * meanRotation * predictedCameraTransform;
     }
 
-    mNextFrame.mCameraRotation = predictedCameraRotation;
+    mNextFrame.mCameraTransform = predictedCameraTransform;
   } else {
-    mNextFrame.mCameraRotation = cameraRotation;
+    mNextFrame.mCameraTransform = cameraTransform;
   }
 
   mNextFrame.mResolution   = mPluginSettings.mResolution.get();
@@ -319,14 +337,8 @@ void Plugin::requestFrame(glm::dquat cameraRotation) {
   mNextFrame.mDenoiseDepth = mPluginSettings.mDenoiseDepth.get();
 
   if (!(mNextFrame == mRenderingFrame)) {
-    mRenderingFrame = mNextFrame;
-    glm::mat4 t     = mBillboard->getRelativeTransform(
-        mTimeControl->pSimulationTime.get(), mSolarSystem->getObserver());
-    glm::vec3 r = cs::core::SolarSystem::getRadii(mBillboard->getCenterName());
-    for (int i = 0; i < 4; i++) {
-      t[i] *= glm::vec4(1 / r[0], 1 / r[1], 1 / r[2], 1);
-    }
-    mFutureFrameData   = mRenderer->getFrame(t, mRenderingFrame.mSamplingRate,
+    mRenderingFrame    = mNextFrame;
+    mFutureFrameData   = mRenderer->getFrame(cameraTransform, mRenderingFrame.mSamplingRate,
         mRenderingFrame.mDepthMode, mNextFrame.mDenoiseColor, mNextFrame.mDenoiseDepth);
     mGettingFrame      = true;
     mLastFrameInterval = 0;
@@ -335,22 +347,22 @@ void Plugin::requestFrame(glm::dquat cameraRotation) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Plugin::tryReuseFrame(glm::dquat cameraRotation) {
+void Plugin::tryReuseFrame(glm::mat4 cameraTransform) {
   cs::utils::FrameTimings::ScopedTimer timer("Try reuse frame");
 
-  double minDiff   = 0;
+  /*double minDiff   = 0;
   Frame& bestFrame = mRenderedFrames[0];
   for (Frame& f : mRenderedFrames) {
-    double diff = glm::extractRealComponent(f.mCameraRotation * glm::conjugate(cameraRotation));
+    double diff = glm::extractRealComponent(f.mCameraTransform * glm::conjugate(cameraTransform));
     if (diff < minDiff) {
       minDiff   = diff;
       bestFrame = f;
     }
   }
   if (glm::extractRealComponent(
-          mDisplayedFrame.mCameraRotation * glm::conjugate(bestFrame.mCameraRotation)) > -0.99) {
+          mDisplayedFrame.mCameraTransform * glm::conjugate(bestFrame.mCameraTransform)) > -0.99) {
     displayFrame(bestFrame);
-  }
+  }*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -367,20 +379,7 @@ void Plugin::displayFrame(Frame& frame) {
 
     mBillboard->setTexture(colorData, frame.mResolution, frame.mResolution);
     mBillboard->setDepthTexture(depthData, frame.mResolution, frame.mResolution);
-    mBillboard->setTransform(glm::toMat4(frame.mCameraRotation));
-    logger().trace("MVP");
-    logger().trace("{}, {}, {}, {}", frame.mModelViewProjection[0][0],
-        frame.mModelViewProjection[1][0], frame.mModelViewProjection[2][0],
-        frame.mModelViewProjection[3][0]);
-    logger().trace("{}, {}, {}, {}", frame.mModelViewProjection[0][1],
-        frame.mModelViewProjection[1][1], frame.mModelViewProjection[2][1],
-        frame.mModelViewProjection[3][1]);
-    logger().trace("{}, {}, {}, {}", frame.mModelViewProjection[0][2],
-        frame.mModelViewProjection[1][2], frame.mModelViewProjection[2][2],
-        frame.mModelViewProjection[3][2]);
-    logger().trace("{}, {}, {}, {}", frame.mModelViewProjection[0][3],
-        frame.mModelViewProjection[1][3], frame.mModelViewProjection[2][3],
-        frame.mModelViewProjection[3][3]);
+    mBillboard->setTransform(glm::toMat4(glm::toQuat(frame.mCameraTransform)));
 
     mBillboard->setMVPMatrix(frame.mModelViewProjection);
     mDisplayedFrame = frame;
