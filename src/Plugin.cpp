@@ -21,8 +21,8 @@
 #include <VistaKernel/GraphicsManager/VistaSceneGraph.h>
 #include <VistaKernelOpenSGExt/VistaOpenSGMaterialTools.h>
 
-#include "glm/gtx/quaternion.hpp"
 #include "glm/gtc/epsilon.hpp"
+#include "glm/gtx/quaternion.hpp"
 
 #include <numeric>
 #include <thread>
@@ -350,19 +350,20 @@ void Plugin::requestFrame(glm::mat4 cameraTransform) {
 void Plugin::tryReuseFrame(glm::mat4 cameraTransform) {
   cs::utils::FrameTimings::ScopedTimer timer("Try reuse frame");
 
-  /*double minDiff   = 0;
-  Frame& bestFrame = mRenderedFrames[0];
-  for (Frame& f : mRenderedFrames) {
-    double diff = glm::extractRealComponent(f.mCameraTransform * glm::conjugate(cameraTransform));
+  Frame bestFrame   = mRenderedFrames.back();
+  glm::vec4    translation = (glm::inverse(cameraTransform) * bestFrame.mCameraTransform)[3];
+  float minDiff = glm::length(glm::vec3(translation.xyz) / translation.w);
+  for (const Frame& f : mRenderedFrames) {
+    translation = (glm::inverse(cameraTransform) * f.mCameraTransform)[3];
+    double diff = glm::length(glm::vec3(translation.xyz) / translation.w);
     if (diff < minDiff) {
       minDiff   = diff;
       bestFrame = f;
     }
   }
-  if (glm::extractRealComponent(
-          mDisplayedFrame.mCameraTransform * glm::conjugate(bestFrame.mCameraTransform)) > -0.99) {
+  if (minDiff > 0) {
     displayFrame(bestFrame);
-  }*/
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
