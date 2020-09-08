@@ -9,8 +9,8 @@
 #include "../logger.hpp"
 #include "Shaders.hpp"
 
-#include "../../../src/cs-utils/FrameTimings.hpp"
-#include "../../../src/cs-utils/utils.hpp"
+#include "../../../../src/cs-utils/FrameTimings.hpp"
+#include "../../../../src/cs-utils/utils.hpp"
 
 #include <VistaKernel/GraphicsManager/VistaSceneGraph.h>
 #include <VistaKernel/GraphicsManager/VistaTransformNode.h>

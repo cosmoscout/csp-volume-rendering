@@ -9,7 +9,7 @@
 
 #include "DataManager.hpp"
 
-#include "../../../src/cs-utils/DefaultProperty.hpp"
+#include "../../../../src/cs-utils/DefaultProperty.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
 

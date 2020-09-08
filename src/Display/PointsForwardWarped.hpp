@@ -16,7 +16,7 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
-#include "../../../src/cs-scene/CelestialObject.hpp"
+#include "../../../../src/cs-scene/CelestialObject.hpp"
 
 namespace csp::volumerendering {
 
