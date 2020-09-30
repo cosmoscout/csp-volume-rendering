@@ -42,8 +42,8 @@ void OSPRayRenderer::setTransferFunction(std::vector<glm::vec4> colors) {
     vtkSmartPointer<vtkUnstructuredGrid> volumeData = getData();
     volumeData->GetPointData()->SetActiveScalars("T");
     return OSPRayUtility::createOSPRayTransferFunction(
-        volumeData->GetPointData()->GetScalars()->GetRange()[0],
-        volumeData->GetPointData()->GetScalars()->GetRange()[1], colors);
+        (float)volumeData->GetPointData()->GetScalars()->GetRange()[0],
+        (float)volumeData->GetPointData()->GetScalars()->GetRange()[1], colors);
   });
 }
 
@@ -53,113 +53,113 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
     glm::mat4 cameraTransform, float samplingRate, Renderer::DepthMode depthMode, bool denoiseColor,
     bool denoiseDepth) {
   mRendering = true;
-  return std::async(std::launch::async, [this, cameraTransform, samplingRate, depthMode,
-                                            denoiseColor, denoiseDepth]() {
-    if (!mVolume.has_value()) {
-      vtkSmartPointer<vtkUnstructuredGrid> volumeData = getData();
-      mVolume = OSPRayUtility::createOSPRayVolume(volumeData, "T");
-    }
+  return std::async(std::launch::async,
+      [this, cameraTransform, samplingRate, depthMode, denoiseColor, denoiseDepth]() {
+        if (!mVolume.has_value()) {
+          vtkSmartPointer<vtkUnstructuredGrid> volumeData = getData();
+          mVolume = OSPRayUtility::createOSPRayVolume(volumeData, "T");
+        }
 
-    getData()->GetPoints()->ComputeBounds();
-    glm::mat4 cameraTransformScaled = cameraTransform;
-    cameraTransformScaled[3] =
-        cameraTransform[3] *
-        glm::vec4(
-            (getData()->GetPoints()->GetBounds()[1] - getData()->GetPoints()->GetBounds()[0]) / 2,
-            (getData()->GetPoints()->GetBounds()[3] - getData()->GetPoints()->GetBounds()[2]) / 2,
-            (getData()->GetPoints()->GetBounds()[5] - getData()->GetPoints()->GetBounds()[4]) / 2,
-            1);
+        getData()->GetPoints()->ComputeBounds();
+        std::vector<float> bounds(6);
+        for (int i = 0; i < 6; i++) {
+          bounds[i] = (float)getData()->GetPoints()->GetBounds()[i];
+        }
+        glm::mat4 cameraTransformScaled = cameraTransform;
+        cameraTransformScaled[3] =
+            cameraTransform[3] * glm::vec4((bounds[1] - bounds[0]) / 2, (bounds[3] - bounds[2]) / 2,
+                                     (bounds[5] - bounds[4]) / 2, 1);
 
-    OSPRayUtility::Camera camera = OSPRayUtility::createOSPRayCamera(mFov.get(),
-        (getData()->GetPoints()->GetBounds()[1] - getData()->GetPoints()->GetBounds()[0]) / 2,
-        cameraTransformScaled);
+        OSPRayUtility::Camera camera = OSPRayUtility::createOSPRayCamera(
+            mFov.get(), (bounds[1] - bounds[0]) / 2, cameraTransformScaled);
 
-    ospray::cpp::VolumetricModel volumetricModel(*mVolume);
-    volumetricModel.setParam("transferFunction", mTransferFunction.get());
-    volumetricModel.commit();
+        ospray::cpp::VolumetricModel volumetricModel(*mVolume);
+        volumetricModel.setParam("transferFunction", mTransferFunction.get());
+        volumetricModel.commit();
 
-    ospray::cpp::Group group;
-    group.setParam("volume", ospray::cpp::Data(volumetricModel));
-    if (depthMode == Renderer::DepthMode::eIsosurface) {
-      ospray::cpp::Geometry isosurface("isosurface");
-      isosurface.setParam("isovalue", 0.8f);
-      isosurface.setParam("volume", volumetricModel.handle());
-      isosurface.commit();
+        ospray::cpp::Group group;
+        group.setParam("volume", ospray::cpp::Data(volumetricModel));
+        if (depthMode == Renderer::DepthMode::eIsosurface) {
+          ospray::cpp::Geometry isosurface("isosurface");
+          isosurface.setParam("isovalue", 0.8f);
+          isosurface.setParam("volume", volumetricModel.handle());
+          isosurface.commit();
 
-      ospcommon::math::vec4f      color{1.f, 1.f, 1.f, 0.f};
-      ospray::cpp::GeometricModel isoModel(isosurface);
-      isoModel.setParam("color", ospray::cpp::Data(color));
-      isoModel.commit();
+          ospcommon::math::vec4f      color{1.f, 1.f, 1.f, 0.f};
+          ospray::cpp::GeometricModel isoModel(isosurface);
+          isoModel.setParam("color", ospray::cpp::Data(color));
+          isoModel.commit();
 
-      group.setParam("geometry", ospray::cpp::Data(isoModel));
-    }
-    group.commit();
+          group.setParam("geometry", ospray::cpp::Data(isoModel));
+        }
+        group.commit();
 
-    ospray::cpp::World world = OSPRayUtility::createOSPRayWorld(group);
+        ospray::cpp::World world = OSPRayUtility::createOSPRayWorld(group);
 
-    ospray::cpp::Renderer renderer("volume_depth");
-    renderer.setParam("aoSamples", 0);
-    renderer.setParam("volumeSamplingRate", samplingRate);
-    renderer.setParam("maxPathLength", 1);
-    renderer.setParam("depthMode", (int)depthMode);
-    renderer.commit();
+        ospray::cpp::Renderer renderer("volume_depth");
+        renderer.setParam("aoSamples", 0);
+        renderer.setParam("volumeSamplingRate", samplingRate);
+        renderer.setParam("maxPathLength", 1);
+        renderer.setParam("depthMode", (int)depthMode);
+        renderer.commit();
 
-    ospcommon::math::vec2i imgSize;
-    imgSize.x    = mResolution.get();
-    imgSize.y    = mResolution.get();
-    int channels = OSP_FB_COLOR;
-    if (depthMode != Renderer::DepthMode::eNone) {
-      channels |= OSP_FB_DEPTH;
-    }
+        ospcommon::math::vec2i imgSize;
+        imgSize.x    = mResolution.get();
+        imgSize.y    = mResolution.get();
+        int channels = OSP_FB_COLOR;
+        if (depthMode != Renderer::DepthMode::eNone) {
+          channels |= OSP_FB_DEPTH;
+        }
 
-    ospray::cpp::FrameBuffer framebuffer(imgSize, OSP_FB_RGBA32F, channels);
-    framebuffer.clear();
+        ospray::cpp::FrameBuffer framebuffer(imgSize, OSP_FB_RGBA32F, channels);
+        framebuffer.clear();
 
-    framebuffer.commit();
+        framebuffer.commit();
 
-    ospray::cpp::Future renderFuture =
-        framebuffer.renderFrame(renderer, camera.osprayCamera, world);
-    renderFuture.wait();
-    logger().trace("Rendered for {}s", renderFuture.duration());
+        ospray::cpp::Future renderFuture =
+            framebuffer.renderFrame(renderer, camera.osprayCamera, world);
+        renderFuture.wait();
+        logger().trace("Rendered for {}s", renderFuture.duration());
 
-    std::vector<float>   colorData((float*)framebuffer.map(OSP_FB_COLOR),
-        (float*)framebuffer.map(OSP_FB_COLOR) + 4 * mResolution.get() * mResolution.get());
-    std::vector<float>   depthData(mResolution.get() * mResolution.get(), INFINITY);
-    std::vector<uint8_t> frameData(4 * mResolution.get() * mResolution.get());
+        std::vector<float>   colorData((float*)framebuffer.map(OSP_FB_COLOR),
+            (float*)framebuffer.map(OSP_FB_COLOR) + 4 * mResolution.get() * mResolution.get());
+        std::vector<float>   depthData(mResolution.get() * mResolution.get(), INFINITY);
+        std::vector<uint8_t> frameData(4 * mResolution.get() * mResolution.get());
 
-    if (denoiseColor) {
-      colorData = OSPRayUtility::denoiseImage(colorData, 4, mResolution.get());
-    }
+        if (denoiseColor) {
+          auto timer = std::chrono::high_resolution_clock::now();
+          colorData  = OSPRayUtility::denoiseImage(colorData, 4, mResolution.get());
+          logger().trace("Denoised color for {}s",
+              (float)(std::chrono::high_resolution_clock::now() - timer).count() / 1000000000);
+        }
 
-    for (int i = 0; i < frameData.size(); i++) {
-      frameData[i] = colorData[i] * 255;
-    }
+        for (int i = 0; i < frameData.size(); i++) {
+          frameData[i] = (uint8_t)(colorData[i] * 255);
+        }
 
-    if (depthMode != Renderer::DepthMode::eNone) {
-      float* depthFrame = (float*)framebuffer.map(OSP_FB_DEPTH);
-      depthData         = std::vector(depthFrame, depthFrame + depthData.size());
-    }
+        if (depthMode != Renderer::DepthMode::eNone) {
+          float* depthFrame = (float*)framebuffer.map(OSP_FB_DEPTH);
+          depthData         = std::vector(depthFrame, depthFrame + depthData.size());
+        }
 
-    depthData = normalizeDepthBuffer(depthData,
-        (getData()->GetPoints()->GetBounds()[1] - getData()->GetPoints()->GetBounds()[0]) / 2,
-        camera);
+        depthData = normalizeDepthBuffer(depthData, (bounds[1] - bounds[0]) / 2, camera);
 
-    if (depthMode != Renderer::DepthMode::eNone && denoiseDepth) {
-      auto               timer          = std::chrono::high_resolution_clock::now();
-      std::vector<float> depthGrayscale = OSPRayUtility::depthToGrayscale(depthData);
-      std::vector<float> denoised =
-          OSPRayUtility::denoiseImage(depthGrayscale, 3, mResolution.get());
-      depthData = OSPRayUtility::grayscaleToDepth(denoised);
-      logger().trace("Denoised depth for {}s",
-          (float)(std::chrono::high_resolution_clock::now() - timer).count() / 1000000000);
-    }
-    frameData.insert(frameData.end(), (uint8_t*)depthData.data(),
-        (uint8_t*)depthData.data() + 4 * mResolution.get() * mResolution.get());
+        if (depthMode != Renderer::DepthMode::eNone && denoiseDepth) {
+          auto               timer          = std::chrono::high_resolution_clock::now();
+          std::vector<float> depthGrayscale = OSPRayUtility::depthToGrayscale(depthData);
+          std::vector<float> denoised =
+              OSPRayUtility::denoiseImage(depthGrayscale, 3, mResolution.get());
+          depthData = OSPRayUtility::grayscaleToDepth(denoised);
+          logger().trace("Denoised depth for {}s",
+              (float)(std::chrono::high_resolution_clock::now() - timer).count() / 1000000000);
+        }
+        frameData.insert(frameData.end(), (uint8_t*)depthData.data(),
+            (uint8_t*)depthData.data() + 4 * mResolution.get() * mResolution.get());
 
-    std::tuple<std::vector<uint8_t>, glm::mat4> result(frameData, camera.transformationMatrix);
-    mRendering = false;
-    return result;
-  });
+        std::tuple<std::vector<uint8_t>, glm::mat4> result(frameData, camera.transformationMatrix);
+        mRendering = false;
+        return result;
+      });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

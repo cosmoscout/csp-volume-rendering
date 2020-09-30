@@ -75,7 +75,7 @@ class Plugin : public cs::core::PluginBase {
 
   int              mLastFrameInterval;
   std::vector<int> mFrameIntervals;
-  int              mFrameIntervalsLength = 1;
+  int              mFrameIntervalsLength = 3;
   int              mFrameIntervalsIndex  = 0;
 
   glm::mat4              mLastCameraTransform;

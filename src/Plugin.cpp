@@ -314,18 +314,19 @@ void Plugin::requestFrame(glm::mat4 cameraTransform) {
     glm::mat4 predictedCameraTransform = cameraTransform;
     int       meanFrameInterval =
         std::accumulate(mFrameIntervals.begin(), mFrameIntervals.end(), 0) / mFrameIntervalsLength;
-    glm::mat4 meanTranslation = std::accumulate(mCameraTransforms.begin(), mCameraTransforms.end(),
-        glm::mat4(1), [this](glm::mat4 transform, glm::mat4 acc) {
-          return glm::translate(acc, glm::vec3(transform[3][0], transform[3][1], transform[3][2]) *
-                                         (1.f / mCameraTransformsLength));
-        });
-    glm::mat4 meanRotation    = std::accumulate(mCameraTransforms.begin(), mCameraTransforms.end(),
-        glm::mat4(1), [this](glm::mat4 transform, glm::mat4 acc) {
-          glm::quat rotation = glm::toQuat(transform) / (float)mCameraTransformsLength;
-          return acc * glm::toMat4(rotation);
-        });
+    glm::vec3 predictedTranslation(0);
+    glm::quat predictedRotation(1, 0, 0, 0);
+
+    for (int i = 0; i < mCameraTransformsLength; i++) {
+      predictedTranslation +=
+          glm::vec3(mCameraTransforms[i][3].xyz) / (float)mCameraTransformsLength;
+      predictedRotation =
+          glm::slerp(predictedRotation, glm::quat_cast(mCameraTransforms[i]), 1.f / (i + 1));
+    }
+
     for (int i = 0; i < meanFrameInterval; i++) {
-      predictedCameraTransform = meanTranslation * meanRotation * predictedCameraTransform;
+      predictedCameraTransform = glm::mat4_cast(predictedRotation) * predictedCameraTransform;
+      predictedCameraTransform = glm::translate(predictedCameraTransform, predictedTranslation);
     }
 
     mNextFrame.mCameraTransform = predictedCameraTransform;
@@ -350,15 +351,21 @@ void Plugin::requestFrame(glm::mat4 cameraTransform) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+float diffTranslations(glm::mat4 transformA, glm::mat4 transformB) {
+  glm::vec3 translationA = glm::normalize(transformA[3]);
+  glm::vec3 translationB = glm::normalize(transformB[3]);
+  return glm::length(translationB - translationA);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void Plugin::tryReuseFrame(glm::mat4 cameraTransform) {
   cs::utils::FrameTimings::ScopedTimer timer("Try reuse frame");
 
-  Frame bestFrame   = mRenderedFrames.back();
-  glm::vec4    translation = (glm::inverse(cameraTransform) * bestFrame.mCameraTransform)[3];
-  float minDiff = glm::length(glm::vec3(translation.xyz) / translation.w);
+  Frame bestFrame = mRenderedFrames.back();
+  float minDiff   = diffTranslations(cameraTransform, bestFrame.mCameraTransform);
   for (const Frame& f : mRenderedFrames) {
-    translation = (glm::inverse(cameraTransform) * f.mCameraTransform)[3];
-    double diff = glm::length(glm::vec3(translation.xyz) / translation.w);
+    double diff = diffTranslations(cameraTransform, f.mCameraTransform);
     if (diff < minDiff) {
       minDiff   = diff;
       bestFrame = f;

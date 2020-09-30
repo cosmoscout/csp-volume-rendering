@@ -7,8 +7,8 @@
 #ifndef CSP_VOLUME_RENDERING_OSPRAYRENDERER_HPP
 #define CSP_VOLUME_RENDERING_OSPRAYRENDERER_HPP
 
-#include "Renderer.hpp"
 #include "OSPRayUtility.hpp"
+#include "Renderer.hpp"
 
 #include <ospray/ospray_cpp.h>
 // Boost defines a function called likely so this macro from platform.h has to be undeffed
