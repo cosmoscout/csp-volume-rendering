@@ -210,7 +210,7 @@ vec4f integrateVolumeIntervals(const VolumeIntervals& volumeIntervals,
 	float perSampleThreshold = 0.0001f / samplingRate;
   int hitCount = 0;
   // Propagate ray across all volumes till opaque
-  while (alpha < .99f) {
+  while (alpha < .99f || depthMode == eLastHit) {
     // Sample across all volumes
     vec4f sampledColorOpacity;
     float dist = sampleAllVolumes(
@@ -237,13 +237,13 @@ vec4f integrateVolumeIntervals(const VolumeIntervals& volumeIntervals,
       }
       break;
     case eThreshold:
-      if (hitCount == 0 && alpha > 0.7f) {
+      if (hitCount == 0 && alpha > 0.8f) {
         distance = dist;
         hitCount = 1;
       }
       break;
     case eMultiThreshold:
-      if (hitCount == 0 && alpha > 0.2f) {
+      if (hitCount == 0 && alpha > 0.35f) {
         distance = dist;
         hitCount = 1;
       }
