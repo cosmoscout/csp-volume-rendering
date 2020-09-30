@@ -77,9 +77,9 @@ bool Plugin::Frame::operator==(const Frame& other) {
          glm::all(glm::epsilonEqual(mCameraTransform[1], other.mCameraTransform[1], 0.0001f)) &&
          glm::all(glm::epsilonEqual(mCameraTransform[2], other.mCameraTransform[2], 0.0001f)) &&
          glm::all(glm::epsilonEqual(mCameraTransform[3], other.mCameraTransform[3], 0.0001f)) &&
-         mSamplingRate == other.mSamplingRate && mFov == other.mFov &&
-         mTransferFunction == other.mTransferFunction && mDenoiseColor == other.mDenoiseColor &&
-         mDenoiseDepth == other.mDenoiseDepth && mDepthMode == other.mDepthMode;
+         mSamplingRate == other.mSamplingRate && mTransferFunction == other.mTransferFunction &&
+         mDenoiseColor == other.mDenoiseColor && mDenoiseDepth == other.mDenoiseDepth &&
+         mDepthMode == other.mDepthMode;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -110,14 +110,6 @@ void Plugin::init() {
       }));
   mPluginSettings.mResolution.connectAndTouch(
       [this](int value) { mGuiManager->setSliderValue("volumeRendering.setResolution", value); });
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setFov",
-      "Sets the field of view of the rendered volume images.", std::function([this](double value) {
-        mPluginSettings.mFov = value;
-        mRenderer->setFov(value);
-      }));
-  mPluginSettings.mFov.connectAndTouch(
-      [this](int value) { mGuiManager->setSliderValue("volumeRendering.setFov", value); });
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setSamplingRate",
       "Sets the sampling rate for volume rendering.",
@@ -189,25 +181,37 @@ void Plugin::init() {
         mRenderedFrames.clear();
       }));
 
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode0",
-      "Don't calculate a depth value.",
-      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eNone; }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode1",
-      "Calculate depth of isosurface.",
-      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eIsosurface; }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode2",
-      "Uses first hit as depth value.",
-      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eFirstHit; }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode3",
-      "Uses last hit as depth value.",
-      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eLastHit; }));
+  mGuiManager->getGui()->registerCallback(
+      "volumeRendering.setDepthMode0", "Don't calculate a depth value.", std::function([this]() {
+        mPluginSettings.mDepthMode = Renderer::DepthMode::eNone;
+        mRenderedFrames.clear();
+      }));
+  mGuiManager->getGui()->registerCallback(
+      "volumeRendering.setDepthMode1", "Calculate depth of isosurface.", std::function([this]() {
+        mPluginSettings.mDepthMode = Renderer::DepthMode::eIsosurface;
+        mRenderedFrames.clear();
+      }));
+  mGuiManager->getGui()->registerCallback(
+      "volumeRendering.setDepthMode2", "Uses first hit as depth value.", std::function([this]() {
+        mPluginSettings.mDepthMode = Renderer::DepthMode::eFirstHit;
+        mRenderedFrames.clear();
+      }));
+  mGuiManager->getGui()->registerCallback(
+      "volumeRendering.setDepthMode3", "Uses last hit as depth value.", std::function([this]() {
+        mPluginSettings.mDepthMode = Renderer::DepthMode::eLastHit;
+        mRenderedFrames.clear();
+      }));
   mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode4",
-      "Uses depth, at which an opacity threshold was reached.",
-      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eThreshold; }));
+      "Uses depth, at which an opacity threshold was reached.", std::function([this]() {
+        mPluginSettings.mDepthMode = Renderer::DepthMode::eThreshold;
+        mRenderedFrames.clear();
+      }));
   mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode5",
       "Uses depth, at which the last of multiple opacity thresholds was reached.",
-      std::function(
-          [this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eMultiThreshold; }));
+      std::function([this]() {
+        mPluginSettings.mDepthMode = Renderer::DepthMode::eMultiThreshold;
+        mRenderedFrames.clear();
+      }));
   mPluginSettings.mDepthMode.connect([this](Renderer::DepthMode drawMode) {
     if (drawMode == Renderer::DepthMode::eNone) {
       mGuiManager->setRadioChecked("stars.setDrawMode0");
@@ -331,7 +335,6 @@ void Plugin::requestFrame(glm::mat4 cameraTransform) {
 
   mNextFrame.mResolution   = mPluginSettings.mResolution.get();
   mNextFrame.mSamplingRate = mPluginSettings.mSamplingRate.get();
-  mNextFrame.mFov          = mPluginSettings.mFov.get();
   mNextFrame.mDepthMode    = mPluginSettings.mDepthMode.get();
   mNextFrame.mDenoiseColor = mPluginSettings.mDenoiseColor.get();
   mNextFrame.mDenoiseDepth = mPluginSettings.mDenoiseDepth.get();
