@@ -60,6 +60,8 @@ class Renderer {
   DataManager mDataManager;
   std::string mCurrentFile;
   int         mCurrentTimestep;
+
+  int mResolutionCon = -1;
 };
 
 } // namespace csp::volumerendering

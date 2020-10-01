@@ -72,13 +72,15 @@ void Renderer::setFov(float fov) {
 
 void Renderer::setResolution(int resolution) {
   if (mRendering.get()) {
-    int con = mRendering.connect([this, resolution, con](bool val) {
+    int con = mRendering.connect([this, resolution](bool val) {
       if (!val) {
         mResolution = resolution;
-        mRendering.disconnect(con);
       }
     });
+    mRendering.disconnect(mResolutionCon);
+    mResolutionCon = con;
   } else {
+    mRendering.disconnect(mResolutionCon);
     mResolution = resolution;
   }
 }
