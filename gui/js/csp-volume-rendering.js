@@ -138,17 +138,17 @@
             // Access the color selector
             this.colorPicker = document.querySelector("#tf-editor-color");
             this.colorPicker.picker.set(255, 0, 0, 255);
-            this.colorPicker.addEventListener("change", () => {
+            this.colorPicker.picker.on("change", () => {
                 me.selected.color = this.colorPicker.value;
                 me.redraw();
             });
             // Export button listener
             $("#export").on("click", function () {
-                me.export.call(me)
+                CosmoScout.callbacks.volumeRendering.exportTransferFunction(document.querySelector("#export-location").value, me.getJsonString());
             });
             // Import button listener
             $("#import").on("click", function () {
-                me.import.call(me)
+                CosmoScout.callbacks.volumeRendering.importTransferFunction($(document.querySelector("#import-box")).val());
             });
 
             // Lock button listener
@@ -511,6 +511,97 @@
             });
 
             return JSON.stringify(exportObject);
+        }
+
+        loadTransferFunction(jsonTransferFunction) {
+            let transferFunction = JSON.parse(jsonTransferFunction);
+            const points = [];
+            if (Array.isArray(transferFunction)) {
+                // Paraview transfer function format
+                transferFunction = transferFunction[0];
+                let index = 0;
+                for (let i = 0; i < transferFunction.RGBPoints.length;) {
+                    points[index] = {};
+                    points[index].position = transferFunction.RGBPoints[i++];
+                    points[index].r = transferFunction.RGBPoints[i++];
+                    points[index].g = transferFunction.RGBPoints[i++];
+                    points[index].b = transferFunction.RGBPoints[i++];
+                    index++;
+                }
+                for (let i = 0; i < transferFunction.Points.length;) {
+                    if (!points.some(point => Number(point.position) === Number(transferFunction.Points[i]))) {
+                        points[index] = {};
+                        points[index].position = transferFunction.Points[i++];
+                        points[index].a = transferFunction.Points[i++];
+                        i += 2;
+                        index++;
+                    } else {
+                        points.find(point => Number(point.position) === Number(transferFunction.Points[i])).a = transferFunction.Points[++i];
+                        i += 3;
+                    }
+                }
+            } else {
+                // Cosmoscout transfer function format
+                let index = 0;
+                Object.keys(transferFunction.RGB).forEach((position) => {
+                    points[index] = {}
+                    points[index].position = position;
+                    points[index].r = transferFunction.RGB[position][0];
+                    points[index].g = transferFunction.RGB[position][1];
+                    points[index].b = transferFunction.RGB[position][2];
+                    ++index;
+                });
+                Object.keys(transferFunction.Alpha).forEach((position) => {
+                    if (!points.some(point => Number(point.position) === Number(position))) {
+                        points[index] = {};
+                        points[index].position = position;
+                        points[index].a = transferFunction.Alpha[position];
+                        ++index;
+                    } else {
+                        points.find(point => Number(point.position) === Number(position)).a = transferFunction.Alpha[position];
+                    }
+                });
+            }
+
+            points.sort((a, b) => {
+                return a - b;
+            });
+            let min = points[0].position;
+            let max = points[points.length - 1].position;
+            points.forEach((point, index) => {
+                if (typeof point.a === 'undefined') {
+                    var right = points.slice(index, points.length).find(point => point.hasOwnProperty("a"));
+                    var left = points.slice(0, index).reverse().find(point => point.hasOwnProperty("a"));
+                    if (left && right) {
+                        point.a = d3.interpolateNumber(left.a, right.a)((point.position - left.position) / (right.position - left.position));
+                    } else if (left) {
+                        point.a = left.a;
+                    } else if (right) {
+                        point.a = right.a;
+                    }
+                }
+            });
+            this.updateControlPoints(points.map((point) => {
+                return {
+                    x: (point.position - min) * (255.0 / (max - min)),
+                    opacity: point.a,
+                    color: (typeof point.r !== 'undefined') ? "#" + (0x1000000 + (point.b * 255 | (point.g * 255 << 8) | (point.r * 255 << 16))).toString(16).slice(1) : "#000000",
+                    locked: (typeof point.r !== 'undefined')
+                };
+            }));
+            this.redraw();
+        }
+
+        setAvailableTransferFunctions(availableFilesJson) {
+            let options = "";
+            const availableFiles = JSON.parse(availableFilesJson);
+            availableFiles.forEach((file) => {
+                options += `<option>${file}</option>`;
+            });
+            const selector = "#import-box";
+            $(selector).html(options);
+            $(selector).selectpicker();
+            $(selector).selectpicker("refresh");
         }
     }
 

@@ -68,6 +68,10 @@ class Plugin : public cs::core::PluginBase {
   void tryReuseFrame(glm::mat4 cameraTransform);
   void displayFrame(Frame& frame);
 
+  void exportTransferFunction(std::string const& path, std::string const& jsonTransferFunction);
+  void importTransferFunction(std::string const& path);
+  void updateAvailableTransferFunctions();
+
   Settings mPluginSettings;
 
   int mOnLoadConnection = -1;

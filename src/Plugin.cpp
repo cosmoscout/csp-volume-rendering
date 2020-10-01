@@ -15,6 +15,7 @@
 #include "../../../src/cs-core/SolarSystem.hpp"
 #include "../../../src/cs-core/TimeControl.hpp"
 #include "../../../src/cs-graphics/ColorMap.hpp"
+#include "../../../src/cs-utils/filesystem.hpp"
 
 #include <VistaKernel/GraphicsManager/VistaGroupNode.h>
 #include <VistaKernel/GraphicsManager/VistaOpenGLNode.h>
@@ -228,6 +229,16 @@ void Plugin::init() {
     }
   });
 
+  mGuiManager->getGui()->registerCallback("volumeRendering.importTransferFunction",
+      "Import a saved transfer function.",
+      std::function([this](std::string name) { importTransferFunction(name); }));
+  mGuiManager->getGui()->registerCallback("volumeRendering.exportTransferFunction",
+      "Export the current transfer function to a file.",
+      std::function([this](std::string name, std::string jsonTransferFunction) {
+        exportTransferFunction(name, jsonTransferFunction);
+      }));
+	updateAvailableTransferFunctions();
+
   // Init volume representation
   auto anchor                           = mAllSettings->mAnchors.find("Mars");
   auto [tStartExistence, tEndExistence] = anchor->second.getExistence();
@@ -395,6 +406,41 @@ void Plugin::displayFrame(Frame& frame) {
     mBillboard->setMVPMatrix(frame.mModelViewProjection);
     mDisplayedFrame = frame;
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Plugin::exportTransferFunction(
+    std::string const& path, std::string const& jsonTransferFunction) {
+  std::ofstream o("../share/resources/transferfunctions/" + path);
+  o << jsonTransferFunction;
+
+  updateAvailableTransferFunctions();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Plugin::importTransferFunction(std::string const& path) {
+  std::stringstream jsonTransferFunction;
+  std::ifstream     i("../share/resources/transferfunctions/" + path);
+  jsonTransferFunction << i.rdbuf();
+  std::string code = "CosmoScout.volumeRendering.loadTransferFunction(`" + jsonTransferFunction.str() + "`);";
+  mGuiManager->addScriptToGui(code);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Plugin::updateAvailableTransferFunctions() {
+  nlohmann::json j;
+  for (const auto& file :
+      cs::utils::filesystem::listFiles("../share/resources/transferfunctions/")) {
+    std::string filename = file;
+    filename.erase(0, 37);
+    j.push_back(filename);
+  }
+
+  std::string code = "CosmoScout.volumeRendering.setAvailableTransferFunctions(`" + j.dump() + "`);";
+  mGuiManager->addScriptToGui(code);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
