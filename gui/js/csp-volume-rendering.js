@@ -564,7 +564,7 @@
             }
 
             points.sort((a, b) => {
-                return a - b;
+                return a.position - b.position;
             });
             let min = points[0].position;
             let max = points[points.length - 1].position;
