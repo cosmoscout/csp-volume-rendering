@@ -10,6 +10,7 @@
 #include "openvkl/openvkl.isph"
 
 struct VolumeContext {
+  uniform unsigned int8 intervalIteratorBuffer[VKL_MAX_INTERVAL_ITERATOR_SIZE];
   VKLIntervalIterator intervalIterator;
   VKLInterval         interval;
   uint32              rayIntervalId;
@@ -52,7 +53,7 @@ static void sampleVolume(const RayIntervals& rayIntervals, VolumeContext& vc,
     // Iterate till sampling position is within interval
     while (vc.iuDistance > vc.iuLength) {
       // Get next VKL interval
-      if (vklIterateIntervalV(&vc.intervalIterator, &vc.interval)) {
+      if (vklIterateIntervalV(vc.intervalIterator, &vc.interval)) {
         // Make it local for the next interval
         vc.iuDistance -= vc.iuLength;
 
@@ -81,7 +82,7 @@ static void sampleVolume(const RayIntervals& rayIntervals, VolumeContext& vc,
       const vec3f p = vc.org + vc.distance * vc.dir;
 
       // Sample volume value in given point
-      sampleVal = vklComputeSampleV(m->volume->vklVolume, (const varying vkl_vec3f* uniform) & p);
+      sampleVal = vklComputeSampleV(m->volume->vklSampler, (const varying vkl_vec3f* uniform) & p);
     } else if (vc.distance == inf) {
       return;
     }
@@ -193,9 +194,9 @@ vec4f integrateVolumeIntervals(const VolumeIntervals& volumeIntervals,
       VolumetricModel* varying model = vi->volumetricModel;
       foreach_unique(m in model) {
         // Create volume interval interator
-        vklInitIntervalIteratorV(&vc.intervalIterator, m->volume->vklVolume,
+        vc.intervalIterator = vklInitIntervalIteratorV(m->volume->vklVolume,
             (varying vkl_vec3f*)&transformedRay.org, (varying vkl_vec3f*)&transformedRay.dir,
-            (varying vkl_range1f*)&vi->interval, m->vklValueSelector);
+            (varying vkl_range1f*)&vi->interval, m->vklValueSelector, vc.intervalIteratorBuffer);
       }
 
       // Need to sample

@@ -14,6 +14,10 @@
 
 #include <OpenImageDenoise/oidn.hpp>
 
+#include <ospray/ospray_cpp/ext/rkcommon.h>
+
+#include <rkcommon/math/vec.h>
+
 #include <vtk-8.2/vtkCellArray.h>
 #include <vtk-8.2/vtkCellData.h>
 #include <vtk-8.2/vtkCellSizeFilter.h>
@@ -52,10 +56,13 @@ void initOSPRay() {
     throw std::runtime_error("OSPRay Initialization failed.");
   }
 
-  ospDeviceSetErrorFunc(ospGetCurrentDevice(),
-      [](OSPError e, const char* errorDetails) { osprayLogger().error(errorDetails); });
-  ospDeviceSetStatusFunc(
-      ospGetCurrentDevice(), [](const char* message) { osprayLogger().info(message); });
+  ospDeviceSetErrorCallback(ospGetCurrentDevice(),
+      [](void* userData, OSPError e, const char* errorDetails) {
+        osprayLogger().error(errorDetails);
+      },
+      nullptr);
+  ospDeviceSetStatusCallback(ospGetCurrentDevice(),
+      [](void* userData, const char* message) { osprayLogger().info(message); }, nullptr);
 
   ospLoadModule("denoiser");
   ospLoadModule("volume_depth");
@@ -107,12 +114,12 @@ Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 observerTransf
   float downPercent  = 0.5f + tan(downAngle) / (2 * tan(fovRad / 2));
   float upPercent    = 0.5f + tan(upAngle) / (2 * tan(fovRad / 2));
 
-  ospcommon::math::vec3f camPosOsp{camPos.x, camPos.y, camPos.z};
-  ospcommon::math::vec3f camUpOsp{camUp.x, camUp.y, camUp.z};
-  ospcommon::math::vec3f camViewOsp{camDir.x, camDir.y, camDir.z};
+  rkcommon::math::vec3f camPosOsp{camPos.x, camPos.y, camPos.z};
+  rkcommon::math::vec3f camUpOsp{camUp.x, camUp.y, camUp.z};
+  rkcommon::math::vec3f camViewOsp{camDir.x, camDir.y, camDir.z};
 
-  ospcommon::math::vec2f camImageStartOsp{leftPercent, downPercent};
-  ospcommon::math::vec2f camImageEndOsp{rightPercent, upPercent};
+  rkcommon::math::vec2f camImageStartOsp{leftPercent, downPercent};
+  rkcommon::math::vec2f camImageEndOsp{rightPercent, upPercent};
 
   ospray::cpp::Camera osprayCamera("perspective");
   osprayCamera.setParam("aspect", 1);
@@ -164,15 +171,18 @@ ospray::cpp::Volume createOSPRayVolume(
   sizeFilter->Update();
   vtkVolume = vtkUnstructuredGrid::SafeDownCast(sizeFilter->GetOutput());
 
-  std::vector<ospcommon::math::vec3f> vertexPositions(
-      (ospcommon::math::vec3f*)vtkVolume->GetPoints()->GetVoidPointer(0),
-      (ospcommon::math::vec3f*)vtkVolume->GetPoints()->GetVoidPointer(0) +
+  std::vector<rkcommon::math::vec3f> vertexPositions(
+      (rkcommon::math::vec3f*)vtkVolume->GetPoints()->GetVoidPointer(0),
+      (rkcommon::math::vec3f*)vtkVolume->GetPoints()->GetVoidPointer(0) +
           vtkVolume->GetNumberOfPoints());
 
   vtkVolume->GetPointData()->SetActiveScalars(scalar.c_str());
   std::vector<double> vertexDataD(vtkVolume->GetNumberOfPoints());
   vtkVolume->GetPointData()->GetScalars()->ExportToVoidPointer(vertexDataD.data());
-  std::vector<float> vertexData(vertexDataD.begin(), vertexDataD.end());
+  std::vector<float> vertexData;
+  vertexData.reserve(vertexDataD.size());
+  std::transform(vertexDataD.begin(), vertexDataD.end(), std::back_inserter(vertexData),
+      [](double d) { return (float)d; });
 
   std::vector<uint64_t> vertexIndices(vtkVolume->GetCells()->GetPointer(),
       vtkVolume->GetCells()->GetPointer() +
@@ -209,7 +219,6 @@ ospray::cpp::Volume createOSPRayVolume(
         [&vertexData, vtkVolume, allCellTypes, &allCellIndices](
             std::promise<std::vector<uint8_t>> pT, std::promise<std::vector<uint64_t>> pI,
             int start, int end) {
-          std::cout << "Starting thread for " << start << " - " << end << std::endl;
           std::vector<uint8_t>  cellTypes;
           std::vector<uint64_t> cellIndices;
 
@@ -224,7 +233,6 @@ ospray::cpp::Volume createOSPRayVolume(
 
           pT.set_value(cellTypes);
           pI.set_value(cellIndices);
-          std::cout << "Finished thread for " << start << " - " << end << std::endl;
         },
         std::move(pT), std::move(pI), start, end);
     splitThreads.push_back(std::move(thread));
@@ -254,11 +262,11 @@ ospray::cpp::Volume createOSPRayVolume(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ospray::cpp::TransferFunction createOSPRayTransferFunction() {
-  std::vector<ospcommon::math::vec3f> color   = {ospcommon::math::vec3f(0.f, 0.f, 1.f),
-      ospcommon::math::vec3f(0.f, 1.f, 0.f), ospcommon::math::vec3f(1.f, 0.f, 0.f)};
-  std::vector<float>                  opacity = {.0f, 5.f};
+  std::vector<rkcommon::math::vec3f> color   = {rkcommon::math::vec3f(0.f, 0.f, 1.f),
+      rkcommon::math::vec3f(0.f, 1.f, 0.f), rkcommon::math::vec3f(1.f, 0.f, 0.f)};
+  std::vector<float>                 opacity = {.0f, 5.f};
 
-  ospcommon::math::vec2f valueRange = {0.f, 1.f};
+  rkcommon::math::vec2f valueRange = {0.f, 1.f};
 
   ospray::cpp::TransferFunction transferFunction("piecewiseLinear");
   transferFunction.setParam("color", ospray::cpp::Data(color));
@@ -272,15 +280,15 @@ ospray::cpp::TransferFunction createOSPRayTransferFunction() {
 
 ospray::cpp::TransferFunction createOSPRayTransferFunction(
     float min, float max, std::vector<glm::vec4> colors) {
-  std::vector<ospcommon::math::vec3f> color;
-  std::vector<float>                  opacity;
+  std::vector<rkcommon::math::vec3f> color;
+  std::vector<float>                 opacity;
 
   for (glm::vec4 c : colors) {
-    color.push_back(ospcommon::math::vec3f(c[0], c[1], c[2]));
-      opacity.push_back(powf(10, c[3]) - 1);
+    color.push_back(rkcommon::math::vec3f(c[0], c[1], c[2]));
+    opacity.push_back(powf(10, c[3]) - 1);
   }
 
-  ospcommon::math::vec2f valueRange = {min, max};
+  rkcommon::math::vec2f valueRange = {min, max};
 
   ospray::cpp::TransferFunction transferFunction("piecewiseLinear");
   transferFunction.setParam("color", ospray::cpp::Data(color));

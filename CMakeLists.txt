@@ -27,7 +27,7 @@ endif()
 if (DEFINED ENV{OSPRAY_CMAKE_CONFIG_DIR})
   SET(ospray_DIR "$ENV{OSPRAY_CMAKE_CONFIG_DIR}")
 else()
-  SET(ospray_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/ospray-2.1.1)
+  SET(ospray_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/ospray-2.3.0)
 endif()
 
 if (DEFINED ENV{EMBREE_CMAKE_CONFIG_DIR})
@@ -36,16 +36,16 @@ else()
   SET(embree_DIR ${COSMOSCOUT_EXTERNALS_DIR})
 endif()
 
-if (DEFINED ENV{OSPCOMMON_CMAKE_CONFIG_DIR})
-  SET(ospcommon_DIR "$ENV{OSPCOMMON_CMAKE_CONFIG_DIR}")
+if (DEFINED ENV{RKCOMMON_CMAKE_CONFIG_DIR})
+  SET(rkcommon_DIR "$ENV{RKCOMMON_CMAKE_CONFIG_DIR}")
 else()
-  SET(ospcommon_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/ospcommon-1.3.1)
+  SET(rkcommon_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/rkcommon-1.5.0)
 endif()
 
 if (DEFINED ENV{OPENVKL_CMAKE_CONFIG_DIR})
   SET(openvkl_DIR "$ENV{OPENVKL_CMAKE_CONFIG_DIR}")
 else()
-  SET(openvkl_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/openvkl-0.9.0)
+  SET(openvkl_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/openvkl-0.10.0)
 endif()
 
 if (DEFINED ENV{OIDN_CMAKE_CONFIG_DIR})
@@ -54,10 +54,10 @@ else()
   SET(OpenImageDenoise_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/OpenImageDenoise)
 endif()
 
-if (DEFINED ENV{OSPCOMMON_TBB_ROOT})
-  SET(OSPCOMMON_TBB_ROOT "$ENV{OSPCOMMON_TBB_ROOT}")
+if (DEFINED ENV{RKCOMMON_TBB_ROOT})
+  SET(RKCOMMON_TBB_ROOT "$ENV{RKCOMMON_TBB_ROOT}")
 else()
-  SET(OSPCOMMON_TBB_ROOT ${COSMOSCOUT_EXTERNALS_DIR})
+  SET(RKCOMMON_TBB_ROOT ${COSMOSCOUT_EXTERNALS_DIR})
 endif()
 
 if (DEFINED ENV{ISPC_EXECUTABLE})
@@ -74,7 +74,7 @@ find_package(VIRACOCHA REQUIRED)
 # build plugin -------------------------------------------------------------------------------------
 
 file(GLOB_RECURSE SOURCE_FILES src/*.cpp)
-# Resoucre files and header files are only added in order to make them available in your IDE.
+# Resource files and header files are only added in order to make them available in your IDE.
 file(GLOB_RECURSE HEADER_FILES src/*.hpp)
 file(GLOB_RECURSE RESOUCRE_FILES gui/*)
 
@@ -122,8 +122,15 @@ get_target_property(OSPRAY_ISPC_MODULE_INCLUDE_DIRS ospray::ospray_module_ispc I
 
 ispc_include_directories(${OSPRAY_ISPC_MODULE_INCLUDE_DIRS})
 
-file(GLOB_RECURSE MODULE_SOURCE_FILES ospray_modules/volume_depth/*.cpp ospray_modules/volume_depth/*.ispc)
-file(GLOB_RECURSE MODULE_HEADER_FILES ospray_modules/volume_depth/*.hpp ospray_modules/volume_depth/*.ih)
+set(MODULE_SOURCE_FILES
+  ospray_modules/volume_depth/ospray/moduleInit.cpp
+	ospray_modules/volume_depth/ospray/render/VolumeDepth.cpp
+	ospray_modules/volume_depth/ospray/render/VolumeDepth.ispc
+	ospray_modules/volume_depth/ospray/render/volumes.ispc)
+set(MODULE_HEADER_FILES
+  ospray_modules/volume_depth/ospray/render/VolumeDepth.hpp
+	ospray_modules/volume_depth/ospray/render/VolumeDepth.ih
+	ospray_modules/volume_depth/ospray/render/volumes.ih)
 
 add_library(ospray_module_volume_depth SHARED)
 
