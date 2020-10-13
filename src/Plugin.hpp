@@ -23,6 +23,7 @@
 namespace csp::volumerendering {
 
 class Billboard;
+class PointsForwardWarped;
 
 class Plugin : public cs::core::PluginBase {
  public:
@@ -87,9 +88,11 @@ class Plugin : public cs::core::PluginBase {
   int                    mCameraTransformsLength = 15;
   int                    mCameraTransformsIndex  = 0;
 
-  std::unique_ptr<Renderer>        mRenderer;
-  std::shared_ptr<Billboard>       mBillboard;
-  std::shared_ptr<VistaOpenGLNode> mVolumeNode;
+  std::unique_ptr<Renderer>            mRenderer;
+  std::shared_ptr<PointsForwardWarped> mPoints;
+  std::shared_ptr<Billboard>           mBillboard;
+  std::shared_ptr<VistaOpenGLNode>     mPointsNode;
+  std::shared_ptr<VistaOpenGLNode>     mBillboardNode;
 
   std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> mFutureFrameData;
 

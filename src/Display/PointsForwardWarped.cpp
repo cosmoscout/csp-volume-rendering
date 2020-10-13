@@ -31,12 +31,18 @@ PointsForwardWarped::PointsForwardWarped(std::string const& sCenterName,
     , mRadii(radii)
     , mTexture(GL_TEXTURE_2D)
     , mDepthValues(256 * 256)
-    , mResolution(256) {
+    , mDepthResolution(256) {
   pVisibleRadius = mRadii[0];
 
   createBuffers();
 
   mShaderDirty = true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void PointsForwardWarped::setEnabled(bool enabled) {
+  mEnabled = enabled;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -48,8 +54,8 @@ void PointsForwardWarped::setTexture(std::vector<uint8_t>& texture, int width, i
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void PointsForwardWarped::setDepthTexture(std::vector<float>& texture, int width, int height) {
-  mDepthValues = texture;
-  mResolution  = width;
+  mDepthValues     = texture;
+  mDepthResolution = width;
 
   createBuffers();
 }
@@ -62,8 +68,26 @@ void PointsForwardWarped::setTransform(glm::mat4 transform) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void PointsForwardWarped::setMVPMatrix(glm::mat4 mvp) {
+  mRendererMVP = mvp;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void PointsForwardWarped::setUseDepth(bool useDepth) {
+  mUseDepth = useDepth;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void PointsForwardWarped::setDrawDepth(bool drawDepth) {
+  mDrawDepth = drawDepth;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 bool PointsForwardWarped::Do() {
-  if (!getIsInExistence() || !pVisible.get()) {
+  if (!mEnabled || !getIsInExistence() || !pVisible.get()) {
     return true;
   }
 
@@ -92,12 +116,54 @@ bool PointsForwardWarped::Do() {
   glUniformMatrix4fv(mShader.GetUniformLocation("uMatProjection"), 1, GL_FALSE, glMatP.data());
   glUniformMatrix4fv(
       mShader.GetUniformLocation("uMatTransform"), 1, GL_FALSE, glm::value_ptr(mTransform));
+  glUniformMatrix4fv(
+      mShader.GetUniformLocation("uMatRendererMVP"), 1, GL_FALSE, glm::value_ptr(mRendererMVP));
+
+  glm::mat4 matrix =
+      glm::mat4(glMatP[0], glMatP[1], glMatP[2], glMatP[3], glMatP[4], glMatP[5], glMatP[6],
+          glMatP[7], glMatP[8], glMatP[9], glMatP[10], glMatP[11], glMatP[12], glMatP[13],
+          glMatP[14], glMatP[15]) *
+      matMV * mTransform *
+      glm::mat4(mRadii[0], 0, 0, 0, 0, mRadii[1], 0, 0, 0, 0, mRadii[2], 0, 0, 0, 0, 1) *
+      inverse(mRendererMVP);
+
+  std::array<GLint, 4> glViewport;
+  glGetIntegerv(GL_VIEWPORT, glViewport.data());
+  glm::vec4 volumeTop    = glm::vec4(0, 1, -mRendererMVP[3][2] / mRendererMVP[2][2], 1);
+  volumeTop              = matrix * volumeTop;
+  volumeTop              = glm::vec4(volumeTop.xyz * (1.f / volumeTop.w), 1);
+  glm::vec4 volumeBottom = glm::vec4(0, -1, -mRendererMVP[3][2] / mRendererMVP[2][2], 1);
+  volumeBottom           = matrix * volumeBottom;
+  volumeBottom           = glm::vec4(volumeBottom.xyz * (1.f / volumeBottom.w), 1);
+  glm::vec4 volumeRight  = glm::vec4(1, 0, -mRendererMVP[3][2] / mRendererMVP[2][2], 1);
+  volumeRight            = matrix * volumeRight;
+  volumeRight            = glm::vec4(volumeRight.xyz * (1.f / volumeRight.w), 1);
+  glm::vec4 volumeLeft   = glm::vec4(-1, 0, -mRendererMVP[3][2] / mRendererMVP[2][2], 1);
+  volumeLeft             = matrix * volumeLeft;
+  volumeLeft             = glm::vec4(volumeLeft.xyz * (1.f / volumeLeft.w), 1);
+
+  glm::vec4 volumeCenter = glm::vec4(0, 0, -mRendererMVP[3][2] / mRendererMVP[2][2], 1);
+  volumeCenter           = inverse(mRendererMVP) * volumeCenter;
+  volumeCenter           = glm::vec4(volumeCenter.xyz * (1.f / volumeCenter.w), 1);
+  volumeCenter           = glm::vec4(mRadii, 1) * volumeCenter;
+  volumeCenter           = glm::vec4((mTransform * glm::vec4(volumeCenter.xyz, 1)).xyz, 1);
+  volumeCenter           = glm::vec4((matMV * glm::vec4(volumeCenter.xyz, 1)).xyz, 1);
+  mShader.SetUniform(mShader.GetUniformLocation("uBaseDepth"), volumeCenter[2] / volumeCenter[3]);
+
+  int pointHeight = (int)ceil((volumeTop[1] / volumeTop[3] - volumeBottom[1] / volumeBottom[3]) /
+                              2.f * (float)glViewport[3] / mDepthResolution);
+  int pointWidth  = (int)ceil((volumeRight[0] / volumeRight[3] - volumeLeft[0] / volumeLeft[3]) /
+                             2.f * (float)glViewport[2] / mDepthResolution);
+  mShader.SetUniform(mShader.GetUniformLocation("uBasePointSize"),
+      pointHeight > pointWidth ? pointHeight : pointWidth);
 
   mShader.SetUniform(mShader.GetUniformLocation("uTexture"), 0);
   mShader.SetUniform(mShader.GetUniformLocation("uRadii"), static_cast<float>(mRadii[0]),
       static_cast<float>(mRadii[0]), static_cast<float>(mRadii[0]));
   mShader.SetUniform(
       mShader.GetUniformLocation("uFarClip"), cs::utils::getCurrentFarClipDistance());
+  mShader.SetUniform(mShader.GetUniformLocation("uUseDepth"), mUseDepth);
+  mShader.SetUniform(mShader.GetUniformLocation("uDrawDepth"), mDrawDepth);
 
   mTexture.Bind(GL_TEXTURE0);
 
@@ -105,11 +171,12 @@ bool PointsForwardWarped::Do() {
   glEnable(GL_CULL_FACE);
   glCullFace(GL_FRONT);
   glEnable(GL_BLEND);
+  glEnable(GL_PROGRAM_POINT_SIZE);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
   // Draw.
   mVAO.Bind();
-  glDrawArrays(GL_POINTS, 0, mResolution * mResolution);
+  glDrawArrays(GL_POINTS, 0, mDepthResolution * mDepthResolution);
   mVAO.Release();
 
   // Clean up.
@@ -129,14 +196,16 @@ bool PointsForwardWarped::GetBoundingBox(VistaBoundingBox& bb) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void PointsForwardWarped::createBuffers() {
-  std::vector<float>    vertices(mResolution * mResolution * 3);
-  std::vector<unsigned> indices((mResolution - 1) * (2 + 2 * mResolution));
+  std::vector<float>    vertices(mDepthResolution * mDepthResolution * 3);
+  std::vector<unsigned> indices((mDepthResolution - 1) * (2 + 2 * mDepthResolution));
 
-  for (uint32_t x = 0; x < mResolution; ++x) {
-    for (uint32_t y = 0; y < mResolution; ++y) {
-      vertices[(x * mResolution + y) * 3 + 0] = 2.f / (mResolution - 1) * x - 1.f;
-      vertices[(x * mResolution + y) * 3 + 1] = 2.f / (mResolution - 1) * y - 1.f;
-      vertices[(x * mResolution + y) * 3 + 2] = mDepthValues[x * mResolution + y];
+  for (int x = 0; x < mDepthResolution; ++x) {
+    for (int y = 0; y < mDepthResolution; ++y) {
+      vertices[(x * mDepthResolution + y) * 3 + 0] = 2.f / (mDepthResolution - 1) * x - 1.f;
+      vertices[(x * mDepthResolution + y) * 3 + 1] = 2.f / (mDepthResolution - 1) * y - 1.f;
+      vertices[(x * mDepthResolution + y) * 3 + 2] =
+          mDepthValues[y * mDepthResolution / mDepthResolution * mDepthResolution +
+                       x * mDepthResolution / mDepthResolution];
     }
   }
 

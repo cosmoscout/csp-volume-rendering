@@ -45,6 +45,12 @@ Billboard::Billboard(std::string const& sCenterName, std::string const& sFrameNa
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void Billboard::setEnabled(bool enabled) {
+  mEnabled = enabled;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void Billboard::setTexture(std::vector<uint8_t>& texture, int width, int height) {
   mTexture.UploadTexture(width, height, texture.data(), false, GL_RGBA);
 }
@@ -85,7 +91,7 @@ void Billboard::setDrawDepth(bool drawDepth) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool Billboard::Do() {
-  if (!getIsInExistence() || !pVisible.get()) {
+  if (!mEnabled || !getIsInExistence() || !pVisible.get()) {
     return true;
   }
 

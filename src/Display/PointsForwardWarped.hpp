@@ -22,8 +22,8 @@ namespace csp::volumerendering {
 
 class PointsForwardWarped : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
  public:
-  PointsForwardWarped(std::string const& sCenterName, std::string const& sFrameName, double tStartExistence,
-      double tEndExistence, glm::dvec3 radii);
+  PointsForwardWarped(std::string const& sCenterName, std::string const& sFrameName,
+      double tStartExistence, double tEndExistence, glm::dvec3 radii);
 
   PointsForwardWarped(PointsForwardWarped const& other) = delete;
   PointsForwardWarped(PointsForwardWarped&& other)      = default;
@@ -31,9 +31,14 @@ class PointsForwardWarped : public cs::scene::CelestialObject, public IVistaOpen
   PointsForwardWarped& operator=(PointsForwardWarped const& other) = delete;
   PointsForwardWarped& operator=(PointsForwardWarped&& other) = default;
 
+  void setEnabled(bool enabled);
+
   void setTexture(std::vector<uint8_t>& texture, int width, int height);
   void setDepthTexture(std::vector<float>& texture, int width, int height);
   void setTransform(glm::mat4 transform);
+  void setMVPMatrix(glm::mat4 mvp);
+  void setUseDepth(bool useDepth);
+  void setDrawDepth(bool drawDepth);
 
   /// Interface implementation of IVistaOpenGLDraw.
   bool Do() override;
@@ -42,14 +47,20 @@ class PointsForwardWarped : public cs::scene::CelestialObject, public IVistaOpen
  private:
   void createBuffers();
 
+  bool mEnabled;
+
   glm::mat4              mTransform;
   VistaTexture           mTexture;
   VistaGLSLShader        mShader;
   VistaVertexArrayObject mVAO;
   VistaBufferObject      mVBO;
+  VistaBufferObject      mIBO;
 
-	std::vector<float> mDepthValues;
-  uint32_t           mResolution;
+  glm::mat4          mRendererMVP;
+  std::vector<float> mDepthValues;
+  int                mDepthResolution;
+  bool               mUseDepth  = true;
+  bool               mDrawDepth = false;
 
   glm::dvec3 mRadii;
 

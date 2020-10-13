@@ -31,6 +31,8 @@ class Billboard : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   Billboard& operator=(Billboard const& other) = delete;
   Billboard& operator=(Billboard&& other) = default;
 
+  void setEnabled(bool enabled);
+
   void setTexture(std::vector<uint8_t>& texture, int width, int height);
   void setDepthTexture(std::vector<float>& texture, int width, int height);
   void setTransform(glm::mat4 transform);
@@ -44,6 +46,8 @@ class Billboard : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
 
  private:
   void createBuffers();
+
+  bool mEnabled;
 
   glm::mat4              mTransform;
   VistaTexture           mTexture;

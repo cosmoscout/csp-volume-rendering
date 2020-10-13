@@ -7,6 +7,7 @@
 #include "Plugin.hpp"
 
 #include "Display/Billboard.hpp"
+#include "Display/PointsForwardWarped.hpp"
 #include "Render/OSPRayRenderer.hpp"
 #include "logger.hpp"
 
@@ -144,6 +145,7 @@ void Plugin::init() {
       "Enables use of depth data for displaying data.", std::function([this](bool enable) {
         mPluginSettings.mDepthData = enable;
         mBillboard->setUseDepth(enable);
+        mPoints->setUseDepth(enable);
       }));
   mPluginSettings.mDepthData.connectAndTouch([this](bool enable) {
     mGuiManager->setCheckboxValue("volumeRendering.setEnableDepthData", enable);
@@ -154,6 +156,7 @@ void Plugin::init() {
       std::function([this](bool enable) {
         mPluginSettings.mDrawDepth = enable;
         mBillboard->setDrawDepth(enable);
+        mPoints->setDrawDepth(enable);
       }));
   mPluginSettings.mDrawDepth.connectAndTouch([this](bool enable) {
     mGuiManager->setCheckboxValue("volumeRendering.setEnableDrawDepth", enable);
@@ -229,6 +232,17 @@ void Plugin::init() {
     }
   });
 
+  mGuiManager->getGui()->registerCallback("volumeRendering.setDisplayMode0",
+      "Displays the rendered images on a continuous mesh.", std::function([this]() {
+        mBillboard->setEnabled(true);
+        mPoints->setEnabled(false);
+      }));
+  mGuiManager->getGui()->registerCallback("volumeRendering.setDisplayMode1",
+      "Displays the rendered images on a continuous mesh.", std::function([this]() {
+        mBillboard->setEnabled(false);
+        mPoints->setEnabled(true);
+      }));
+
   mGuiManager->getGui()->registerCallback("volumeRendering.importTransferFunction",
       "Import a saved transfer function.",
       std::function([this](std::string name) { importTransferFunction(name); }));
@@ -237,19 +251,28 @@ void Plugin::init() {
       std::function([this](std::string name, std::string jsonTransferFunction) {
         exportTransferFunction(name, jsonTransferFunction);
       }));
-	updateAvailableTransferFunctions();
+  updateAvailableTransferFunctions();
 
   // Init volume representation
   auto anchor                           = mAllSettings->mAnchors.find("Mars");
   auto [tStartExistence, tEndExistence] = anchor->second.getExistence();
   mBillboard = std::make_shared<Billboard>(anchor->second.mCenter, anchor->second.mFrame,
       tStartExistence, tEndExistence, cs::core::SolarSystem::getRadii(anchor->second.mCenter));
+  mPoints    = std::make_shared<PointsForwardWarped>(anchor->second.mCenter, anchor->second.mFrame,
+      tStartExistence, tEndExistence, cs::core::SolarSystem::getRadii(anchor->second.mCenter));
 
   // Add volume representation to solar system and scene graph
   mSolarSystem->registerAnchor(mBillboard);
-  mVolumeNode.reset(mSceneGraph->NewOpenGLNode(mSceneGraph->GetRoot(), mBillboard.get()));
+  mBillboardNode.reset(mSceneGraph->NewOpenGLNode(mSceneGraph->GetRoot(), mBillboard.get()));
   VistaOpenSGMaterialTools::SetSortKeyOnSubtree(
-      mVolumeNode.get(), static_cast<int>(cs::utils::DrawOrder::eTransparentItems));
+      mBillboardNode.get(), static_cast<int>(cs::utils::DrawOrder::eTransparentItems));
+  mSolarSystem->registerAnchor(mPoints);
+  mPointsNode.reset(mSceneGraph->NewOpenGLNode(mSceneGraph->GetRoot(), mPoints.get()));
+  VistaOpenSGMaterialTools::SetSortKeyOnSubtree(
+      mPointsNode.get(), static_cast<int>(cs::utils::DrawOrder::eTransparentItems));
+
+  mBillboard->setEnabled(true);
+  mPoints->setEnabled(false);
 
   // Init buffers for predictive rendering
   mFrameIntervals.resize(mFrameIntervalsLength);
@@ -264,7 +287,9 @@ void Plugin::deInit() {
   logger().info("Unloading plugin...");
 
   mSolarSystem->unregisterAnchor(mBillboard);
-  mSceneGraph->GetRoot()->DisconnectChild(mVolumeNode.get());
+  mSolarSystem->unregisterAnchor(mPoints);
+  mSceneGraph->GetRoot()->DisconnectChild(mBillboardNode.get());
+  mSceneGraph->GetRoot()->DisconnectChild(mPointsNode.get());
 
   mAllSettings->onLoad().disconnect(mOnLoadConnection);
   mAllSettings->onSave().disconnect(mOnSaveConnection);
@@ -297,7 +322,8 @@ void Plugin::update() {
         mFrameIntervalsIndex = 0;
       }
     }
-  } else {
+  }
+  if (!mGettingFrame) {
     if (mPluginSettings.mRequestImages.get()) {
       requestFrame(currentCameraTransform);
     }
@@ -400,10 +426,14 @@ void Plugin::displayFrame(Frame& frame) {
         (float*)frame.mFrameData.data() + 2 * frame.mResolution * frame.mResolution);
 
     mBillboard->setTexture(colorData, frame.mResolution, frame.mResolution);
+    mPoints->setTexture(colorData, frame.mResolution, frame.mResolution);
     mBillboard->setDepthTexture(depthData, frame.mResolution, frame.mResolution);
+    mPoints->setDepthTexture(depthData, frame.mResolution, frame.mResolution);
     mBillboard->setTransform(glm::toMat4(glm::toQuat(frame.mCameraTransform)));
+    mPoints->setTransform(glm::toMat4(glm::toQuat(frame.mCameraTransform)));
 
     mBillboard->setMVPMatrix(frame.mModelViewProjection);
+    mPoints->setMVPMatrix(frame.mModelViewProjection);
     mDisplayedFrame = frame;
   }
 }
@@ -424,7 +454,8 @@ void Plugin::importTransferFunction(std::string const& path) {
   std::stringstream jsonTransferFunction;
   std::ifstream     i("../share/resources/transferfunctions/" + path);
   jsonTransferFunction << i.rdbuf();
-  std::string code = "CosmoScout.volumeRendering.loadTransferFunction(`" + jsonTransferFunction.str() + "`);";
+  std::string code =
+      "CosmoScout.volumeRendering.loadTransferFunction(`" + jsonTransferFunction.str() + "`);";
   mGuiManager->addScriptToGui(code);
 }
 
@@ -439,7 +470,8 @@ void Plugin::updateAvailableTransferFunctions() {
     j.push_back(filename);
   }
 
-  std::string code = "CosmoScout.volumeRendering.setAvailableTransferFunctions(`" + j.dump() + "`);";
+  std::string code =
+      "CosmoScout.volumeRendering.setAvailableTransferFunctions(`" + j.dump() + "`);";
   mGuiManager->addScriptToGui(code);
 }
 

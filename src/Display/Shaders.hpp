@@ -31,28 +31,28 @@ out float vDepth;
 
 void main()
 {
-		vDepth = (iPos.z + 1) / 2;
+   vDepth = (iPos.z + 1) / 2;
 
-    vTexCoords  = vec2((iPos.x + 1) / 2, (iPos.y + 1) / 2);
+   vTexCoords  = vec2((iPos.x + 1) / 2, (iPos.y + 1) / 2);
 
-    vec4 objSpacePos = vec4(iPos, 1);
-		if (!uUseDepth) {
-      objSpacePos.z = -uMatRendererMVP[3][2] / uMatRendererMVP[2][2];
-    }
+   vec4 objSpacePos = vec4(iPos, 1);
+   if (!uUseDepth) {
+     objSpacePos.z = -uMatRendererMVP[3][2] / uMatRendererMVP[2][2];
+   }
 
-    objSpacePos = inverse(uMatRendererMVP) * objSpacePos;
-    vPosition   = objSpacePos.xyz / objSpacePos.w;
-    vPosition   = uRadii * vPosition;
-    vPosition   = (uMatTransform * vec4(vPosition, 1.0)).xyz;
-    vPosition   = (uMatModelView * vec4(vPosition, 1.0)).xyz;
-    gl_Position = uMatProjection * vec4(vPosition, 1);
+   objSpacePos = inverse(uMatRendererMVP) * objSpacePos;
+   vPosition   = objSpacePos.xyz / objSpacePos.w;
+   vPosition   = uRadii * vPosition;
+   vPosition   = (uMatTransform * vec4(vPosition, 1.0)).xyz;
+   vPosition   = (uMatModelView * vec4(vPosition, 1.0)).xyz;
+   gl_Position = uMatProjection * vec4(vPosition, 1);
 
-    if (gl_Position.w > 0) {
-      gl_Position /= gl_Position.w;
-      if (gl_Position.z >= 1) {
-        gl_Position.z = 0.999999;
-      }
-    }
+   if (gl_Position.w > 0) {
+     gl_Position /= gl_Position.w;
+     if (gl_Position.z >= 1) {
+       gl_Position.z = 0.999999;
+     }
+   }
 }
 )";
 
@@ -75,16 +75,16 @@ layout(location = 0) out vec4 oColor;
     
 void main()
 {
-	oColor = texture(uTexture, vTexCoords);
-	if(oColor.a <= 0)
-	{
-		discard;
-	}
-  if (uDrawDepth) {
-    oColor = vec4(vDepth, vDepth, vDepth, 1);
-  }
+    oColor = texture(uTexture, vTexCoords);
+    if(oColor.a <= 0)
+    {
+      discard;
+    }
+    if (uDrawDepth) {
+      oColor = vec4(vDepth, vDepth, vDepth, 1);
+    }
 
-	gl_FragDepth = length(vPosition) / uFarClip;
+    gl_FragDepth = length(vPosition) / uFarClip;
 }
 )";
 
@@ -97,6 +97,10 @@ uniform vec3 uRadii;
 uniform mat4 uMatModelView;
 uniform mat4 uMatProjection;
 uniform mat4 uMatTransform;
+uniform mat4 uMatRendererMVP;
+uniform bool uUseDepth;
+uniform int uBasePointSize;
+uniform float uBaseDepth;
 
 // inputs
 layout(location = 0) in vec3 iPos;
@@ -104,13 +108,25 @@ layout(location = 0) in vec3 iPos;
 // outputs
 out vec2 vTexCoords;
 out vec3 vPosition;
+out float vDepth;
 
 void main()
 {
+    vDepth = (iPos.z + 1) / 2;
+
     vTexCoords  = vec2((iPos.x + 1) / 2, (iPos.y + 1) / 2);
-    vPosition   = uRadii * vec3(iPos.x, iPos.y, -iPos.z / 2);
+
+    vec4 objSpacePos = vec4(iPos, 1);
+    if (!uUseDepth) {
+      objSpacePos.z = -uMatRendererMVP[3][2] / uMatRendererMVP[2][2];
+    }
+
+    objSpacePos = inverse(uMatRendererMVP) * objSpacePos;
+    vPosition   = objSpacePos.xyz / objSpacePos.w;
+    vPosition   = uRadii * vPosition;
     vPosition   = (uMatTransform * vec4(vPosition, 1.0)).xyz;
     vPosition   = (uMatModelView * vec4(vPosition, 1.0)).xyz;
+    gl_PointSize = uBasePointSize * uBaseDepth / vPosition.z;
     gl_Position = uMatProjection * vec4(vPosition, 1);
 
     if (gl_Position.w > 0) {
@@ -129,23 +145,28 @@ constexpr char* POINTS_FORWARD_FRAG = R"(
 
 uniform sampler2D uTexture;
 uniform float uFarClip;
+uniform bool uDrawDepth;
 
 // inputs
 in vec2 vTexCoords;
 in vec3 vPosition;
+in float vDepth;
 
 // outputs
 layout(location = 0) out vec4 oColor;
 
 void main()
 {
-	oColor = texture(uTexture, vTexCoords);
-	if(oColor.a <= 0)
-	{
-		discard;
-	}
+  oColor = texture(uTexture, vTexCoords);
+  if(oColor.a <= 0)
+  {
+    discard;
+  }
+  if (uDrawDepth) {
+    oColor = vec4(vDepth, vDepth, vDepth, 1);
+  }
 
-	gl_FragDepth = length(vPosition) / uFarClip;
+  gl_FragDepth = length(vPosition) / uFarClip;
 }
 )";
 
