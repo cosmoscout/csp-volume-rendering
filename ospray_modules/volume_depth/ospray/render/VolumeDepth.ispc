@@ -1,100 +1,13 @@
 // Copyright 2009-2020 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 
-#include "math/random.ih"
 #include "render/Renderer.ih"
-
+// ao renderer
 #include "VolumeDepth.ih"
+#include "math/random.ih"
+#include "math/sampling.ih"
+#include "surfaces.ih"
 #include "volumes.ih"
-
-unmasked void clippingIntersectionFilterV(const struct RTCFilterFunctionNArguments* uniform args) {
-  // Set execution mask
-  varying int* uniform valid = (varying int* uniform)args->valid;
-  if (*valid == 0)
-    return;
-
-  // Get pointer to the intersection context
-  uniform UserIntersectionContextForClipping* uniform context =
-      (uniform UserIntersectionContextForClipping * uniform) args->context;
-
-  // We skip this intersection to collect all remaining intersections
-  *valid = 0;
-
-  // Skip if array is full
-  if (context->hitsCount >= CLIPPING_HITS_MAX_COUNT)
-    return;
-
-  // Get ray and hit
-  varying Ray* uniform ray          = (varying Ray * uniform) args->ray;
-  varying const RTCHit* uniform hit = (varying const RTCHit* uniform)args->hit;
-
-  // Prepare clipping normal
-  vec3f Nc;
-  {
-    // The postIntersect function needs the hit part of the Ray structure to be
-    // initialized. Making a ray copy here is quite costly. That is why just
-    // the necessary ray fields are set here.
-    DifferentialGeometry dg;
-    ray->Ng     = make_vec3f(hit->Ng_x, hit->Ng_y, hit->Ng_z);
-    ray->u      = hit->u;
-    ray->v      = hit->v;
-    ray->primID = hit->primID;
-    ray->geomID = hit->geomID;
-
-    // We need to call postIntersect on clipping geometry
-    foreach_unique(instID in hit->instID[0]) {
-      // Call postIntersect to get shading normal
-      Instance* uniform instance = *(context->world->clippersInst + instID);
-      Instance_postIntersect(instance, NULL, dg, *ray, DG_NG | DG_NS, true);
-
-      // Use geometry normal for clipping
-      // but use shading normal to check if invertion is needed
-      Nc = (dot(dg.Ns, dg.Ng) > 0.f) ? ray->Ng : neg(ray->Ng);
-    }
-
-    // Restore IDs initial values
-    ray->primID = RTC_INVALID_GEOMETRY_ID;
-    ray->geomID = RTC_INVALID_GEOMETRY_ID;
-  }
-
-  // Based on clipping normal vector decide if the ray is
-  // entering clipping geometry (set positive hit value) or exitting clipping
-  // geometry (set negative hit value)
-  const bool  exitsClipping = (dot(ray->dir, Nc) > 0.f);
-  ClippingHit cHit;
-  cHit.t      = (exitsClipping) ? -ray->t : ray->t;
-  cHit.primID = hit->primID;
-  cHit.geomID = hit->geomID;
-  cHit.instID = hit->instID[0];
-
-  // Some geometry types (e.g. curves, subdivisions)
-  // may give more than 2 intersections, we have to filter them out
-  for (uint32 i = 0; i < context->hitsCount; i++) {
-    if ((context->hits[i].primID == cHit.primID) && (context->hits[i].geomID == cHit.geomID) &&
-        (context->hits[i].instID == cHit.instID) &&
-        floatUlpCompare(context->hits[i].t, cHit.t, 512))
-      return;
-  }
-
-  // Now we know that this intersection will be taken into account,
-  // so we can update clipping depth correction value accordingly
-  if (exitsClipping) {
-    context->corrClippingDepth--;
-  } else {
-    context->corrClippingDepth++;
-  }
-
-  // Insert hit value into sorted array
-  for (uint32 i = 0; i < context->hitsCount; i++) {
-    if (abs(context->hits[i].t) > abs(cHit.t)) {
-      const ClippingHit tmp = context->hits[i];
-      context->hits[i]      = cHit;
-      cHit                  = tmp;
-    }
-  }
-  context->hits[context->hitsCount] = cHit;
-  context->hitsCount++;
-}
 
 void VolumeDepth_renderSample(Renderer* uniform _self, FrameBuffer* uniform fb,
     World* uniform world, void* uniform perFrameData, varying ScreenSample& sample) {
@@ -125,8 +38,14 @@ void VolumeDepth_renderSample(Renderer* uniform _self, FrameBuffer* uniform fb,
   float distance = inf;
   // Sample volumes across volume intervals (in front of geometry hit)
   if (volumeIntervals.numVolumeIntervals > 0) {
-    vec4f volumeColor = integrateVolumeIntervals(volumeIntervals, rayIntervals, volumeRay,
-        ldSampler, self->volumeSamplingRate, distance, self->depthMode);
+    VolumeDepthRenderContext rc;
+    rc.renderer       = self;
+    rc.fb             = fb;
+    rc.world          = world;
+    rc.sample         = sample;
+    rc.ldSampler      = ldSampler;
+    vec4f volumeColor = integrateVolumeIntervals(rc, volumeIntervals, rayIntervals, volumeRay,
+        ldSampler, self->volumeSamplingRate, true, distance, self->depthMode);
     outputColor       = outputColor + (1.f - outputColor.w) * volumeColor;
   }
   if (self->depthMode == eIsosurface) {
@@ -150,10 +69,56 @@ export void* uniform VolumeDepth_create(void* uniform cppE) {
   return self;
 }
 
-export void VolumeDepth_set(
-    void* uniform _self, uniform float volumeSamplingRate, uniform int depthMode) {
+export void VolumeDepth_set(void* uniform _self, uniform int depthMode, uniform bool shadowsEnabled,
+    uniform int aoSamples, uniform float aoRadius, uniform float volumeSamplingRate) {
   uniform VolumeDepth* uniform self = (uniform VolumeDepth * uniform) _self;
 
+  self->depthMode = depthMode;
+
+  self->shadowsEnabled = shadowsEnabled;
+  self->aoSamples      = aoSamples;
+  self->aoRadius       = aoRadius;
+
   self->volumeSamplingRate = volumeSamplingRate;
-  self->depthMode          = depthMode;
+}
+
+float SciVis_computeAO(const uniform VolumeDepth* uniform self, const FrameBuffer* uniform fb,
+    const World* uniform world, ScreenSample& sample, varying LDSampler* uniform ldSampler,
+    const varying DifferentialGeometry& dg, const uniform int sampleCnt,
+    const uniform float aoRadius, const varying vec3i& sampleID) {
+  const uniform int accumID = reduce_max(sampleID.z) * sampleCnt;
+
+  // init TEA RNG //
+  RandomTEA rng_state;
+  varying RandomTEA* const uniform rng = &rng_state;
+  RandomTEA__Constructor(rng, sampleID.x, sampleID.y);
+  const vec2f rot = RandomTEA__getFloats(rng);
+
+  float hits = 0.f;
+
+  const linear3f localToWorld = frame(dg.Ns);
+
+  for (uniform int i = 0; i < sampleCnt; i++) {
+    // Use base-5 and base-7 Halton to avoid correlation with sample position
+    const vec2f halton =
+        make_vec2f(PermHalton_sample5(accumID + i), PermHalton_sample7(accumID + i));
+    const vec2f r            = CranleyPattersonRotation(halton, rot);
+    const vec3f local_ao_dir = cosineSampleHemisphere(r);
+    const vec3f ao_dir       = localToWorld * local_ao_dir;
+
+    if (dot(ao_dir, dg.Ns) < 0.01f) { // check below surface
+      hits += 1.f;
+      continue;
+    }
+
+    Ray ao_ray;
+    setRay(ao_ray, dg.P, ao_dir, dg.epsilon, aoRadius);
+
+    hits = hits +
+           (1.f - lightAlpha(self, ao_ray, fb, world, sample, ldSampler, 1.f, dg.epsilon, 0.1f));
+  }
+
+  // the cosTheta of cosineSampleHemispherePDF and dot(shadingNormal, ao_dir)
+  // cancel
+  return 1.0f - (hits / (float)sampleCnt);
 }

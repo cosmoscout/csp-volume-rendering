@@ -78,6 +78,7 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
 
         ospray::cpp::VolumetricModel volumetricModel(*mVolume);
         volumetricModel.setParam("transferFunction", mTransferFunction.get());
+        volumetricModel.setParam("gradientShadingScale", 1.f);
         volumetricModel.commit();
 
         ospray::cpp::Group group;
@@ -101,8 +102,8 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
 
         ospray::cpp::Renderer renderer("volume_depth");
         renderer.setParam("aoSamples", 0);
+        renderer.setParam("shadows", false);
         renderer.setParam("volumeSamplingRate", samplingRate);
-        renderer.setParam("maxPathLength", 1);
         renderer.setParam("depthMode", (int)depthMode);
         renderer.commit();
 

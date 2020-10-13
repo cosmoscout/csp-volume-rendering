@@ -325,11 +325,22 @@ ospray::cpp::World createOSPRayWorld(ospray::cpp::Group group) {
   instance.commit();
 
   ospray::cpp::Light light("ambient");
+  light.setParam("intensity", .5f);
+  light.setParam("color", rkcommon::math::vec3f(1, 1, 1));
   light.commit();
+
+  ospray::cpp::Light sun("distant");
+  sun.setParam("intensity", 1.f);
+  sun.setParam("color", rkcommon::math::vec3f(1, 1, 1));
+  sun.setParam("direction", rkcommon::math::vec3f{0, 1, 0});
+  sun.setParam("angularDiameter", .53f);
+  sun.commit();
+
+  std::vector<ospray::cpp::Light> lights{light, sun};
 
   ospray::cpp::World world;
   world.setParam("instance", ospray::cpp::Data(instance));
-  world.setParam("light", ospray::cpp::Data(light));
+  world.setParam("light", ospray::cpp::Data(lights));
   world.commit();
 
   return world;
