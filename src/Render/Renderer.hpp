@@ -44,7 +44,7 @@ class Renderer {
 
   virtual std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> getFrame(
       glm::mat4 cameraTransform, float samplingRate, DepthMode depthMode, bool denoiseColor,
-      bool denoiseDepth) = 0;
+      bool denoiseDepth, bool shading) = 0;
 
  protected:
   vtkSmartPointer<vtkUnstructuredGrid> getData();

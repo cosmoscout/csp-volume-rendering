@@ -54,10 +54,10 @@ void OSPRayRenderer::setTransferFunction(std::vector<glm::vec4> colors) {
 
 std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFrame(
     glm::mat4 cameraTransform, float samplingRate, Renderer::DepthMode depthMode, bool denoiseColor,
-    bool denoiseDepth) {
+    bool denoiseDepth, bool shading) {
   mRendering = true;
   return std::async(std::launch::async,
-      [this, cameraTransform, samplingRate, depthMode, denoiseColor, denoiseDepth]() {
+      [this, cameraTransform, samplingRate, depthMode, denoiseColor, denoiseDepth, shading]() {
         if (!mVolume.has_value()) {
           vtkSmartPointer<vtkUnstructuredGrid> volumeData = getData();
           mVolume = OSPRayUtility::createOSPRayVolume(volumeData, "T");
@@ -78,7 +78,7 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
 
         ospray::cpp::VolumetricModel volumetricModel(*mVolume);
         volumetricModel.setParam("transferFunction", mTransferFunction.get());
-        volumetricModel.setParam("gradientShadingScale", 1.f);
+        volumetricModel.setParam("gradientShadingScale", shading ? 1.f : 0.f);
         volumetricModel.commit();
 
         ospray::cpp::Group group;

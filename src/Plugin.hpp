@@ -28,6 +28,8 @@ class PointsForwardWarped;
 class Plugin : public cs::core::PluginBase {
  public:
   struct Settings {
+    enum DisplayMode { eMesh, ePoints };
+
     struct Volume {
       std::string mPath;
     };
@@ -38,10 +40,12 @@ class Plugin : public cs::core::PluginBase {
     cs::utils::DefaultProperty<bool>                mDepthData{true};
     cs::utils::DefaultProperty<bool>                mDrawDepth{false};
     cs::utils::DefaultProperty<Renderer::DepthMode> mDepthMode{Renderer::DepthMode::eNone};
+    cs::utils::DefaultProperty<DisplayMode>         mDisplayMode{DisplayMode::eMesh};
     cs::utils::DefaultProperty<bool>                mDenoiseColor{true};
     cs::utils::DefaultProperty<bool>                mDenoiseDepth{true};
     cs::utils::DefaultProperty<int>                 mResolution{256};
     cs::utils::DefaultProperty<float>               mSamplingRate{0.005};
+    cs::utils::DefaultProperty<bool>                mShading{true};
     std::map<std::string, Volume>                   mVolumes;
   };
 
@@ -58,6 +62,7 @@ class Plugin : public cs::core::PluginBase {
     Renderer::DepthMode    mDepthMode;
     bool                   mDenoiseColor;
     bool                   mDenoiseDepth;
+    bool                   mShading;
 
     std::vector<uint8_t> mFrameData;
     glm::mat4            mModelViewProjection;

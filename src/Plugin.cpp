@@ -81,7 +81,7 @@ bool Plugin::Frame::operator==(const Frame& other) {
          glm::all(glm::epsilonEqual(mCameraTransform[3], other.mCameraTransform[3], 0.0001f)) &&
          mSamplingRate == other.mSamplingRate && mTransferFunction == other.mTransferFunction &&
          mDenoiseColor == other.mDenoiseColor && mDenoiseDepth == other.mDenoiseDepth &&
-         mDepthMode == other.mDepthMode;
+         mDepthMode == other.mDepthMode && mShading == other.mShading;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -118,6 +118,15 @@ void Plugin::init() {
       std::function([this](double value) { mPluginSettings.mSamplingRate = value; }));
   mPluginSettings.mSamplingRate.connectAndTouch([this](float value) {
     mGuiManager->setSliderValue("volumeRendering.setSamplingRate", value);
+  });
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableShading",
+      "If enabled gradient shading will be used.", std::function([this](bool enable) {
+        mPluginSettings.mShading = enable;
+        mRenderedFrames.clear();
+      }));
+  mPluginSettings.mShading.connectAndTouch([this](bool enable) {
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableShading", enable);
   });
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setEnableRequestImages",
@@ -242,6 +251,13 @@ void Plugin::init() {
         mBillboard->setEnabled(false);
         mPoints->setEnabled(true);
       }));
+  mPluginSettings.mDisplayMode.connect([this](Settings::DisplayMode displayMode) {
+    if (displayMode == Settings::DisplayMode::eMesh) {
+      mGuiManager->setRadioChecked("stars.setDisplayMode0");
+    } else if (displayMode == Settings::DisplayMode::ePoints) {
+      mGuiManager->setRadioChecked("stars.setDisplayMode1");
+    }
+  });
 
   mGuiManager->getGui()->registerCallback("volumeRendering.importTransferFunction",
       "Import a saved transfer function.",
@@ -376,11 +392,12 @@ void Plugin::requestFrame(glm::mat4 cameraTransform) {
   mNextFrame.mDepthMode    = mPluginSettings.mDepthMode.get();
   mNextFrame.mDenoiseColor = mPluginSettings.mDenoiseColor.get();
   mNextFrame.mDenoiseDepth = mPluginSettings.mDenoiseDepth.get();
+  mNextFrame.mShading      = mPluginSettings.mShading.get();
 
   if (!(mNextFrame == mRenderingFrame)) {
     mRenderingFrame    = mNextFrame;
     mFutureFrameData   = mRenderer->getFrame(cameraTransform, mRenderingFrame.mSamplingRate,
-        mRenderingFrame.mDepthMode, mNextFrame.mDenoiseColor, mNextFrame.mDenoiseDepth);
+        mRenderingFrame.mDepthMode, mNextFrame.mDenoiseColor, mNextFrame.mDenoiseDepth, mNextFrame.mShading);
     mGettingFrame      = true;
     mLastFrameInterval = 0;
   }
