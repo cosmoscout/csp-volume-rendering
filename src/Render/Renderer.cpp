@@ -55,21 +55,6 @@ void Renderer::setFile(std::string path) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Renderer::setFov(float fov) {
-  if (mRendering.get()) {
-    int con = mRendering.connect([this, fov, con](bool val) {
-      if (!val) {
-        mFov = fov;
-        mRendering.disconnect(con);
-      }
-    });
-  } else {
-    mFov = fov;
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 void Renderer::setResolution(int resolution) {
   if (mRendering.get()) {
     int con = mRendering.connect([this, resolution](bool val) {

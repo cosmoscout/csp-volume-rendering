@@ -74,7 +74,7 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
                                      (bounds[5] - bounds[4]) / 2, 1);
 
         OSPRayUtility::Camera camera = OSPRayUtility::createOSPRayCamera(
-            mFov.get(), (bounds[1] - bounds[0]) / 2, cameraTransformScaled);
+            (bounds[1] - bounds[0]) / 2, cameraTransformScaled);
 
         ospray::cpp::VolumetricModel volumetricModel(*mVolume);
         volumetricModel.setParam("transferFunction", mTransferFunction.get());

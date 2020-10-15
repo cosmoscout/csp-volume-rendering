@@ -37,7 +37,6 @@ class Renderer {
   void setTime(int timestep);
   void setFile(std::string path);
 
-  void setFov(float fov);
   void setResolution(int resolution);
 
   virtual void setTransferFunction(std::vector<glm::vec4> colors) = 0;
@@ -51,7 +50,6 @@ class Renderer {
 
   cs::utils::DefaultProperty<bool> mRendering{false};
 
-  cs::utils::DefaultProperty<float> mFov{22};
   cs::utils::DefaultProperty<int>   mResolution{256};
 
  private:

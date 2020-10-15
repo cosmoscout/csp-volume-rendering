@@ -70,7 +70,9 @@ void initOSPRay() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Camera createOSPRayCamera(float fov, float modelHeight, glm::mat4 observerTransform) {
+Camera createOSPRayCamera(float modelHeight, glm::mat4 observerTransform) {
+  // Define vertical field of view for ospray camera
+  float fov    = 60;
   float fovRad = fov / 180 * (float)M_PI;
 
   // Create camera transform looking along negative z
