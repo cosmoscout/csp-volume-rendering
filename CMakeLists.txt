@@ -129,6 +129,8 @@ set(MODULE_SOURCE_FILES
 	ospray_modules/volume_depth/ospray/render/volumes.ispc
 	ospray_modules/volume_depth/ospray/render/surfaces.ispc
 	ospray_modules/volume_depth/ospray/render/lightAlpha.ispc
+	ospray_modules/volume_depth/ospray/math/halton.ispc
+	ospray_modules/volume_depth/ospray/math/sobol.ispc
 )
 set(MODULE_HEADER_FILES
   ospray_modules/volume_depth/ospray/render/VolumeDepth.hpp
