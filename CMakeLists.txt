@@ -126,11 +126,16 @@ set(MODULE_SOURCE_FILES
   ospray_modules/volume_depth/ospray/moduleInit.cpp
 	ospray_modules/volume_depth/ospray/render/VolumeDepth.cpp
 	ospray_modules/volume_depth/ospray/render/VolumeDepth.ispc
-	ospray_modules/volume_depth/ospray/render/volumes.ispc)
+	ospray_modules/volume_depth/ospray/render/volumes.ispc
+	ospray_modules/volume_depth/ospray/render/surfaces.ispc
+	ospray_modules/volume_depth/ospray/render/lightAlpha.ispc
+)
 set(MODULE_HEADER_FILES
   ospray_modules/volume_depth/ospray/render/VolumeDepth.hpp
 	ospray_modules/volume_depth/ospray/render/VolumeDepth.ih
-	ospray_modules/volume_depth/ospray/render/volumes.ih)
+	ospray_modules/volume_depth/ospray/render/volumes.ih
+	ospray_modules/volume_depth/ospray/render/surfaces.ih
+)
 
 add_library(ospray_module_volume_depth SHARED)
 
@@ -138,6 +143,7 @@ ispc_target_add_sources(ospray_module_volume_depth
   ${MODULE_SOURCE_FILES}
 	${MODULE_HEADER_FILES}
 )
+target_include_directories(ospray_module_volume_depth PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/ospray_modules/volume_depth/ospray)
 
 target_sources(ospray_module_volume_depth PRIVATE ${MODULE_SOURCE_FILES})
 
@@ -145,7 +151,8 @@ generate_export_header(ospray_module_volume_depth)
 
 target_link_libraries(ospray_module_volume_depth
   PUBLIC
-	  ospray::ospray_module_ispc
+    ospray::ospray_module_ispc
+    ospray::ospray_sdk
 )
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/ospray_modules/volume_depth FILES

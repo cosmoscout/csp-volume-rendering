@@ -6,7 +6,7 @@
 #include "math/sampling.ih"
 #include "render/util.ih"
 // SciVis renderer
-#include "SciVisMaterial.ih"
+#include "render/scivis/SciVisMaterial.ih"
 #include "surfaces.ih"
 #include "volumes.ih"
 
