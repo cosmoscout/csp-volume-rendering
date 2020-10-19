@@ -47,28 +47,39 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void from_json(nlohmann::json const& j, Plugin::Settings::Volume& o) {
-  cs::core::Settings::deserialize(j, "path", o.mPath);
-}
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    DataManager::VolumeFileType, {
+                                     {DataManager::VolumeFileType::eInvalid, nullptr},
+                                     {DataManager::VolumeFileType::eGaia, "gaia"},
+                                     {DataManager::VolumeFileType::eVtk, "vtk"},
+                                 })
 
-void to_json(nlohmann::json& j, Plugin::Settings::Volume const& o) {
-  cs::core::Settings::serialize(j, "path", o.mPath);
-}
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    Renderer::VolumeStructure, {
+                                   {Renderer::VolumeStructure::eInvalid, nullptr},
+                                   {Renderer::VolumeStructure::eStructured, "structured"},
+                                   {Renderer::VolumeStructure::eUnstructured, "unstructured"},
+                               })
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    Renderer::VolumeShape, {
+                               {Renderer::VolumeShape::eInvalid, nullptr},
+                               {Renderer::VolumeShape::eCubic, "cubic"},
+                               {Renderer::VolumeShape::eSpherical, "spherical"},
+                           })
 
 void from_json(nlohmann::json const& j, Plugin::Settings& o) {
-  cs::core::Settings::deserialize(j, "predictiveRendering", o.mPredictiveRendering);
-  cs::core::Settings::deserialize(j, "resolution", o.mResolution);
-  cs::core::Settings::deserialize(j, "samplingRate", o.mSamplingRate);
-  cs::core::Settings::deserialize(j, "volumes", o.mVolumes);
+  cs::core::Settings::deserialize(j, "volumeDataPath", o.mVolumeDataPath);
+  cs::core::Settings::deserialize(j, "volumeDataType", o.mVolumeDataType);
+  cs::core::Settings::deserialize(j, "volumeStructure", o.mVolumeStructure);
+  cs::core::Settings::deserialize(j, "volumeShape", o.mVolumeShape);
 }
 
 void to_json(nlohmann::json& j, Plugin::Settings const& o) {
-  cs::core::Settings::serialize(j, "predictiveRendering", o.mPredictiveRendering);
-  cs::core::Settings::serialize(j, "resolution", o.mResolution);
-  cs::core::Settings::serialize(j, "samplingRate", o.mSamplingRate);
-  cs::core::Settings::serialize(j, "volumes", o.mVolumes);
+  cs::core::Settings::serialize(j, "volumeDataPath", o.mVolumeDataPath);
+  cs::core::Settings::serialize(j, "volumeDataType", o.mVolumeDataType);
+  cs::core::Settings::serialize(j, "volumeStructure", o.mVolumeStructure);
+  cs::core::Settings::serialize(j, "volumeShape", o.mVolumeShape);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -94,11 +105,6 @@ void Plugin::init() {
   mOnSaveConnection = mAllSettings->onSave().connect(
       [this]() { mAllSettings->mPlugins["csp-volume-rendering"] = mPluginSettings; });
 
-  // Init volume renderer
-  mRenderer = std::make_unique<OSPRayRenderer>();
-  mRenderer->setData("C:/Users/frit_jn/Documents/GAIA_Data/PX_OUT_mars_14564", 0);
-  mGettingFrame = false;
-
   // Add the volume rendering user interface components to the CosmoScout user interface.
   mGuiManager->addPluginTabToSideBarFromHTML(
       "Volume Rendering", "blur_circular", "../share/resources/gui/volume_rendering_tab.html");
@@ -106,10 +112,8 @@ void Plugin::init() {
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setResolution",
-      "Sets the resolution of the rendered volume images.", std::function([this](double value) {
-        mPluginSettings.mResolution = value;
-        mRenderer->setResolution(value);
-      }));
+      "Sets the resolution of the rendered volume images.",
+      std::function([this](double value) { mPluginSettings.mResolution = value; }));
   mPluginSettings.mResolution.connectAndTouch(
       [this](int value) { mGuiManager->setSliderValue("volumeRendering.setResolution", value); });
 
@@ -269,6 +273,17 @@ void Plugin::init() {
       }));
   updateAvailableTransferFunctions();
 
+  // Load settings
+  from_json(mAllSettings->mPlugins.at("csp-volume-rendering"), mPluginSettings);
+
+  // Init data manager and volume renderer
+  mDataManager = std::make_unique<DataManager>(
+      mPluginSettings.mVolumeDataPath.get(), mPluginSettings.mVolumeDataType.get());
+  mRenderer = std::make_unique<OSPRayRenderer>(
+      mDataManager, mPluginSettings.mVolumeStructure.get(), mPluginSettings.mVolumeShape.get());
+  // mDataManager->setTimestep(14564);
+  mRenderState = eRequestImage;
+
   // Init volume representation
   auto anchor                           = mAllSettings->mAnchors.find("Mars");
   auto [tStartExistence, tEndExistence] = anchor->second.getExistence();
@@ -324,7 +339,7 @@ void Plugin::update() {
       glm::scale(currentCameraTransform, glm::vec3(1.f / scale, 1.f / scale, 1.f / scale));
   currentCameraTransform[3] *= glm::vec4(1 / r[0], 1 / r[1], 1 / r[2], 1);
 
-  if (mGettingFrame) {
+  if (mRenderState == RenderState::eRenderingImage) {
     if (mFutureFrameData.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
       std::tie(mRenderingFrame.mFrameData, mRenderingFrame.mModelViewProjection) =
           mFutureFrameData.get();
@@ -332,17 +347,15 @@ void Plugin::update() {
 
       displayFrame(mRenderingFrame);
 
-      mGettingFrame                         = false;
+      mRenderState                          = RenderState::eRequestImage;
       mFrameIntervals[mFrameIntervalsIndex] = mLastFrameInterval;
       if (++mFrameIntervalsIndex >= mFrameIntervalsLength) {
         mFrameIntervalsIndex = 0;
       }
     }
   }
-  if (!mGettingFrame) {
-    if (mPluginSettings.mRequestImages.get()) {
-      requestFrame(currentCameraTransform);
-    }
+  if (mRenderState == RenderState::eRequestImage && mPluginSettings.mRequestImages.get()) {
+    requestFrame(currentCameraTransform);
   }
 
   if (mPluginSettings.mReuseImages.get() && mRenderedFrames.size() > 0) {
@@ -396,9 +409,10 @@ void Plugin::requestFrame(glm::mat4 cameraTransform) {
 
   if (!(mNextFrame == mRenderingFrame)) {
     mRenderingFrame    = mNextFrame;
-    mFutureFrameData   = mRenderer->getFrame(cameraTransform, mRenderingFrame.mSamplingRate,
-        mRenderingFrame.mDepthMode, mNextFrame.mDenoiseColor, mNextFrame.mDenoiseDepth, mNextFrame.mShading);
-    mGettingFrame      = true;
+    mFutureFrameData   = mRenderer->getFrame(mNextFrame.mResolution, cameraTransform,
+        mRenderingFrame.mSamplingRate, mRenderingFrame.mDepthMode, mNextFrame.mDenoiseColor,
+        mNextFrame.mDenoiseDepth, mNextFrame.mShading);
+    mRenderState       = RenderState::eRenderingImage;
     mLastFrameInterval = 0;
   }
 }

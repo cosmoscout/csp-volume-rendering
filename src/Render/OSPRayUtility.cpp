@@ -161,7 +161,7 @@ Camera createOSPRayCamera(float modelHeight, glm::mat4 observerTransform) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ospray::cpp::Volume createOSPRayVolume(
+ospray::cpp::Volume createOSPRayVolumeUnstructured(
     vtkSmartPointer<vtkUnstructuredGrid> vtkVolume, std::string scalar) {
   vtkSmartPointer<vtkCellSizeFilter> sizeFilter = vtkSmartPointer<vtkCellSizeFilter>::New();
   sizeFilter->SetComputeArea(false);
@@ -256,6 +256,46 @@ ospray::cpp::Volume createOSPRayVolume(
   volume.setParam("indexPrefixed", false);
   volume.setParam("cell.index", ospray::cpp::Data(cellIndices));
   volume.setParam("cell.type", ospray::cpp::Data(cellTypes));
+  volume.commit();
+
+  return volume;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+ospray::cpp::Volume createOSPRayVolumeStructured(
+    vtkSmartPointer<vtkStructuredPoints> vtkVolume, std::string scalar) {
+  vtkVolume->GetPointData()->SetActiveScalars(scalar.c_str());
+  double origin[3];
+  vtkVolume->GetOrigin(origin);
+  double spacing[3];
+  vtkVolume->GetSpacing(spacing);
+  int dimensions[3];
+  vtkVolume->GetDimensions(dimensions);
+
+  for (int i = 0; i < 3; i++) {
+    origin[i] = -vtkVolume->GetBounds()[i * 2 + 1] / 2;
+  }
+
+  ospray::cpp::Volume volume("structuredRegular");
+  volume.setParam(
+      "gridOrigin", rkcommon::math::vec3f{(float)origin[0], (float)origin[1], (float)origin[2]});
+  volume.setParam("gridSpacing",
+      rkcommon::math::vec3f{(float)spacing[0], (float)spacing[1], (float)spacing[2]});
+
+  if (vtkVolume->GetScalarSize() == 4) {
+    std::vector<float> data((float*)vtkVolume->GetScalarPointer(),
+        (float*)vtkVolume->GetScalarPointer() + vtkVolume->GetNumberOfPoints());
+    volume.setParam(
+        "data", ospray::cpp::CopiedData(data.data(),
+                    rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]}));
+  } else if (vtkVolume->GetScalarSize() == 8) {
+    std::vector<double> data((double*)vtkVolume->GetScalarPointer(),
+        (double*)vtkVolume->GetScalarPointer() + vtkVolume->GetNumberOfPoints());
+    volume.setParam(
+        "data", ospray::cpp::CopiedData(data.data(),
+                    rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]}));
+  }
   volume.commit();
 
   return volume;
@@ -395,6 +435,36 @@ std::vector<float> denoiseImage(std::vector<float>& image, int componentCount, i
   filter.execute();
 
   return image;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::vector<float> OSPRayUtility::normalizeDepthBuffer(
+    int resolution, std::vector<float> buffer, float modelRadius, OSPRayUtility::Camera camera) {
+  std::vector<float> depthData(resolution * resolution);
+
+  for (int i = 0; i < depthData.size(); i++) {
+    float val = buffer[i];
+    if (val == INFINITY) {
+      depthData[i] = -camera.transformationMatrix[3][2] / camera.transformationMatrix[2][2];
+    } else {
+      val /= modelRadius;
+      int       x          = i % resolution;
+      float     ndcX       = ((float)x / resolution - 0.5f) * 2;
+      int       y          = i / resolution;
+      float     ndcY       = ((float)y / resolution - 0.5f) * 2;
+      glm::vec4 posPixClip = glm::vec4(ndcX, ndcY, 0, 1);
+      glm::vec4 posPix     = glm::inverse(camera.transformationMatrix) * posPixClip;
+      glm::vec3 posPixNorm = posPix.xyz * (1 / posPix.w);
+      glm::vec3 pos =
+          val * glm::normalize(posPixNorm - camera.positionRotated) + camera.positionRotated;
+      glm::vec4 posClip     = camera.transformationMatrix * glm::vec4(pos, 1);
+      glm::vec3 posClipNorm = posClip.xyz * (1 / posClip.w);
+      depthData[i]          = posClipNorm.z;
+    }
+  }
+
+  return depthData;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

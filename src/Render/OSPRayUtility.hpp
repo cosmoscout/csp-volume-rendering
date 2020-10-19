@@ -11,6 +11,7 @@
 
 #include <vtk-8.2/vtkSmartPointer.h>
 #include <vtk-8.2/vtkUnstructuredGrid.h>
+#include <vtk-8.2/vtkStructuredPoints.h>
 
 #include <glm/gtc/type_ptr.hpp>
 
@@ -24,8 +25,10 @@ struct Camera {
 void initOSPRay();
 
 Camera              createOSPRayCamera(float modelHeight, glm::mat4 observerTransform);
-ospray::cpp::Volume createOSPRayVolume(
+ospray::cpp::Volume createOSPRayVolumeUnstructured(
     vtkSmartPointer<vtkUnstructuredGrid> vtkVolume, std::string scalar);
+ospray::cpp::Volume createOSPRayVolumeStructured(
+    vtkSmartPointer<vtkStructuredPoints> vtkVolume, std::string scalar);
 ospray::cpp::TransferFunction createOSPRayTransferFunction();
 ospray::cpp::TransferFunction createOSPRayTransferFunction(
     float min, float max, std::vector<glm::vec4> colors);
@@ -36,6 +39,9 @@ ospray::cpp::World createOSPRayWorld(ospray::cpp::Group group);
 std::vector<float> depthToGrayscale(const std::vector<float>& depth);
 std::vector<float> grayscaleToDepth(const std::vector<float>& grayscale);
 std::vector<float> denoiseImage(std::vector<float>& image, int componentCount, int resolution);
+
+std::vector<float> normalizeDepthBuffer(
+    int resolution, std::vector<float> buffer, float modelRadius, OSPRayUtility::Camera camera);
 
 } // namespace csp::volumerendering::OSPRayUtility
 

@@ -10,76 +10,11 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Renderer::Renderer()
-    : mCurrentFile("")
-    , mCurrentTimestep(0) {
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-Renderer::Renderer(std::string path)
-    : mCurrentFile(path)
-    , mCurrentTimestep(0) {
-  updateData();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-Renderer::Renderer(std::string path, int timestep)
-    : mCurrentFile(path)
-    , mCurrentTimestep(timestep) {
-  updateData();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Renderer::setData(std::string path, int timestep) {
-  mCurrentFile     = path;
-  mCurrentTimestep = timestep;
-  updateData();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Renderer::setTime(int timestep) {
-  mCurrentTimestep = timestep;
-  updateData();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Renderer::setFile(std::string path) {
-  mCurrentFile = path;
-  updateData();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Renderer::setResolution(int resolution) {
-  if (mRendering.get()) {
-    int con = mRendering.connect([this, resolution](bool val) {
-      if (!val) {
-        mResolution = resolution;
-      }
-    });
-    mRendering.disconnect(mResolutionCon);
-    mResolutionCon = con;
-  } else {
-    mRendering.disconnect(mResolutionCon);
-    mResolution = resolution;
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-vtkSmartPointer<vtkUnstructuredGrid> Renderer::getData() {
-  return mDataManager.getData(mCurrentFile, mCurrentTimestep);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Renderer::updateData() {
-  mDataManager.loadData(mCurrentFile, mCurrentTimestep);
+Renderer::Renderer(
+    std::shared_ptr<DataManager> dataManager, VolumeStructure structure, VolumeShape shape)
+    : mDataManager(dataManager)
+    , mStructure(structure)
+    , mShape(shape) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

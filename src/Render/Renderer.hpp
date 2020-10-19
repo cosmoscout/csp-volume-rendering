@@ -20,7 +20,9 @@ namespace csp::volumerendering {
 
 class Renderer {
  public:
-  enum DepthMode {
+  enum class VolumeStructure { eInvalid = -1, eStructured, eUnstructured };
+  enum class VolumeShape { eInvalid = -1, eCubic, eSpherical };
+  enum class DepthMode {
     eNone           = 0,
     eIsosurface     = 1,
     eFirstHit       = 2,
@@ -29,37 +31,21 @@ class Renderer {
     eMultiThreshold = 16
   };
 
-  Renderer();
-  Renderer(std::string path);
-  Renderer(std::string path, int timestep);
-
-  void setData(std::string path, int timestep);
-  void setTime(int timestep);
-  void setFile(std::string path);
-
-  void setResolution(int resolution);
+  Renderer(std::shared_ptr<DataManager> dataManager, VolumeStructure structure, VolumeShape shape);
 
   virtual void setTransferFunction(std::vector<glm::vec4> colors) = 0;
 
-  virtual std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> getFrame(
+  virtual std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> getFrame(int resolution,
       glm::mat4 cameraTransform, float samplingRate, DepthMode depthMode, bool denoiseColor,
       bool denoiseDepth, bool shading) = 0;
 
  protected:
-  vtkSmartPointer<vtkUnstructuredGrid> getData();
-
   cs::utils::DefaultProperty<bool> mRendering{false};
 
-  cs::utils::DefaultProperty<int>   mResolution{256};
+  std::shared_ptr<DataManager> mDataManager;
 
- private:
-  void updateData();
-
-  DataManager mDataManager;
-  std::string mCurrentFile;
-  int         mCurrentTimestep;
-
-  int mResolutionCon = -1;
+  VolumeStructure mStructure;
+  VolumeShape     mShape;
 };
 
 } // namespace csp::volumerendering

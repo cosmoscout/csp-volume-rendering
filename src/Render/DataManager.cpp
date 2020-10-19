@@ -17,30 +17,66 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void DataManager::loadData(std::string path, int timestep) {
-  logger().info("Loading data from {}, timestep {}...", path, timestep);
-  DataSet data;
-  data.mPath         = path;
-  data.mTimestep     = timestep;
-  data.mFutureData   = std::async(std::launch::async,
-      [](std::string path, int timestep) {
-        vtkSmartPointer<vtkUnstructuredGrid> data = vtkUnstructuredGrid::SafeDownCast(
-            VrcGenericDataLoader::LoadGaiaDataSet(path.c_str(), timestep, nullptr));
-        logger().info("Finished loading data from {}, timestep {}.", path, timestep);
-        return data;
-      },
-      path, timestep);
-  mCache.push_back(std::move(data));
+DataManager::DataManager(std::string path, VolumeFileType type)
+    : mPath(path)
+    , mType(type) {
+  setTimestep(0);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-vtkSmartPointer<vtkUnstructuredGrid> DataManager::getData(std::string path, int timestep) {
-  auto data = std::find_if(mCache.begin(), mCache.end(),
-      [&path, &timestep](const DataSet& d) { return d.mPath == path && d.mTimestep == timestep; });
+void DataManager::setTimestep(int timestep) {
+  mCurrentTimestep = timestep;
+  mDirty           = true;
+  if (mCache.find(timestep) == mCache.end()) {
+    loadData(timestep);
+  }
+}
 
-  std::shared_future<vtkSmartPointer<vtkUnstructuredGrid>> future = data->mFutureData;
-  return future.get();
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void DataManager::cacheTimestep(int timestep) {
+  loadData(timestep);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+bool DataManager::isDirty() {
+  return mDirty;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+vtkSmartPointer<vtkDataSet> DataManager::getData() {
+  auto                        data    = mCache.find(mCurrentTimestep);
+  vtkSmartPointer<vtkDataSet> dataset = data->second.get();
+  mDirty                              = false;
+  return dataset;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void DataManager::loadData(int timestep) {
+  logger().info("Loading data from {}, timestep {}...", mPath, timestep);
+  auto data        = std::async(std::launch::async,
+      [this](std::string path, VolumeFileType type, int timestep) {
+        std::lock_guard<std::mutex> lock(mReadMutex);
+        auto                        timer = std::chrono::high_resolution_clock::now();
+        vtkSmartPointer<vtkDataSet> data;
+        switch (type) {
+        case VolumeFileType::eGaia:
+          data = VrcGenericDataLoader::LoadGaiaDataSet(path.c_str(), timestep, nullptr);
+          break;
+        case VolumeFileType::eVtk:
+          data = VrcGenericDataLoader::LoadVtkDataSet(path.c_str());
+          break;
+        }
+        logger().info("Finished loading data from {}, timestep {}. Took {}s", path, timestep,
+            (float)(std::chrono::high_resolution_clock::now() - timer).count() / 1000000000);
+        return data;
+      },
+      mPath, mType, timestep);
+  mCache[timestep] = std::move(data);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

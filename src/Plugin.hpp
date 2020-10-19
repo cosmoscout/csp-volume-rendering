@@ -7,6 +7,7 @@
 #ifndef CSP_VOLUME_RENDERING_PLUGIN_HPP
 #define CSP_VOLUME_RENDERING_PLUGIN_HPP
 
+#include "Render/DataManager.hpp"
 #include "Render/Renderer.hpp"
 
 #include "../../../src/cs-core/PluginBase.hpp"
@@ -28,11 +29,12 @@ class PointsForwardWarped;
 class Plugin : public cs::core::PluginBase {
  public:
   struct Settings {
-    enum DisplayMode { eMesh, ePoints };
+    enum class DisplayMode { eMesh, ePoints };
 
-    struct Volume {
-      std::string mPath;
-    };
+    cs::utils::Property<std::string>                 mVolumeDataPath;
+    cs::utils::Property<DataManager::VolumeFileType> mVolumeDataType;
+    cs::utils::Property<Renderer::VolumeStructure>   mVolumeStructure;
+    cs::utils::Property<Renderer::VolumeShape>       mVolumeShape;
 
     cs::utils::DefaultProperty<bool>                mRequestImages{true};
     cs::utils::DefaultProperty<bool>                mPredictiveRendering{false};
@@ -44,9 +46,8 @@ class Plugin : public cs::core::PluginBase {
     cs::utils::DefaultProperty<bool>                mDenoiseColor{true};
     cs::utils::DefaultProperty<bool>                mDenoiseDepth{true};
     cs::utils::DefaultProperty<int>                 mResolution{256};
-    cs::utils::DefaultProperty<float>               mSamplingRate{0.005};
+    cs::utils::DefaultProperty<float>               mSamplingRate{0.05};
     cs::utils::DefaultProperty<bool>                mShading{true};
-    std::map<std::string, Volume>                   mVolumes;
   };
 
   void init() override;
@@ -69,6 +70,8 @@ class Plugin : public cs::core::PluginBase {
 
     bool operator==(const Frame& other);
   };
+
+  enum class RenderState { eIdle, eRequestImage, eRenderingImage };
 
   void requestFrame(glm::mat4 cameraTransform);
   void tryReuseFrame(glm::mat4 cameraTransform);
@@ -94,6 +97,7 @@ class Plugin : public cs::core::PluginBase {
   int                    mCameraTransformsIndex  = 0;
 
   std::unique_ptr<Renderer>            mRenderer;
+  std::shared_ptr<DataManager>         mDataManager;
   std::shared_ptr<PointsForwardWarped> mPoints;
   std::shared_ptr<Billboard>           mBillboard;
   std::shared_ptr<VistaOpenGLNode>     mPointsNode;
@@ -101,7 +105,8 @@ class Plugin : public cs::core::PluginBase {
 
   std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> mFutureFrameData;
 
-  bool               mGettingFrame;
+  RenderState mRenderState = RenderState::eIdle;
+
   Frame              mNextFrame;
   Frame              mRenderingFrame;
   Frame              mDisplayedFrame;

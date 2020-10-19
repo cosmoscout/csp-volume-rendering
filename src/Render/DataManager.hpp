@@ -7,29 +7,39 @@
 #ifndef CSP_VOLUME_RENDERING_DATAMANAGER_HPP
 #define CSP_VOLUME_RENDERING_DATAMANAGER_HPP
 
+#include "vtk-8.2/vtkDataSet.h"
 #include "vtk-8.2/vtkSmartPointer.h"
-#include "vtk-8.2/vtkUnstructuredGrid.h"
 
 #include <future>
 #include <map>
+#include <mutex>
 #include <string>
 
 namespace csp::volumerendering {
 
 class DataManager {
  public:
-  void                                 loadData(std::string path, int timestep);
-  vtkSmartPointer<vtkUnstructuredGrid> getData(std::string path, int timestep);
+  enum class VolumeFileType { eInvalid = -1, eGaia, eVtk };
+
+  DataManager(std::string path, VolumeFileType type);
+
+  void setTimestep(int timestep);
+  void cacheTimestep(int timestep);
+  bool isDirty();
+
+  vtkSmartPointer<vtkDataSet> getData();
 
  private:
-  struct DataSet {
-    std::string mPath;
-    int         mTimestep;
+  std::string    mPath;
+  VolumeFileType mType;
+  int            mCurrentTimestep;
+  bool           mDirty;
 
-    std::shared_future<vtkSmartPointer<vtkUnstructuredGrid>> mFutureData;
-  };
+  std::mutex mReadMutex;
 
-  std::vector<DataSet> mCache;
+  std::map<int, std::shared_future<vtkSmartPointer<vtkDataSet>>> mCache;
+
+  void loadData(int timestep);
 };
 
 } // namespace csp::volumerendering
