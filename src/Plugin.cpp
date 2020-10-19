@@ -282,7 +282,7 @@ void Plugin::init() {
   mRenderer = std::make_unique<OSPRayRenderer>(
       mDataManager, mPluginSettings.mVolumeStructure.get(), mPluginSettings.mVolumeShape.get());
   // mDataManager->setTimestep(14564);
-  mRenderState = eRequestImage;
+  mRenderState = RenderState::eRequestImage;
 
   // Init volume representation
   auto anchor                           = mAllSettings->mAnchors.find("Mars");
