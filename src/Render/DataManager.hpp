@@ -7,8 +7,10 @@
 #ifndef CSP_VOLUME_RENDERING_DATAMANAGER_HPP
 #define CSP_VOLUME_RENDERING_DATAMANAGER_HPP
 
-#include "vtk-8.2/vtkDataSet.h"
-#include "vtk-8.2/vtkSmartPointer.h"
+#include "../../../src/cs-utils/Property.hpp"
+
+#include <vtk-8.2/vtkDataSet.h>
+#include <vtk-8.2/vtkSmartPointer.h>
 
 #include <future>
 #include <map>
@@ -27,12 +29,16 @@ class DataManager {
   void cacheTimestep(int timestep);
   bool isDirty();
 
+  cs::utils::Property<std::vector<std::string>> mScalars;
+  void                                          setActiveScalar(std::string scalar);
+
   vtkSmartPointer<vtkDataSet> getData();
 
  private:
   std::string    mPath;
   VolumeFileType mType;
   int            mCurrentTimestep;
+  std::string    mActiveScalar;
   bool           mDirty;
 
   std::mutex mReadMutex;

@@ -111,15 +111,19 @@ void Plugin::init() {
 
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
 
+  mGuiManager->getGui()->registerCallback("volumeRendering.setScalar",
+      "Set the scalar to be rendered.",
+      std::function([this](std::string scalar) { mDataManager->setActiveScalar(scalar); }));
+
   mGuiManager->getGui()->registerCallback("volumeRendering.setResolution",
       "Sets the resolution of the rendered volume images.",
-      std::function([this](double value) { mPluginSettings.mResolution = value; }));
+      std::function([this](double value) { mPluginSettings.mResolution = (int)value; }));
   mPluginSettings.mResolution.connectAndTouch(
       [this](int value) { mGuiManager->setSliderValue("volumeRendering.setResolution", value); });
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setSamplingRate",
       "Sets the sampling rate for volume rendering.",
-      std::function([this](double value) { mPluginSettings.mSamplingRate = value; }));
+      std::function([this](double value) { mPluginSettings.mSamplingRate = (float)value; }));
   mPluginSettings.mSamplingRate.connectAndTouch([this](float value) {
     mGuiManager->setSliderValue("volumeRendering.setSamplingRate", value);
   });
@@ -281,7 +285,14 @@ void Plugin::init() {
       mPluginSettings.mVolumeDataPath.get(), mPluginSettings.mVolumeDataType.get());
   mRenderer = std::make_unique<OSPRayRenderer>(
       mDataManager, mPluginSettings.mVolumeStructure.get(), mPluginSettings.mVolumeShape.get());
-  // mDataManager->setTimestep(14564);
+  mDataManager->mScalars.connect([this](std::vector<std::string> scalars) {
+    for (std::string scalar : scalars) {
+      mGuiManager->getGui()->callJavascript(
+          "CosmoScout.gui.addDropdownValue", "volumeRendering.setScalar", scalar, scalar, false);
+    }
+    mGuiManager->getGui()->callJavascript(
+        "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", scalars[0]);
+  });
   mRenderState = RenderState::eRequestImage;
 
   // Init volume representation
@@ -433,7 +444,7 @@ void Plugin::tryReuseFrame(glm::mat4 cameraTransform) {
   Frame bestFrame = mRenderedFrames.back();
   float minDiff   = diffTranslations(cameraTransform, bestFrame.mCameraTransform);
   for (const Frame& f : mRenderedFrames) {
-    double diff = diffTranslations(cameraTransform, f.mCameraTransform);
+    float diff = diffTranslations(cameraTransform, f.mCameraTransform);
     if (diff < minDiff) {
       minDiff   = diff;
       bestFrame = f;

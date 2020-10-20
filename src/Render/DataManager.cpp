@@ -55,10 +55,22 @@ bool DataManager::isDirty() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void DataManager::setActiveScalar(std::string scalar) {
+  if (std::find(mScalars.get().begin(), mScalars.get().end(), scalar) != mScalars.get().end()) {
+    mActiveScalar = scalar;
+    mDirty        = true;
+  } else {
+    logger().warn("{} is not a scalar in the current dataset. {} will be used instead.", scalar,
+        mActiveScalar);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 vtkSmartPointer<vtkDataSet> DataManager::getData() {
   auto                        data    = mCache.find(mCurrentTimestep);
   vtkSmartPointer<vtkDataSet> dataset = data->second.get();
-  dataset->GetPointData()->SetActiveScalars("T");
+  dataset->GetPointData()->SetActiveScalars(mActiveScalar.c_str());
   mDirty = false;
   return dataset;
 }
@@ -82,6 +94,17 @@ void DataManager::loadData(int timestep) {
         }
         logger().info("Finished loading data from {}, timestep {}. Took {}s", path, timestep,
             (float)(std::chrono::high_resolution_clock::now() - timer).count() / 1000000000);
+
+        if (mActiveScalar == "") {
+          std::vector<std::string> scalars;
+          for (int i = 0; i < data->GetPointData()->GetNumberOfArrays(); i++) {
+            if (data->GetPointData()->GetAbstractArray(i)->GetNumberOfComponents() == 1) {
+              scalars.push_back(data->GetPointData()->GetArrayName(i));
+            }
+          }
+          mScalars.set(scalars);
+          mActiveScalar = scalars[0];
+        }
         return data;
       },
       mPath, mType, timestep);
