@@ -20,7 +20,6 @@
 
 #include <vtk-8.2/vtkCellArray.h>
 #include <vtk-8.2/vtkCellData.h>
-#include <vtk-8.2/vtkCellSizeFilter.h>
 #include <vtk-8.2/vtkPointData.h>
 #include <vtk-8.2/vtkUnsignedCharArray.h>
 
@@ -161,24 +160,12 @@ Camera createOSPRayCamera(float modelHeight, glm::mat4 observerTransform) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ospray::cpp::Volume createOSPRayVolumeUnstructured(
-    vtkSmartPointer<vtkUnstructuredGrid> vtkVolume, std::string scalar) {
-  vtkSmartPointer<vtkCellSizeFilter> sizeFilter = vtkSmartPointer<vtkCellSizeFilter>::New();
-  sizeFilter->SetComputeArea(false);
-  sizeFilter->SetComputeLength(false);
-  sizeFilter->SetComputeSum(false);
-  sizeFilter->SetComputeVertexCount(false);
-  sizeFilter->SetComputeVolume(true);
-  sizeFilter->SetInputData(vtkVolume);
-  sizeFilter->Update();
-  vtkVolume = vtkUnstructuredGrid::SafeDownCast(sizeFilter->GetOutput());
-
+ospray::cpp::Volume createOSPRayVolumeUnstructured(vtkSmartPointer<vtkUnstructuredGrid> vtkVolume) {
   std::vector<rkcommon::math::vec3f> vertexPositions(
       (rkcommon::math::vec3f*)vtkVolume->GetPoints()->GetVoidPointer(0),
       (rkcommon::math::vec3f*)vtkVolume->GetPoints()->GetVoidPointer(0) +
           vtkVolume->GetNumberOfPoints());
 
-  vtkVolume->GetPointData()->SetActiveScalars(scalar.c_str());
   std::vector<double> vertexDataD(vtkVolume->GetNumberOfPoints());
   vtkVolume->GetPointData()->GetScalars()->ExportToVoidPointer(vertexDataD.data());
   std::vector<float> vertexData;
@@ -190,64 +177,15 @@ ospray::cpp::Volume createOSPRayVolumeUnstructured(
       vtkVolume->GetCells()->GetPointer() +
           vtkVolume->GetCells()->GetNumberOfConnectivityEntries());
 
-  std::vector<uint64_t> allCellIndices(vtkVolume->GetNumberOfCells());
+  std::vector<uint64_t> cellIndices(vtkVolume->GetNumberOfCells());
   int                   index = -4;
-  std::generate(allCellIndices.begin(), allCellIndices.end(), [&index] {
+  std::generate(cellIndices.begin(), cellIndices.end(), [&index] {
     index += 5;
     return index;
   });
 
-  std::vector<uint8_t> allCellTypes(
+  std::vector<uint8_t> cellTypes(
       vtkVolume->GetCellTypesArray()->Begin(), vtkVolume->GetCellTypesArray()->End());
-
-  std::vector<uint64_t> cellIndices;
-  std::vector<uint8_t>  cellTypes;
-  vtkVolume->GetCellData()->SetActiveScalars("Volume");
-
-  std::vector<std::thread>                        splitThreads;
-  std::vector<std::future<std::vector<uint8_t>>>  futureCellTypes;
-  std::vector<std::future<std::vector<uint64_t>>> futureCellIndices;
-  int                                             threadCount = 4;
-
-  for (int i = 0; i < threadCount; i++) {
-    std::promise<std::vector<uint8_t>>  pT;
-    std::promise<std::vector<uint64_t>> pI;
-    futureCellTypes.push_back(pT.get_future());
-    futureCellIndices.push_back(pI.get_future());
-    int start = (int)((float)vtkVolume->GetNumberOfCells() / threadCount * i);
-    int end   = (int)((float)vtkVolume->GetNumberOfCells() / threadCount * (i + 1));
-
-    std::thread thread(
-        [&vertexData, vtkVolume, allCellTypes, &allCellIndices](
-            std::promise<std::vector<uint8_t>> pT, std::promise<std::vector<uint64_t>> pI,
-            int start, int end) {
-          std::vector<uint8_t>  cellTypes;
-          std::vector<uint64_t> cellIndices;
-
-          for (int i = start; i < end; i++) {
-            double volume;
-            vtkVolume->GetCellData()->GetScalars()->GetTuple(i, &volume);
-            if (volume > 0.000001 && volume < 2.59941e-05) {
-              cellIndices.push_back(allCellIndices[i]);
-              cellTypes.push_back(allCellTypes[i]);
-            }
-          }
-
-          pT.set_value(cellTypes);
-          pI.set_value(cellIndices);
-        },
-        std::move(pT), std::move(pI), start, end);
-    splitThreads.push_back(std::move(thread));
-  }
-
-  for (int i = 0; i < threadCount; i++) {
-    splitThreads[i].join();
-    auto cellTypesFromFuture   = futureCellTypes[i].get();
-    auto cellIndicesFromFuture = futureCellIndices[i].get();
-    cellTypes.insert(cellTypes.end(), cellTypesFromFuture.begin(), cellTypesFromFuture.end());
-    cellIndices.insert(
-        cellIndices.end(), cellIndicesFromFuture.begin(), cellIndicesFromFuture.end());
-  }
 
   ospray::cpp::Volume volume("unstructured");
   volume.setParam("vertex.position", ospray::cpp::Data(vertexPositions));
@@ -263,9 +201,7 @@ ospray::cpp::Volume createOSPRayVolumeUnstructured(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ospray::cpp::Volume createOSPRayVolumeStructured(
-    vtkSmartPointer<vtkStructuredPoints> vtkVolume, std::string scalar) {
-  vtkVolume->GetPointData()->SetActiveScalars(scalar.c_str());
+ospray::cpp::Volume createOSPRayVolumeStructured(vtkSmartPointer<vtkStructuredPoints> vtkVolume) {
   double origin[3];
   vtkVolume->GetOrigin(origin);
   double spacing[3];

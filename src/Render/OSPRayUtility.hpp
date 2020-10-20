@@ -10,8 +10,8 @@
 #include <ospray/ospray_cpp.h>
 
 #include <vtk-8.2/vtkSmartPointer.h>
-#include <vtk-8.2/vtkUnstructuredGrid.h>
 #include <vtk-8.2/vtkStructuredPoints.h>
+#include <vtk-8.2/vtkUnstructuredGrid.h>
 
 #include <glm/gtc/type_ptr.hpp>
 
@@ -25,10 +25,8 @@ struct Camera {
 void initOSPRay();
 
 Camera              createOSPRayCamera(float modelHeight, glm::mat4 observerTransform);
-ospray::cpp::Volume createOSPRayVolumeUnstructured(
-    vtkSmartPointer<vtkUnstructuredGrid> vtkVolume, std::string scalar);
-ospray::cpp::Volume createOSPRayVolumeStructured(
-    vtkSmartPointer<vtkStructuredPoints> vtkVolume, std::string scalar);
+ospray::cpp::Volume createOSPRayVolumeUnstructured(vtkSmartPointer<vtkUnstructuredGrid> vtkVolume);
+ospray::cpp::Volume createOSPRayVolumeStructured(vtkSmartPointer<vtkStructuredPoints> vtkVolume);
 ospray::cpp::TransferFunction createOSPRayTransferFunction();
 ospray::cpp::TransferFunction createOSPRayTransferFunction(
     float min, float max, std::vector<glm::vec4> colors);

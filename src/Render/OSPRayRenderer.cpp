@@ -45,7 +45,6 @@ OSPRayRenderer::~OSPRayRenderer() {
 void OSPRayRenderer::setTransferFunction(std::vector<glm::vec4> colors) {
   mTransferFunction = std::async(std::launch::deferred, [this, colors]() {
     vtkSmartPointer<vtkDataSet> volumeData = mDataManager->getData();
-    volumeData->GetPointData()->SetActiveScalars("B_Mag");
     return OSPRayUtility::createOSPRayTransferFunction(
         (float)volumeData->GetPointData()->GetScalars()->GetRange()[0],
         (float)volumeData->GetPointData()->GetScalars()->GetRange()[1], colors);
@@ -69,7 +68,7 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
       vtkSmartPointer<vtkUnstructuredGrid> volumeData =
           vtkUnstructuredGrid::SafeDownCast(mDataManager->getData());
       if (recreateVolume) {
-        mVolume = OSPRayUtility::createOSPRayVolumeUnstructured(volumeData, "T");
+        mVolume = OSPRayUtility::createOSPRayVolumeUnstructured(volumeData);
       }
       volumeData->GetPoints()->ComputeBounds();
       for (int i = 0; i < 6; i++) {
@@ -81,7 +80,7 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
       vtkSmartPointer<vtkStructuredPoints> volumeData =
           vtkStructuredPoints::SafeDownCast(mDataManager->getData());
       if (recreateVolume) {
-        mVolume = OSPRayUtility::createOSPRayVolumeStructured(volumeData, "B_Mag");
+        mVolume = OSPRayUtility::createOSPRayVolumeStructured(volumeData);
       }
       volumeData->ComputeBounds();
       for (int i = 0; i < 6; i++) {
@@ -100,7 +99,7 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
     switch (mShape) {
     case Renderer::VolumeShape::eCubic: {
       float diagonal           = sqrtf(x * x + y * y + z * z);
-      cameraTransformScaled[3] = cameraTransform[3] * glm::vec4(diagonal, diagonal, diagonal, 1.f);
+      cameraTransformScaled[3] = cameraTransform[3] * glm::vec4(diagonal, diagonal, diagonal, 1);
       height                   = diagonal;
       break;
     }
@@ -170,7 +169,7 @@ std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> OSPRayRenderer::getFram
     }
 
     depthData = OSPRayUtility::normalizeDepthBuffer(
-        resolution, depthData, (bounds[1] - bounds[0]) / 2, camera);
+        resolution, depthData, height, camera);
 
     auto timer = std::chrono::high_resolution_clock::now();
 

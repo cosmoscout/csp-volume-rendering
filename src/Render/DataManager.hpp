@@ -39,7 +39,8 @@ class DataManager {
 
   std::map<int, std::shared_future<vtkSmartPointer<vtkDataSet>>> mCache;
 
-  void loadData(int timestep);
+  void                        loadData(int timestep);
+  vtkSmartPointer<vtkDataSet> loadGaiaData(int timestep);
 };
 
 } // namespace csp::volumerendering
