@@ -31,23 +31,33 @@ class Plugin : public cs::core::PluginBase {
   struct Settings {
     enum class DisplayMode { eMesh, ePoints };
 
+    // Data settings
     cs::utils::Property<std::string>                 mVolumeDataPath;
     cs::utils::Property<DataManager::VolumeFileType> mVolumeDataType;
     cs::utils::Property<Renderer::VolumeStructure>   mVolumeStructure;
     cs::utils::Property<Renderer::VolumeShape>       mVolumeShape;
 
+    // Rendering settings
     cs::utils::DefaultProperty<bool>                mRequestImages{true};
-    cs::utils::DefaultProperty<bool>                mPredictiveRendering{false};
-    cs::utils::DefaultProperty<bool>                mReuseImages{false};
-    cs::utils::DefaultProperty<bool>                mDepthData{true};
-    cs::utils::DefaultProperty<bool>                mDrawDepth{false};
-    cs::utils::DefaultProperty<Renderer::DepthMode> mDepthMode{Renderer::DepthMode::eNone};
-    cs::utils::DefaultProperty<DisplayMode>         mDisplayMode{DisplayMode::eMesh};
-    cs::utils::DefaultProperty<bool>                mDenoiseColor{true};
-    cs::utils::DefaultProperty<bool>                mDenoiseDepth{true};
     cs::utils::DefaultProperty<int>                 mResolution{256};
     cs::utils::DefaultProperty<float>               mSamplingRate{0.05f};
+    cs::utils::DefaultProperty<bool>                mDenoiseColor{true};
+    cs::utils::DefaultProperty<bool>                mDenoiseDepth{true};
     cs::utils::DefaultProperty<bool>                mShading{true};
+    cs::utils::DefaultProperty<Renderer::DepthMode> mDepthMode{Renderer::DepthMode::eNone};
+
+    // Display settings
+    cs::utils::DefaultProperty<bool>        mPredictiveRendering{false};
+    cs::utils::DefaultProperty<bool>        mReuseImages{false};
+    cs::utils::DefaultProperty<bool>        mDepthData{true};
+    cs::utils::DefaultProperty<bool>        mDrawDepth{false};
+    cs::utils::DefaultProperty<DisplayMode> mDisplayMode{DisplayMode::eMesh};
+
+    // Transform settings
+    cs::utils::Property<std::string>      mAnchor;
+    cs::utils::DefaultProperty<glm::dvec3> mPosition{glm::dvec3(0, 0, 0)};
+    cs::utils::DefaultProperty<double> mScale{1.};
+    cs::utils::DefaultProperty<glm::dquat> mRotation{glm::dquat(0, 0, 0, 1)};
   };
 
   void init() override;

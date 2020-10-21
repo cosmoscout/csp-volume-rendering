@@ -69,17 +69,31 @@ NLOHMANN_JSON_SERIALIZE_ENUM(
                            })
 
 void from_json(nlohmann::json const& j, Plugin::Settings& o) {
+  // Data settings
   cs::core::Settings::deserialize(j, "volumeDataPath", o.mVolumeDataPath);
   cs::core::Settings::deserialize(j, "volumeDataType", o.mVolumeDataType);
   cs::core::Settings::deserialize(j, "volumeStructure", o.mVolumeStructure);
   cs::core::Settings::deserialize(j, "volumeShape", o.mVolumeShape);
+
+  // Transform settings
+  cs::core::Settings::deserialize(j, "anchor", o.mAnchor);
+  cs::core::Settings::deserialize(j, "position", o.mPosition);
+  cs::core::Settings::deserialize(j, "scale", o.mScale);
+  cs::core::Settings::deserialize(j, "rotation", o.mRotation);
 }
 
 void to_json(nlohmann::json& j, Plugin::Settings const& o) {
+  // Data settings
   cs::core::Settings::serialize(j, "volumeDataPath", o.mVolumeDataPath);
   cs::core::Settings::serialize(j, "volumeDataType", o.mVolumeDataType);
   cs::core::Settings::serialize(j, "volumeStructure", o.mVolumeStructure);
   cs::core::Settings::serialize(j, "volumeShape", o.mVolumeShape);
+
+  // Transform settings
+  cs::core::Settings::serialize(j, "anchor", o.mAnchor);
+  cs::core::Settings::serialize(j, "position", o.mPosition);
+  cs::core::Settings::serialize(j, "scale", o.mScale);
+  cs::core::Settings::serialize(j, "rotation", o.mRotation);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -296,12 +310,18 @@ void Plugin::init() {
   mRenderState = RenderState::eRequestImage;
 
   // Init volume representation
-  auto anchor                           = mAllSettings->mAnchors.find("Mars");
+  auto anchor = mAllSettings->mAnchors.find(mPluginSettings.mAnchor.get());
   auto [tStartExistence, tEndExistence] = anchor->second.getExistence();
   mBillboard = std::make_shared<Billboard>(anchor->second.mCenter, anchor->second.mFrame,
       tStartExistence, tEndExistence, cs::core::SolarSystem::getRadii(anchor->second.mCenter));
   mPoints    = std::make_shared<PointsForwardWarped>(anchor->second.mCenter, anchor->second.mFrame,
       tStartExistence, tEndExistence, cs::core::SolarSystem::getRadii(anchor->second.mCenter));
+  mBillboard->setAnchorPosition(mPluginSettings.mPosition.get());
+  mBillboard->setAnchorScale(mPluginSettings.mScale.get());
+  mBillboard->setAnchorRotation(mPluginSettings.mRotation.get());
+  mPoints->setAnchorPosition(mPluginSettings.mPosition.get());
+  mPoints->setAnchorScale(mPluginSettings.mScale.get());
+  mPoints->setAnchorRotation(mPluginSettings.mRotation.get());
 
   // Add volume representation to solar system and scene graph
   mSolarSystem->registerAnchor(mBillboard);
