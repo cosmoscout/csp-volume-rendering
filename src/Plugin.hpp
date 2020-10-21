@@ -33,6 +33,7 @@ class Plugin : public cs::core::PluginBase {
 
     // Data settings
     cs::utils::Property<std::string>                 mVolumeDataPath;
+    cs::utils::Property<std::string>                 mVolumeDataPattern;
     cs::utils::Property<DataManager::VolumeFileType> mVolumeDataType;
     cs::utils::Property<Renderer::VolumeStructure>   mVolumeStructure;
     cs::utils::Property<Renderer::VolumeShape>       mVolumeShape;
@@ -54,9 +55,9 @@ class Plugin : public cs::core::PluginBase {
     cs::utils::DefaultProperty<DisplayMode> mDisplayMode{DisplayMode::eMesh};
 
     // Transform settings
-    cs::utils::Property<std::string>      mAnchor;
+    cs::utils::Property<std::string>       mAnchor;
     cs::utils::DefaultProperty<glm::dvec3> mPosition{glm::dvec3(0, 0, 0)};
-    cs::utils::DefaultProperty<double> mScale{1.};
+    cs::utils::DefaultProperty<double>     mScale{1.};
     cs::utils::DefaultProperty<glm::dquat> mRotation{glm::dquat(0, 0, 0, 1)};
   };
 
@@ -66,6 +67,8 @@ class Plugin : public cs::core::PluginBase {
 
  private:
   struct Frame {
+    std::string            mScalar;
+    int                    mTimestep;
     int                    mResolution;
     float                  mSamplingRate;
     glm::mat4              mCameraTransform;

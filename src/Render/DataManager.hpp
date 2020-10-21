@@ -23,25 +23,28 @@ class DataManager {
  public:
   enum class VolumeFileType { eInvalid = -1, eGaia, eVtk };
 
-  DataManager(std::string path, VolumeFileType type);
+  DataManager(std::string path, std::string filenamePattern, VolumeFileType type);
+
+  cs::utils::Property<std::vector<int>>         pTimesteps;
+  cs::utils::Property<std::vector<std::string>> pScalars;
 
   void setTimestep(int timestep);
   void cacheTimestep(int timestep);
   bool isDirty();
 
-  cs::utils::Property<std::vector<std::string>> mScalars;
-  void                                          setActiveScalar(std::string scalar);
+  void setActiveScalar(std::string scalar);
 
   vtkSmartPointer<vtkDataSet> getData();
 
  private:
-  std::string    mPath;
   VolumeFileType mType;
   int            mCurrentTimestep;
   std::string    mActiveScalar;
   bool           mDirty;
 
   std::mutex mReadMutex;
+
+  std::map<int, std::string> mTimestepFiles;
 
   std::map<int, std::shared_future<vtkSmartPointer<vtkDataSet>>> mCache;
 

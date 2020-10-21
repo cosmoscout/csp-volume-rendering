@@ -71,6 +71,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(
 void from_json(nlohmann::json const& j, Plugin::Settings& o) {
   // Data settings
   cs::core::Settings::deserialize(j, "volumeDataPath", o.mVolumeDataPath);
+  cs::core::Settings::deserialize(j, "volumeDataPattern", o.mVolumeDataPattern);
   cs::core::Settings::deserialize(j, "volumeDataType", o.mVolumeDataType);
   cs::core::Settings::deserialize(j, "volumeStructure", o.mVolumeStructure);
   cs::core::Settings::deserialize(j, "volumeShape", o.mVolumeShape);
@@ -85,6 +86,7 @@ void from_json(nlohmann::json const& j, Plugin::Settings& o) {
 void to_json(nlohmann::json& j, Plugin::Settings const& o) {
   // Data settings
   cs::core::Settings::serialize(j, "volumeDataPath", o.mVolumeDataPath);
+  cs::core::Settings::serialize(j, "volumeDataPattern", o.mVolumeDataPattern);
   cs::core::Settings::serialize(j, "volumeDataType", o.mVolumeDataType);
   cs::core::Settings::serialize(j, "volumeStructure", o.mVolumeStructure);
   cs::core::Settings::serialize(j, "volumeShape", o.mVolumeShape);
@@ -106,7 +108,8 @@ bool Plugin::Frame::operator==(const Frame& other) {
          glm::all(glm::epsilonEqual(mCameraTransform[3], other.mCameraTransform[3], 0.0001f)) &&
          mSamplingRate == other.mSamplingRate && mTransferFunction == other.mTransferFunction &&
          mDenoiseColor == other.mDenoiseColor && mDenoiseDepth == other.mDenoiseDepth &&
-         mDepthMode == other.mDepthMode && mShading == other.mShading;
+         mDepthMode == other.mDepthMode && mShading == other.mShading && mScalar == other.mScalar &&
+         mTimestep == other.mTimestep;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -126,8 +129,18 @@ void Plugin::init() {
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setScalar",
-      "Set the scalar to be rendered.",
-      std::function([this](std::string scalar) { mDataManager->setActiveScalar(scalar); }));
+      "Set the scalar to be rendered.", std::function([this](std::string scalar) {
+        mDataManager->setActiveScalar(scalar);
+        mNextFrame.mScalar = scalar;
+        mRenderedFrames.clear();
+      }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setTimestep",
+      "Sets the timestep of the rendered volume images.", std::function([this](double value) {
+        mDataManager->setTimestep((int)std::lround(value));
+        mNextFrame.mTimestep = (int)std::lround(value);
+        mRenderedFrames.clear();
+      }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setResolution",
       "Sets the resolution of the rendered volume images.",
@@ -295,17 +308,24 @@ void Plugin::init() {
   from_json(mAllSettings->mPlugins.at("csp-volume-rendering"), mPluginSettings);
 
   // Init data manager and volume renderer
-  mDataManager = std::make_unique<DataManager>(
-      mPluginSettings.mVolumeDataPath.get(), mPluginSettings.mVolumeDataType.get());
-  mRenderer = std::make_unique<OSPRayRenderer>(
+  mDataManager = std::make_unique<DataManager>(mPluginSettings.mVolumeDataPath.get(),
+      mPluginSettings.mVolumeDataPattern.get(), mPluginSettings.mVolumeDataType.get());
+  mRenderer    = std::make_unique<OSPRayRenderer>(
       mDataManager, mPluginSettings.mVolumeStructure.get(), mPluginSettings.mVolumeShape.get());
-  mDataManager->mScalars.connect([this](std::vector<std::string> scalars) {
+  mDataManager->pTimesteps.connectAndTouch([this](std::vector<int> timesteps) {
+    nlohmann::json timestepsJson(timesteps);
+    mGuiManager->getGui()->callJavascript(
+        "CosmoScout.volumeRendering.setTimesteps", timestepsJson.dump());
+  });
+  mDataManager->pScalars.connectAndTouch([this](std::vector<std::string> scalars) {
     for (std::string scalar : scalars) {
       mGuiManager->getGui()->callJavascript(
           "CosmoScout.gui.addDropdownValue", "volumeRendering.setScalar", scalar, scalar, false);
     }
-    mGuiManager->getGui()->callJavascript(
-        "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", scalars[0]);
+    if (scalars.size() > 0) {
+      mGuiManager->getGui()->callJavascript(
+          "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", scalars[0]);
+    }
   });
   mRenderState = RenderState::eRequestImage;
 

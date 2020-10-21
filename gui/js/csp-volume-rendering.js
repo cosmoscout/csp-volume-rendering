@@ -62,6 +62,29 @@
             }, 500);
         }
 
+        setTimesteps(timestepsJson) {
+            var timesteps = JSON.parse(timestepsJson);
+            timesteps.sort();
+            var min = timesteps[0];
+            var max = timesteps[timesteps.length - 1];
+            var range = {};
+            timesteps.forEach((t, i) => {
+                var percent = ((t - min) / (max - min) * 100) + "%";
+                if (t == min) {
+                    percent = "min";
+                }
+                else if (t == max) {
+                    percent = "max";
+                }
+                range[percent] = [];
+                range[percent][0] = t;
+                if (t != max) {
+                    range[percent][1] = timesteps[i + 1] - t;
+                }
+            });
+            CosmoScout.gui.initSliderRange("volumeRendering.setTimestep", range, timesteps[0], [100]);
+        }
+
         ready() {
             // Access the svg dom element
             this.svg = d3.select("#tf-graph");

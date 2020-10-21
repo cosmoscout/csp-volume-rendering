@@ -8,6 +8,8 @@
 
 #include "../logger.hpp"
 
+#include "../../../src/cs-utils/filesystem.hpp"
+
 #include <vtk-8.2/vtkCellData.h>
 #include <vtk-8.2/vtkCellSizeFilter.h>
 #include <vtk-8.2/vtkDoubleArray.h>
@@ -20,15 +22,26 @@
 
 #include <algorithm>
 #include <future>
+#include <regex>
 
 namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-DataManager::DataManager(std::string path, VolumeFileType type)
-    : mPath(path)
-    , mType(type) {
-  setTimestep(0);
+DataManager::DataManager(std::string path, std::string filenamePattern, VolumeFileType type)
+    : mType(type) {
+  std::vector<int> timesteps;
+  for (std::string file : cs::utils::filesystem::listFiles(path, std::regex(".*" + filenamePattern))) {
+    file = std::regex_replace(file, std::regex(R"(\\)"), "/");
+    logger().trace(file);
+    std::smatch match;
+    std::regex_search(file, match, std::regex(filenamePattern));
+    int timestep = std::stoi(match[1].str());
+    timesteps.push_back(timestep);
+    mTimestepFiles[timestep] = file;
+  }
+  pTimesteps.set(timesteps);
+  setTimestep(timesteps[0]);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,7 +69,7 @@ bool DataManager::isDirty() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void DataManager::setActiveScalar(std::string scalar) {
-  if (std::find(mScalars.get().begin(), mScalars.get().end(), scalar) != mScalars.get().end()) {
+  if (std::find(pScalars.get().begin(), pScalars.get().end(), scalar) != pScalars.get().end()) {
     mActiveScalar = scalar;
     mDirty        = true;
   } else {
@@ -78,12 +91,13 @@ vtkSmartPointer<vtkDataSet> DataManager::getData() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void DataManager::loadData(int timestep) {
-  logger().info("Loading data from {}, timestep {}...", mPath, timestep);
+  logger().info("Loading data from {}, timestep {}...", mTimestepFiles[timestep], timestep);
   auto data        = std::async(std::launch::async,
       [this](std::string path, VolumeFileType type, int timestep) {
         std::lock_guard<std::mutex> lock(mReadMutex);
         auto                        timer = std::chrono::high_resolution_clock::now();
         vtkSmartPointer<vtkDataSet> data;
+
         switch (type) {
         case VolumeFileType::eGaia:
           data = loadGaiaData(timestep);
@@ -92,6 +106,7 @@ void DataManager::loadData(int timestep) {
           data = VrcGenericDataLoader::LoadVtkDataSet(path.c_str());
           break;
         }
+
         logger().info("Finished loading data from {}, timestep {}. Took {}s", path, timestep,
             (float)(std::chrono::high_resolution_clock::now() - timer).count() / 1000000000);
 
@@ -102,12 +117,12 @@ void DataManager::loadData(int timestep) {
               scalars.push_back(data->GetPointData()->GetArrayName(i));
             }
           }
-          mScalars.set(scalars);
+          pScalars.set(scalars);
           mActiveScalar = scalars[0];
         }
         return data;
       },
-      mPath, mType, timestep);
+      mTimestepFiles[timestep], mType, timestep);
   mCache[timestep] = std::move(data);
 }
 
@@ -115,7 +130,7 @@ void DataManager::loadData(int timestep) {
 
 vtkSmartPointer<vtkDataSet> DataManager::loadGaiaData(int timestep) {
   vtkSmartPointer<vtkDataSet> data;
-  data = VrcGenericDataLoader::LoadGaiaDataSet(mPath.c_str(), timestep, nullptr);
+  data = VrcGenericDataLoader::LoadGaiaDataSet(mTimestepFiles[timestep].c_str(), timestep, nullptr);
 
   vtkSmartPointer<vtkCellSizeFilter> sizeFilter = vtkSmartPointer<vtkCellSizeFilter>::New();
   sizeFilter->SetComputeArea(false);
