@@ -9,6 +9,7 @@
 
 #include "../../../src/cs-utils/Property.hpp"
 
+#include <vtk-8.2/vtkCellArray.h>
 #include <vtk-8.2/vtkDataSet.h>
 #include <vtk-8.2/vtkSmartPointer.h>
 
@@ -47,6 +48,8 @@ class DataManager {
   std::map<int, std::string> mTimestepFiles;
 
   std::map<int, std::shared_future<vtkSmartPointer<vtkDataSet>>> mCache;
+
+  vtkSmartPointer<vtkCellArray> mGaiaCells;
 
   void                        loadData(int timestep);
   vtkSmartPointer<vtkDataSet> loadGaiaData(int timestep);
