@@ -23,6 +23,9 @@
 #include <VistaKernel/GraphicsManager/VistaSceneGraph.h>
 #include <VistaKernelOpenSGExt/VistaOpenSGMaterialTools.h>
 
+#include <vtk-8.2/vtkOutputWindow.h>
+#include <vtk-8.2/vtkSmartPointer.h>
+
 #include "glm/gtc/epsilon.hpp"
 #include "glm/gtx/quaternion.hpp"
 
@@ -116,6 +119,10 @@ bool Plugin::Frame::operator==(const Frame& other) {
 
 void Plugin::init() {
   logger().info("Loading plugin...");
+
+  // Print vtk output to the console instead of opening a window
+  vtkSmartPointer<vtkOutputWindow> outputWindow = vtkSmartPointer<vtkOutputWindow>::New();
+  vtkOutputWindow::SetInstance(outputWindow);
 
   mOnLoadConnection =
       mAllSettings->onLoad().connect([this]() { logger().info("Settings loaded."); });
@@ -479,7 +486,7 @@ void Plugin::requestFrame(glm::mat4 cameraTransform) {
     mRenderingFrame = mNextFrame;
 
     glm::vec4 dir = glm::vec4(mSolarSystem->getSunDirection(mBillboard->getWorldPosition()), 1);
-    dir = dir * glm::inverse(cameraTransform);
+    dir           = dir * glm::inverse(cameraTransform);
     mRenderer->setSunDirection(dir);
     mFutureFrameData   = mRenderer->getFrame(cameraTransform);
     mRenderState       = RenderState::eRenderingImage;
