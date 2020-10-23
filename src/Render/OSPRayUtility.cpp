@@ -69,97 +69,6 @@ void initOSPRay() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Camera createOSPRayCamera(float modelHeight, glm::mat4 observerTransform) {
-  // Define vertical field of view for ospray camera
-  float fov    = 60;
-  float fovRad = fov / 180 * (float)M_PI;
-
-  // Create camera transform looking along negative z
-  glm::mat4 cameraTransform(1);
-  cameraTransform[2][2] = -1;
-
-  // Move camera to observer position relative to planet
-  cameraTransform = observerTransform * cameraTransform;
-
-  // Get base vectors of rotated coordinate system
-  glm::vec3 camRight(cameraTransform[0].xyz);
-  camRight = glm::normalize(camRight);
-  glm::vec3 camUp(cameraTransform[1].xyz);
-  camUp = glm::normalize(camUp);
-  glm::vec3 camDir(cameraTransform[2].xyz);
-  camDir = glm::normalize(camDir);
-  glm::vec3 camPos(cameraTransform[3].xyz);
-
-  // Get position of camera in rotated coordinate system
-  float camXLen = glm::dot(camPos, camRight);
-  float camYLen = glm::dot(camPos, camUp);
-  float camZLen = glm::dot(camPos, camDir);
-
-  // Get angle between camera position and forward vector
-  float cameraAngleX = atan(camXLen / camZLen);
-  float cameraAngleY = atan(camYLen / camZLen);
-
-  // Get angle between ray towards center of volume and ray at edge of volume
-  float modelAngleX = asin(modelHeight / sqrt(camXLen * camXLen + camZLen * camZLen));
-  float modelAngleY = asin(modelHeight / sqrt(camYLen * camYLen + camZLen * camZLen));
-
-  // Get angle between rays at edges of volume and forward vector
-  float leftAngle  = cameraAngleX - modelAngleX;
-  float rightAngle = cameraAngleX + modelAngleX;
-  float downAngle  = cameraAngleY - modelAngleY;
-  float upAngle    = cameraAngleY + modelAngleY;
-
-  // Get edges of volume in image space coordinates
-  float leftPercent  = 0.5f + tan(leftAngle) / (2 * tan(fovRad / 2));
-  float rightPercent = 0.5f + tan(rightAngle) / (2 * tan(fovRad / 2));
-  float downPercent  = 0.5f + tan(downAngle) / (2 * tan(fovRad / 2));
-  float upPercent    = 0.5f + tan(upAngle) / (2 * tan(fovRad / 2));
-
-  rkcommon::math::vec3f camPosOsp{camPos.x, camPos.y, camPos.z};
-  rkcommon::math::vec3f camUpOsp{camUp.x, camUp.y, camUp.z};
-  rkcommon::math::vec3f camViewOsp{camDir.x, camDir.y, camDir.z};
-
-  rkcommon::math::vec2f camImageStartOsp{leftPercent, downPercent};
-  rkcommon::math::vec2f camImageEndOsp{rightPercent, upPercent};
-
-  ospray::cpp::Camera osprayCamera("perspective");
-  osprayCamera.setParam("aspect", 1);
-  osprayCamera.setParam("position", camPosOsp);
-  osprayCamera.setParam("up", camUpOsp);
-  osprayCamera.setParam("direction", camViewOsp);
-  osprayCamera.setParam("fovy", fov);
-  osprayCamera.setParam("imageStart", camImageStartOsp);
-  osprayCamera.setParam("imageEnd", camImageEndOsp);
-  osprayCamera.commit();
-
-  Camera camera;
-  camera.osprayCamera    = osprayCamera;
-  camera.positionRotated = glm::vec3(camXLen, camYLen, -camZLen) / modelHeight;
-
-  glm::mat4 view =
-      glm::translate(glm::mat4(1.f), -glm::vec3(camXLen, camYLen, -camZLen) / modelHeight);
-
-  float     nearClip  = -camZLen / modelHeight - 1;
-  float     farClip   = -camZLen / modelHeight + 1;
-  float     leftClip  = tan(leftAngle) * nearClip;
-  float     rightClip = tan(rightAngle) * nearClip;
-  float     downClip  = tan(downAngle) * nearClip;
-  float     upClip    = tan(upAngle) * nearClip;
-  glm::mat4 projection(0);
-  projection[0][0] = 2 * nearClip / (rightClip - leftClip);
-  projection[1][1] = 2 * nearClip / (upClip - downClip);
-  projection[2][0] = (rightClip + leftClip) / (rightClip - leftClip);
-  projection[2][1] = (upClip + downClip) / (upClip - downClip);
-  projection[2][2] = -(farClip + nearClip) / (farClip - nearClip);
-  projection[2][3] = -1;
-  projection[3][2] = -2 * farClip * nearClip / (farClip - nearClip);
-
-  camera.transformationMatrix = projection * view;
-  return camera;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 ospray::cpp::Volume createOSPRayVolumeUnstructured(vtkSmartPointer<vtkUnstructuredGrid> vtkVolume) {
   std::vector<rkcommon::math::vec3f> vertexPositions(
       (rkcommon::math::vec3f*)vtkVolume->GetPoints()->GetVoidPointer(0),
@@ -212,7 +121,6 @@ ospray::cpp::Volume createOSPRayVolumeStructured(vtkSmartPointer<vtkStructuredPo
   for (int i = 0; i < 3; i++) {
     origin[i] = -vtkVolume->GetBounds()[i * 2 + 1] / 2;
   }
-
   ospray::cpp::Volume volume("structuredRegular");
   volume.setParam(
       "gridOrigin", rkcommon::math::vec3f{(float)origin[0], (float)origin[1], (float)origin[2]});
@@ -278,54 +186,6 @@ ospray::cpp::TransferFunction createOSPRayTransferFunction(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ospray::cpp::World createOSPRayWorld(ospray::cpp::VolumetricModel model) {
-  ospray::cpp::Group group;
-  group.setParam("volume", ospray::cpp::Data(model));
-  group.commit();
-
-  return createOSPRayWorld(group);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-ospray::cpp::World createOSPRayWorld(ospray::cpp::GeometricModel model) {
-  ospray::cpp::Group group;
-  group.setParam("geometry", ospray::cpp::Data(model));
-  group.commit();
-
-  return createOSPRayWorld(group);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-ospray::cpp::World createOSPRayWorld(ospray::cpp::Group group) {
-  ospray::cpp::Instance instance(group);
-  instance.commit();
-
-  ospray::cpp::Light light("ambient");
-  light.setParam("intensity", .5f);
-  light.setParam("color", rkcommon::math::vec3f(1, 1, 1));
-  light.commit();
-
-  ospray::cpp::Light sun("distant");
-  sun.setParam("intensity", 1.f);
-  sun.setParam("color", rkcommon::math::vec3f(1, 1, 1));
-  sun.setParam("direction", rkcommon::math::vec3f{0, 1, 0});
-  sun.setParam("angularDiameter", .53f);
-  sun.commit();
-
-  std::vector<ospray::cpp::Light> lights{light, sun};
-
-  ospray::cpp::World world;
-  world.setParam("instance", ospray::cpp::Data(instance));
-  world.setParam("light", ospray::cpp::Data(lights));
-  world.commit();
-
-  return world;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 std::vector<float> depthToGrayscale(const std::vector<float>& depth) {
   std::vector<float> grayscale;
   grayscale.reserve(depth.size() * 3);
@@ -371,36 +231,6 @@ std::vector<float> denoiseImage(std::vector<float>& image, int componentCount, i
   filter.execute();
 
   return image;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-std::vector<float> OSPRayUtility::normalizeDepthBuffer(
-    int resolution, std::vector<float> buffer, float modelRadius, OSPRayUtility::Camera camera) {
-  std::vector<float> depthData(resolution * resolution);
-
-  for (int i = 0; i < depthData.size(); i++) {
-    float val = buffer[i];
-    if (val == INFINITY) {
-      depthData[i] = -camera.transformationMatrix[3][2] / camera.transformationMatrix[2][2];
-    } else {
-      val /= modelRadius;
-      int       x          = i % resolution;
-      float     ndcX       = ((float)x / resolution - 0.5f) * 2;
-      int       y          = i / resolution;
-      float     ndcY       = ((float)y / resolution - 0.5f) * 2;
-      glm::vec4 posPixClip = glm::vec4(ndcX, ndcY, 0, 1);
-      glm::vec4 posPix     = glm::inverse(camera.transformationMatrix) * posPixClip;
-      glm::vec3 posPixNorm = posPix.xyz * (1 / posPix.w);
-      glm::vec3 pos =
-          val * glm::normalize(posPixNorm - camera.positionRotated) + camera.positionRotated;
-      glm::vec4 posClip     = camera.transformationMatrix * glm::vec4(pos, 1);
-      glm::vec3 posClipNorm = posClip.xyz * (1 / posClip.w);
-      depthData[i]          = posClipNorm.z;
-    }
-  }
-
-  return depthData;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

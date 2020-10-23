@@ -30,15 +30,35 @@ class OSPRayRenderer : public Renderer {
   OSPRayRenderer(const OSPRayRenderer& other) = delete;
   OSPRayRenderer& operator=(const OSPRayRenderer& other) = delete;
 
-  void setTransferFunction(std::vector<glm::vec4> colors) override;
-
-  std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> getFrame(int resolution,
-      glm::mat4 cameraTransform, float samplingRate, DepthMode depthMode, bool denoiseColor,
-      bool denoiseDepth, bool shading) override;
+  std::future<Renderer::RenderedImage> getFrame(glm::mat4 cameraTransform) override;
 
  private:
-  std::shared_future<ospray::cpp::TransferFunction> mTransferFunction;
-  std::optional<ospray::cpp::Volume>                mVolume;
+  struct Volume {
+    ospray::cpp::Volume  mOsprayData;
+    float                mHeight;
+    std::array<float, 2> mScalarBounds;
+  };
+
+  struct Camera {
+    ospray::cpp::Camera mOsprayCamera;
+    glm::vec3           mPositionRotated;
+    glm::mat4           mTransformationMatrix;
+  };
+
+  std::optional<ospray::cpp::Volume> mVolume;
+
+  Volume               getVolume(Renderer::VolumeShape shape);
+  float                getHeight(vtkSmartPointer<vtkDataSet> data, Renderer::VolumeShape shape);
+  std::array<float, 2> getScalarBounds(vtkSmartPointer<vtkDataSet> data);
+  ospray::cpp::TransferFunction getTransferFunction(Volume& volume, Parameters& parameters);
+  ospray::cpp::World            getWorld(Volume& volume, Parameters& parameters);
+  OSPRayRenderer::Camera        getCamera(float volumeHeight, glm::mat4 observerTransform);
+  ospray::cpp::FrameBuffer      renderFrame(
+           ospray::cpp::World world, ospray::cpp::Camera camera, Parameters& parameters);
+  Renderer::RenderedImage extractImageData(
+      ospray::cpp::FrameBuffer frame, Camera camera, float volumeHeight, Parameters& parameters);
+  std::vector<float> normalizeDepthData(
+      std::vector<float> data, Camera camera, float volumeHeight, Parameters& parameters);
 };
 
 } // namespace csp::volumerendering

@@ -16,30 +16,19 @@
 #include <glm/gtc/type_ptr.hpp>
 
 namespace csp::volumerendering::OSPRayUtility {
-struct Camera {
-  ospray::cpp::Camera osprayCamera;
-  glm::vec3           positionRotated;
-  glm::mat4           transformationMatrix;
-};
 
 void initOSPRay();
 
-Camera              createOSPRayCamera(float modelHeight, glm::mat4 observerTransform);
 ospray::cpp::Volume createOSPRayVolumeUnstructured(vtkSmartPointer<vtkUnstructuredGrid> vtkVolume);
 ospray::cpp::Volume createOSPRayVolumeStructured(vtkSmartPointer<vtkStructuredPoints> vtkVolume);
+
 ospray::cpp::TransferFunction createOSPRayTransferFunction();
 ospray::cpp::TransferFunction createOSPRayTransferFunction(
     float min, float max, std::vector<glm::vec4> colors);
-ospray::cpp::World createOSPRayWorld(ospray::cpp::VolumetricModel model);
-ospray::cpp::World createOSPRayWorld(ospray::cpp::GeometricModel model);
-ospray::cpp::World createOSPRayWorld(ospray::cpp::Group group);
 
 std::vector<float> depthToGrayscale(const std::vector<float>& depth);
 std::vector<float> grayscaleToDepth(const std::vector<float>& grayscale);
 std::vector<float> denoiseImage(std::vector<float>& image, int componentCount, int resolution);
-
-std::vector<float> normalizeDepthBuffer(
-    int resolution, std::vector<float> buffer, float modelRadius, OSPRayUtility::Camera camera);
 
 } // namespace csp::volumerendering::OSPRayUtility
 

@@ -31,21 +31,49 @@ class Renderer {
     eMultiThreshold = 16
   };
 
+  struct RenderedImage {
+    std::vector<uint8_t> mColorData;
+    std::vector<float>   mDepthData;
+    glm::mat4            mMVP;
+  };
+
   Renderer(std::shared_ptr<DataManager> dataManager, VolumeStructure structure, VolumeShape shape);
 
-  virtual void setTransferFunction(std::vector<glm::vec4> colors) = 0;
+  void setResolution(int resolution);
+  void setSamplingRate(float samplingRate);
+  void setDepthMode(Renderer::DepthMode depthMode);
 
-  virtual std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> getFrame(int resolution,
-      glm::mat4 cameraTransform, float samplingRate, DepthMode depthMode, bool denoiseColor,
-      bool denoiseDepth, bool shading) = 0;
+  void setDenoiseColor(bool denoiseColor);
+  void setDenoiseDepth(bool denoiseDepth);
+
+  void setTransferFunction(std::vector<glm::vec4> transferFunction);
+  void setShading(bool shading);
+  void setAmbientLight(float strength);
+  void setSunDirection(glm::vec3 sunDirection);
+
+  virtual std::future<Renderer::RenderedImage> getFrame(glm::mat4 cameraTransform) = 0;
 
  protected:
-  cs::utils::DefaultProperty<bool> mRendering{false};
+  struct Parameters {
+    int                 mResolution;
+    float               mSamplingRate;
+    Renderer::DepthMode mDepthMode;
+
+    bool mDenoiseColor;
+    bool mDenoiseDepth;
+
+    std::vector<glm::vec4> mTransferFunction;
+    bool                   mShading;
+    float                  mAmbientLight;
+    glm::vec3              mSunDirection;
+  };
 
   std::shared_ptr<DataManager> mDataManager;
 
   VolumeStructure mStructure;
   VolumeShape     mShape;
+
+  Parameters mParameters;
 };
 
 } // namespace csp::volumerendering

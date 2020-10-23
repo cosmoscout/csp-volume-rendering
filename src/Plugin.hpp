@@ -77,14 +77,18 @@ class Plugin : public cs::core::PluginBase {
     bool                   mDenoiseColor;
     bool                   mDenoiseDepth;
     bool                   mShading;
+    float                  mAmbientLight;
 
-    std::vector<uint8_t> mFrameData;
+    std::vector<uint8_t> mColorImage;
+    std::vector<float>   mDepthImage;
     glm::mat4            mModelViewProjection;
 
     bool operator==(const Frame& other);
   };
 
   enum class RenderState { eIdle, eRequestImage, eRenderingImage };
+
+  void initUI();
 
   void requestFrame(glm::mat4 cameraTransform);
   void tryReuseFrame(glm::mat4 cameraTransform);
@@ -116,7 +120,7 @@ class Plugin : public cs::core::PluginBase {
   std::shared_ptr<VistaOpenGLNode>     mPointsNode;
   std::shared_ptr<VistaOpenGLNode>     mBillboardNode;
 
-  std::future<std::tuple<std::vector<uint8_t>, glm::mat4>> mFutureFrameData;
+  std::future<Renderer::RenderedImage> mFutureFrameData;
 
   RenderState mRenderState = RenderState::eIdle;
 
