@@ -14,8 +14,13 @@
          * @inheritDoc
          */
         init() {
+            CosmoScout.gui.initSlider("volumeRendering.setAnimationSpeed", 10, 1000, 10, [100]);
             CosmoScout.gui.initSlider("volumeRendering.setResolution", 32, 2048, 32, [256]);
             CosmoScout.gui.initSliderRange("volumeRendering.setSamplingRate", { "min": 0.001, "33%": 0.01, "66%": 0.1, "max": 1 }, 0.001, [0.005]);
+
+            // Trigger "setTimestep" callback on "update" event
+            var timestepSlider = document.querySelector(`[data-callback="volumeRendering.setTimestep"]`);
+            timestepSlider.dataset.event = "update";
 
             const html = `
                 <div>
@@ -23,12 +28,12 @@
                         <svg id="tf-graph" width="420" height="150"></svg>
                     </div>
                     <div class="row">
-                        <div class="col-1">
+                        <div class="col-2">
                             <a id="color-lock" class="btn glass block" title="Lock Color">
                                 <i class="material-icons">lock</i>
                             </a>
                         </div>
-                        <div class="col-3">
+                        <div class="col-2">
                             <input type="text" class="form-control color-input" id="tf-editor-color" style="color: black;" value="#FF0000">
                         </div>
                     </div>
@@ -60,6 +65,26 @@
                 CosmoScout.gui.initInputs();
                 this.ready();
             }, 500);
+        }
+
+        play() {
+            const playButton = document.getElementById("volumeRendering.play");
+            if (this.playing) {
+                clearInterval(this.playHandle);
+                playButton.getElementsByTagName("i")[0].innerHTML = "play_arrow";
+                this.playing = false;
+            }
+            else {
+                const timeSlider = document.querySelector(`[data-callback="volumeRendering.setTimestep"]`);
+                this.time = parseInt(timeSlider.noUiSlider.get());
+                this.playHandle = setInterval(() => {
+                    CosmoScout.gui.setSliderValue("volumeRendering.setTimestep", true, this.time);
+                    const speedSlider = document.querySelector(`[data-callback="volumeRendering.setAnimationSpeed"]`);
+                    this.time += parseInt(speedSlider.noUiSlider.get()) / 10;
+                }, 100);
+                playButton.getElementsByTagName("i")[0].innerHTML = "pause";
+                this.playing = true;
+            }
         }
 
         setTimesteps(timestepsJson) {
