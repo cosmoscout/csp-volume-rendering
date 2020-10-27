@@ -83,10 +83,10 @@ void DataManager::setActiveScalar(std::string scalar) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 vtkSmartPointer<vtkDataSet> DataManager::getData() {
+  mDirty                              = false;
   auto                        data    = mCache.find(mCurrentTimestep);
   vtkSmartPointer<vtkDataSet> dataset = data->second.get();
   dataset->GetPointData()->SetActiveScalars(mActiveScalar.c_str());
-  mDirty = false;
   return dataset;
 }
 
