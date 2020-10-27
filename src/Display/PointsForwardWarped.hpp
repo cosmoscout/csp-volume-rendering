@@ -47,7 +47,7 @@ class PointsForwardWarped : public cs::scene::CelestialObject, public IVistaOpen
  private:
   void createBuffers();
 
-  bool mEnabled;
+  bool mEnabled = false;
 
   glm::mat4              mTransform;
   VistaTexture           mTexture;

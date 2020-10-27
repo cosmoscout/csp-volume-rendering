@@ -88,6 +88,8 @@ class Plugin : public cs::core::PluginBase {
   enum class RenderState { eIdle, eRequestImage, eRenderingImage };
 
   void initUI();
+  void onLoad();
+  void connectSettings();
 
   void requestFrame(glm::mat4 cameraTransform);
   void tryReuseFrame(glm::mat4 cameraTransform);

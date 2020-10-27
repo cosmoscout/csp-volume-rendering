@@ -47,7 +47,7 @@ class Billboard : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
  private:
   void createBuffers();
 
-  bool mEnabled;
+  bool mEnabled = false;
 
   glm::mat4              mTransform;
   VistaTexture           mTexture;

@@ -170,61 +170,15 @@ void Plugin::init() {
   vtkSmartPointer<vtkOutputWindow> outputWindow = vtkSmartPointer<vtkOutputWindow>::New();
   vtkOutputWindow::SetInstance(outputWindow);
 
-  mOnLoadConnection =
-      mAllSettings->onLoad().connect([this]() { logger().info("Settings loaded."); });
+  mOnLoadConnection = mAllSettings->onLoad().connect([this]() { onLoad(); });
   mOnSaveConnection = mAllSettings->onSave().connect(
       [this]() { mAllSettings->mPlugins["csp-volume-rendering"] = mPluginSettings; });
 
-  // Load settings
-  from_json(mAllSettings->mPlugins.at("csp-volume-rendering"), mPluginSettings);
-
-  // Init data manager and volume renderer
-  mDataManager = std::make_unique<DataManager>(mPluginSettings.mVolumeDataPath.get(),
-      mPluginSettings.mVolumeDataPattern.get(), mPluginSettings.mVolumeDataType.get());
-  mRenderer    = std::make_unique<OSPRayRenderer>(
-      mDataManager, mPluginSettings.mVolumeStructure.get(), mPluginSettings.mVolumeShape.get());
-
-  mAllSettings->mGraphics.pEnableLighting.connectAndTouch([this](bool enable) {
-    mRenderer->setShading(enable);
-    mNextFrame.mShading = enable;
-    mRenderedFrames.clear();
-  });
-  mAllSettings->mGraphics.pAmbientBrightness.connectAndTouch([this](float value) {
-    mRenderer->setAmbientLight(value);
-    mNextFrame.mAmbientLight = value;
-    mRenderedFrames.clear();
-  });
-
+  onLoad();
   initUI();
+  connectSettings();
 
   mRenderState = RenderState::eRequestImage;
-
-  // Init volume representation
-  auto anchor = mAllSettings->mAnchors.find(mPluginSettings.mAnchor.get());
-  auto [tStartExistence, tEndExistence] = anchor->second.getExistence();
-  mBillboard = std::make_shared<Billboard>(anchor->second.mCenter, anchor->second.mFrame,
-      tStartExistence, tEndExistence, cs::core::SolarSystem::getRadii(anchor->second.mCenter));
-  mPoints    = std::make_shared<PointsForwardWarped>(anchor->second.mCenter, anchor->second.mFrame,
-      tStartExistence, tEndExistence, cs::core::SolarSystem::getRadii(anchor->second.mCenter));
-  mBillboard->setAnchorPosition(mPluginSettings.mPosition.get());
-  mBillboard->setAnchorScale(mPluginSettings.mScale.get());
-  mBillboard->setAnchorRotation(mPluginSettings.mRotation.get());
-  mPoints->setAnchorPosition(mPluginSettings.mPosition.get());
-  mPoints->setAnchorScale(mPluginSettings.mScale.get());
-  mPoints->setAnchorRotation(mPluginSettings.mRotation.get());
-
-  // Add volume representation to solar system and scene graph
-  mSolarSystem->registerAnchor(mBillboard);
-  mBillboardNode.reset(mSceneGraph->NewOpenGLNode(mSceneGraph->GetRoot(), mBillboard.get()));
-  VistaOpenSGMaterialTools::SetSortKeyOnSubtree(
-      mBillboardNode.get(), static_cast<int>(cs::utils::DrawOrder::eTransparentItems));
-  mSolarSystem->registerAnchor(mPoints);
-  mPointsNode.reset(mSceneGraph->NewOpenGLNode(mSceneGraph->GetRoot(), mPoints.get()));
-  VistaOpenSGMaterialTools::SetSortKeyOnSubtree(
-      mPointsNode.get(), static_cast<int>(cs::utils::DrawOrder::eTransparentItems));
-
-  mBillboard->setEnabled(true);
-  mPoints->setEnabled(false);
 
   // Init buffers for predictive rendering
   mFrameIntervals.resize(mFrameIntervalsLength);
@@ -296,165 +250,95 @@ void Plugin::update() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Plugin::initUI() {
-  // Add the volume rendering user interface components to the CosmoScout user interface.
-  mGuiManager->addPluginTabToSideBarFromHTML(
-      "Volume Rendering", "blur_circular", "../share/resources/gui/volume_rendering_tab.html");
+void Plugin::onLoad() {
+  // Get plugin settings
+  from_json(mAllSettings->mPlugins.at("csp-volume-rendering"), mPluginSettings);
 
-  mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
+  // Init data manager and volume renderer
+  mDataManager = std::make_unique<DataManager>(mPluginSettings.mVolumeDataPath.get(),
+      mPluginSettings.mVolumeDataPattern.get(), mPluginSettings.mVolumeDataType.get());
+  mRenderer    = std::make_unique<OSPRayRenderer>(
+      mDataManager, mPluginSettings.mVolumeStructure.get(), mPluginSettings.mVolumeShape.get());
 
-  mDataManager->pTimesteps.connectAndTouch([this](std::vector<int> timesteps) {
-    nlohmann::json timestepsJson(timesteps);
-    mGuiManager->getGui()->callJavascript(
-        "CosmoScout.volumeRendering.setTimesteps", timestepsJson.dump());
+  // If the volume representations already exist, remove them from the solar system
+  if (mBillboard) {
+    mSolarSystem->unregisterAnchor(mBillboard);
+    mSceneGraph->GetRoot()->DisconnectChild(mBillboardNode.get());
+  }
+  if (mPoints) {
+    mSolarSystem->unregisterAnchor(mPoints);
+    mSceneGraph->GetRoot()->DisconnectChild(mPointsNode.get());
+  }
+
+  // Init volume representation
+  auto anchor = mAllSettings->mAnchors.find(mPluginSettings.mAnchor.get());
+  auto [tStartExistence, tEndExistence] = anchor->second.getExistence();
+  mBillboard = std::make_shared<Billboard>(anchor->second.mCenter, anchor->second.mFrame,
+      tStartExistence, tEndExistence, cs::core::SolarSystem::getRadii(anchor->second.mCenter));
+  mPoints    = std::make_shared<PointsForwardWarped>(anchor->second.mCenter, anchor->second.mFrame,
+      tStartExistence, tEndExistence, cs::core::SolarSystem::getRadii(anchor->second.mCenter));
+  mBillboard->setAnchorPosition(mPluginSettings.mPosition.get());
+  mBillboard->setAnchorScale(mPluginSettings.mScale.get());
+  mBillboard->setAnchorRotation(mPluginSettings.mRotation.get());
+  mPoints->setAnchorPosition(mPluginSettings.mPosition.get());
+  mPoints->setAnchorScale(mPluginSettings.mScale.get());
+  mPoints->setAnchorRotation(mPluginSettings.mRotation.get());
+
+  // Add volume representation to solar system and scene graph
+  mSolarSystem->registerAnchor(mBillboard);
+  mBillboardNode.reset(mSceneGraph->NewOpenGLNode(mSceneGraph->GetRoot(), mBillboard.get()));
+  VistaOpenSGMaterialTools::SetSortKeyOnSubtree(
+      mBillboardNode.get(), static_cast<int>(cs::utils::DrawOrder::eTransparentItems));
+  mSolarSystem->registerAnchor(mPoints);
+  mPointsNode.reset(mSceneGraph->NewOpenGLNode(mSceneGraph->GetRoot(), mPoints.get()));
+  VistaOpenSGMaterialTools::SetSortKeyOnSubtree(
+      mPointsNode.get(), static_cast<int>(cs::utils::DrawOrder::eTransparentItems));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Plugin::connectSettings() {
+  // Connect to global CosmoScout graphics settings
+  mAllSettings->mGraphics.pEnableLighting.connectAndTouch([this](bool enable) {
+    mRenderer->setShading(enable);
+    mNextFrame.mShading = enable;
+    mRenderedFrames.clear();
   });
-  mDataManager->pScalars.connectAndTouch([this](std::vector<std::string> scalars) {
-    for (std::string scalar : scalars) {
-      mGuiManager->getGui()->callJavascript(
-          "CosmoScout.gui.addDropdownValue", "volumeRendering.setScalar", scalar, scalar, false);
-    }
-    if (scalars.size() > 0) {
-      mGuiManager->getGui()->callJavascript(
-          "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", scalars[0]);
-    }
+  mAllSettings->mGraphics.pAmbientBrightness.connectAndTouch([this](float value) {
+    mRenderer->setAmbientLight(value);
+    mNextFrame.mAmbientLight = value;
+    mRenderedFrames.clear();
   });
 
-  mGuiManager->getGui()->registerCallback("volumeRendering.setScalar",
-      "Set the scalar to be rendered.", std::function([this](std::string scalar) {
-        mDataManager->setActiveScalar(scalar);
-        mNextFrame.mScalar = scalar;
-        mRenderedFrames.clear();
-      }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setTimestep",
-      "Sets the timestep of the rendered volume images.", std::function([this](double value) {
-        mDataManager->setTimestep((int)std::lround(value));
-        mNextFrame.mTimestep = (int)std::lround(value);
-        mRenderedFrames.clear();
-      }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setResolution",
-      "Sets the resolution of the rendered volume images.", std::function([this](double value) {
-        mPluginSettings.mResolution = (int)std::lround(value);
-      }));
+  // Connect to plugin settings
+  // Rendering settings
+  mPluginSettings.mRequestImages.connectAndTouch([this](bool enable) {
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableRequestImages", enable);
+  });
   mPluginSettings.mResolution.connectAndTouch([this](int value) {
     mNextFrame.mResolution = value;
     mRenderer->setResolution(value);
     mGuiManager->setSliderValue("volumeRendering.setResolution", value);
   });
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setSamplingRate",
-      "Sets the sampling rate for volume rendering.",
-      std::function([this](double value) { mPluginSettings.mSamplingRate = (float)value; }));
   mPluginSettings.mSamplingRate.connectAndTouch([this](float value) {
     mNextFrame.mSamplingRate = value;
     mRenderer->setSamplingRate(value);
     mGuiManager->setSliderValue("volumeRendering.setSamplingRate", value);
   });
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableRequestImages",
-      "If disabled no new images will be rendered.",
-      std::function([this](bool enable) { mPluginSettings.mRequestImages = enable; }));
-  mPluginSettings.mRequestImages.connectAndTouch([this](bool enable) {
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableRequestImages", enable);
-  });
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnablePredictiveRendering",
-      "Enables predicting the next camera position for rendering.",
-      std::function([this](bool enable) { mPluginSettings.mPredictiveRendering = enable; }));
-  mPluginSettings.mPredictiveRendering.connectAndTouch([this](bool enable) {
-    mGuiManager->setCheckboxValue("volumeRendering.setEnablePredictiveRendering", enable);
-  });
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableReuseImages",
-      "Enables reuse of previously rendered images.",
-      std::function([this](bool enable) { mPluginSettings.mReuseImages = enable; }));
-  mPluginSettings.mReuseImages.connectAndTouch([this](bool enable) {
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableReuseImages", enable);
-  });
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDepthData",
-      "Enables use of depth data for displaying data.", std::function([this](bool enable) {
-        mPluginSettings.mDepthData = enable;
-        mBillboard->setUseDepth(enable);
-        mPoints->setUseDepth(enable);
-      }));
-  mPluginSettings.mDepthData.connectAndTouch([this](bool enable) {
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableDepthData", enable);
-  });
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDrawDepth",
-      "Enables displaying the depth buffer instead of the color buffer.",
-      std::function([this](bool enable) {
-        mPluginSettings.mDrawDepth = enable;
-        mBillboard->setDrawDepth(enable);
-        mPoints->setDrawDepth(enable);
-      }));
-  mPluginSettings.mDrawDepth.connectAndTouch([this](bool enable) {
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableDrawDepth", enable);
-  });
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDenoiseColor",
-      "Enables use of OIDN for displaying color data.",
-      std::function([this](bool enable) { mPluginSettings.mDenoiseColor = enable; }));
   mPluginSettings.mDenoiseColor.connectAndTouch([this](bool enable) {
     mNextFrame.mDenoiseColor = enable;
     mRenderer->setDenoiseColor(enable);
     mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseColor", enable);
   });
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDenoiseDepth",
-      "Enables use of OIDN for displaying depth data.",
-      std::function([this](bool enable) { mPluginSettings.mDenoiseDepth = enable; }));
   mPluginSettings.mDenoiseDepth.connectAndTouch([this](bool enable) {
     mNextFrame.mDenoiseDepth = enable;
     mRenderer->setDenoiseDepth(enable);
     mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseDepth", enable);
   });
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setTransferFunction",
-      "Sets the transfer function for rendering the volume.",
-      std::function([this](std::string json) {
-        cs::graphics::ColorMap colorMap(json, false);
-        mRenderer->setTransferFunction(colorMap.getRawData());
-        mNextFrame.mTransferFunction = colorMap.getRawData();
-        mRenderedFrames.clear();
-      }));
-
-  mGuiManager->getGui()->registerCallback(
-      "volumeRendering.setDepthMode0", "Don't calculate a depth value.", std::function([this]() {
-        mPluginSettings.mDepthMode = Renderer::DepthMode::eNone;
-        mRenderedFrames.clear();
-      }));
-  mGuiManager->getGui()->registerCallback(
-      "volumeRendering.setDepthMode1", "Calculate depth of isosurface.", std::function([this]() {
-        mPluginSettings.mDepthMode = Renderer::DepthMode::eIsosurface;
-        mRenderedFrames.clear();
-      }));
-  mGuiManager->getGui()->registerCallback(
-      "volumeRendering.setDepthMode2", "Uses first hit as depth value.", std::function([this]() {
-        mPluginSettings.mDepthMode = Renderer::DepthMode::eFirstHit;
-        mRenderedFrames.clear();
-      }));
-  mGuiManager->getGui()->registerCallback(
-      "volumeRendering.setDepthMode3", "Uses last hit as depth value.", std::function([this]() {
-        mPluginSettings.mDepthMode = Renderer::DepthMode::eLastHit;
-        mRenderedFrames.clear();
-      }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode4",
-      "Uses depth, at which an opacity threshold was reached.", std::function([this]() {
-        mPluginSettings.mDepthMode = Renderer::DepthMode::eThreshold;
-        mRenderedFrames.clear();
-      }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode5",
-      "Uses depth, at which the last of multiple opacity thresholds was reached.",
-      std::function([this]() {
-        mPluginSettings.mDepthMode = Renderer::DepthMode::eMultiThreshold;
-        mRenderedFrames.clear();
-      }));
-  mPluginSettings.mDepthMode.connect([this](Renderer::DepthMode drawMode) {
+  mPluginSettings.mDepthMode.connectAndTouch([this](Renderer::DepthMode drawMode) {
     mNextFrame.mDepthMode = drawMode;
     mRenderer->setDepthMode(drawMode);
+    mRenderedFrames.clear();
     if (drawMode == Renderer::DepthMode::eNone) {
       mGuiManager->setRadioChecked("stars.setDrawMode0");
     } else if (drawMode == Renderer::DepthMode::eIsosurface) {
@@ -470,23 +354,153 @@ void Plugin::initUI() {
     }
   });
 
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDisplayMode0",
-      "Displays the rendered images on a continuous mesh.", std::function([this]() {
-        mBillboard->setEnabled(true);
-        mPoints->setEnabled(false);
-      }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDisplayMode1",
-      "Displays the rendered images on a continuous mesh.", std::function([this]() {
-        mBillboard->setEnabled(false);
-        mPoints->setEnabled(true);
-      }));
-  mPluginSettings.mDisplayMode.connect([this](Settings::DisplayMode displayMode) {
+  // Display settings
+  mPluginSettings.mPredictiveRendering.connectAndTouch([this](bool enable) {
+    mGuiManager->setCheckboxValue("volumeRendering.setEnablePredictiveRendering", enable);
+  });
+  mPluginSettings.mReuseImages.connectAndTouch([this](bool enable) {
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableReuseImages", enable);
+  });
+  mPluginSettings.mDepthData.connectAndTouch([this](bool enable) {
+    mBillboard->setUseDepth(enable);
+    mPoints->setUseDepth(enable);
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableDepthData", enable);
+  });
+  mPluginSettings.mDrawDepth.connectAndTouch([this](bool enable) {
+    mBillboard->setDrawDepth(enable);
+    mPoints->setDrawDepth(enable);
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableDrawDepth", enable);
+  });
+  mPluginSettings.mDisplayMode.connectAndTouch([this](Settings::DisplayMode displayMode) {
     if (displayMode == Settings::DisplayMode::eMesh) {
+      mBillboard->setEnabled(true);
+      mPoints->setEnabled(false);
       mGuiManager->setRadioChecked("stars.setDisplayMode0");
     } else if (displayMode == Settings::DisplayMode::ePoints) {
+      mBillboard->setEnabled(false);
+      mPoints->setEnabled(true);
       mGuiManager->setRadioChecked("stars.setDisplayMode1");
     }
   });
+
+  // Connect to data manager properties
+  mDataManager->pScalars.connectAndTouch([this](std::vector<std::string> scalars) {
+    for (std::string scalar : scalars) {
+      mGuiManager->getGui()->callJavascript(
+          "CosmoScout.gui.addDropdownValue", "volumeRendering.setScalar", scalar, scalar, false);
+    }
+    if (scalars.size() > 0) {
+      mGuiManager->getGui()->callJavascript(
+          "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", scalars[0]);
+    }
+  });
+  mDataManager->pTimesteps.connectAndTouch([this](std::vector<int> timesteps) {
+    nlohmann::json timestepsJson(timesteps);
+    mGuiManager->getGui()->callJavascript(
+        "CosmoScout.volumeRendering.setTimesteps", timestepsJson.dump());
+  });
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Plugin::initUI() {
+  // Add the volume rendering user interface components to the CosmoScout user interface.
+  mGuiManager->addPluginTabToSideBarFromHTML(
+      "Volume Rendering", "blur_circular", "../share/resources/gui/volume_rendering_tab.html");
+  mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
+
+  // Rendering settings
+  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableRequestImages",
+      "If disabled no new images will be rendered.",
+      std::function([this](bool enable) { mPluginSettings.mRequestImages = enable; }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setResolution",
+      "Sets the resolution of the rendered volume images.", std::function([this](double value) {
+        mPluginSettings.mResolution = (int)std::lround(value);
+      }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setSamplingRate",
+      "Sets the sampling rate for volume rendering.",
+      std::function([this](double value) { mPluginSettings.mSamplingRate = (float)value; }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDenoiseColor",
+      "Enables use of OIDN for displaying color data.",
+      std::function([this](bool enable) { mPluginSettings.mDenoiseColor = enable; }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDenoiseDepth",
+      "Enables use of OIDN for displaying depth data.",
+      std::function([this](bool enable) { mPluginSettings.mDenoiseDepth = enable; }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode0",
+      "Don't calculate a depth value.",
+      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eNone; }));
+  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode1",
+      "Calculate depth of isosurface.",
+      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eIsosurface; }));
+  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode2",
+      "Uses first hit as depth value.",
+      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eFirstHit; }));
+  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode3",
+      "Uses last hit as depth value.",
+      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eLastHit; }));
+  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode4",
+      "Uses depth, at which an opacity threshold was reached.",
+      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eThreshold; }));
+  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode5",
+      "Uses depth, at which the last of multiple opacity thresholds was reached.",
+      std::function(
+          [this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eMultiThreshold; }));
+
+  // Display settings
+  mGuiManager->getGui()->registerCallback("volumeRendering.setEnablePredictiveRendering",
+      "Enables predicting the next camera position for rendering.",
+      std::function([this](bool enable) { mPluginSettings.mPredictiveRendering = enable; }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableReuseImages",
+      "Enables reuse of previously rendered images.",
+      std::function([this](bool enable) { mPluginSettings.mReuseImages = enable; }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDepthData",
+      "Enables use of depth data for displaying data.",
+      std::function([this](bool enable) { mPluginSettings.mDepthData = enable; }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDrawDepth",
+      "Enables displaying the depth buffer instead of the color buffer.",
+      std::function([this](bool enable) { mPluginSettings.mDrawDepth = enable; }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setDisplayMode0",
+      "Displays the rendered images on a continuous mesh.", std::function([this]() {
+        mPluginSettings.mDisplayMode = Plugin::Settings::DisplayMode::eMesh;
+      }));
+  mGuiManager->getGui()->registerCallback("volumeRendering.setDisplayMode1",
+      "Displays the rendered images on a continuous mesh.", std::function([this]() {
+        mPluginSettings.mDisplayMode = Plugin::Settings::DisplayMode::ePoints;
+      }));
+
+  // Data settings
+  mGuiManager->getGui()->registerCallback("volumeRendering.setScalar",
+      "Set the scalar to be rendered.", std::function([this](std::string scalar) {
+        mDataManager->setActiveScalar(scalar);
+        mNextFrame.mScalar = scalar;
+        mRenderedFrames.clear();
+      }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setTimestep",
+      "Sets the timestep of the rendered volume images.", std::function([this](double value) {
+        mDataManager->setTimestep((int)std::lround(value));
+        mNextFrame.mTimestep = (int)std::lround(value);
+        mRenderedFrames.clear();
+      }));
+
+  // Transferfunction
+  mGuiManager->getGui()->registerCallback("volumeRendering.setTransferFunction",
+      "Sets the transfer function for rendering the volume.",
+      std::function([this](std::string json) {
+        cs::graphics::ColorMap colorMap(json, false);
+        mRenderer->setTransferFunction(colorMap.getRawData());
+        mNextFrame.mTransferFunction = colorMap.getRawData();
+        mRenderedFrames.clear();
+      }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.importTransferFunction",
       "Import a saved transfer function.",
@@ -496,6 +510,7 @@ void Plugin::initUI() {
       std::function([this](std::string name, std::string jsonTransferFunction) {
         exportTransferFunction(name, jsonTransferFunction);
       }));
+
   updateAvailableTransferFunctions();
 }
 
