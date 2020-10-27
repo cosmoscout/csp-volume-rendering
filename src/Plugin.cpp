@@ -71,6 +71,22 @@ NLOHMANN_JSON_SERIALIZE_ENUM(
                                {Renderer::VolumeShape::eSpherical, "spherical"},
                            })
 
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    Plugin::Settings::DisplayMode, {
+                                       {Plugin::Settings::DisplayMode::ePoints, "points"},
+                                       {Plugin::Settings::DisplayMode::eMesh, "mesh"},
+                                   })
+
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    Renderer::DepthMode, {
+                             {Renderer::DepthMode::eNone, "none"},
+                             {Renderer::DepthMode::eIsosurface, "isosurface"},
+                             {Renderer::DepthMode::eFirstHit, "firstHit"},
+                             {Renderer::DepthMode::eLastHit, "lastHit"},
+                             {Renderer::DepthMode::eThreshold, "threshold"},
+                             {Renderer::DepthMode::eMultiThreshold, "multiThreshold"},
+                         })
+
 void from_json(nlohmann::json const& j, Plugin::Settings& o) {
   // Data settings
   cs::core::Settings::deserialize(j, "volumeDataPath", o.mVolumeDataPath);
@@ -78,6 +94,21 @@ void from_json(nlohmann::json const& j, Plugin::Settings& o) {
   cs::core::Settings::deserialize(j, "volumeDataType", o.mVolumeDataType);
   cs::core::Settings::deserialize(j, "volumeStructure", o.mVolumeStructure);
   cs::core::Settings::deserialize(j, "volumeShape", o.mVolumeShape);
+
+  // Rendering settings
+  cs::core::Settings::deserialize(j, "requestImages", o.mRequestImages);
+  cs::core::Settings::deserialize(j, "resolution", o.mResolution);
+  cs::core::Settings::deserialize(j, "samplingRate", o.mSamplingRate);
+  cs::core::Settings::deserialize(j, "denoiseColor", o.mDenoiseColor);
+  cs::core::Settings::deserialize(j, "denoiseDepth", o.mDenoiseDepth);
+  cs::core::Settings::deserialize(j, "depthMode", o.mDepthMode);
+
+  // Display settings
+  cs::core::Settings::deserialize(j, "predictiveRendering", o.mPredictiveRendering);
+  cs::core::Settings::deserialize(j, "reuseImages", o.mReuseImages);
+  cs::core::Settings::deserialize(j, "useDepth", o.mDepthData);
+  cs::core::Settings::deserialize(j, "drawDepth", o.mDrawDepth);
+  cs::core::Settings::deserialize(j, "displayMode", o.mDisplayMode);
 
   // Transform settings
   cs::core::Settings::deserialize(j, "anchor", o.mAnchor);
@@ -93,6 +124,21 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
   cs::core::Settings::serialize(j, "volumeDataType", o.mVolumeDataType);
   cs::core::Settings::serialize(j, "volumeStructure", o.mVolumeStructure);
   cs::core::Settings::serialize(j, "volumeShape", o.mVolumeShape);
+
+  // Rendering settings
+  cs::core::Settings::serialize(j, "requestImages", o.mRequestImages);
+  cs::core::Settings::serialize(j, "resolution", o.mResolution);
+  cs::core::Settings::serialize(j, "samplingRate", o.mSamplingRate);
+  cs::core::Settings::serialize(j, "denoiseColor", o.mDenoiseColor);
+  cs::core::Settings::serialize(j, "denoiseDepth", o.mDenoiseDepth);
+  cs::core::Settings::serialize(j, "depthMode", o.mDepthMode);
+
+  // Display settings
+  cs::core::Settings::serialize(j, "predictiveRendering", o.mPredictiveRendering);
+  cs::core::Settings::serialize(j, "reuseImages", o.mReuseImages);
+  cs::core::Settings::serialize(j, "useDepth", o.mDepthData);
+  cs::core::Settings::serialize(j, "drawDepth", o.mDrawDepth);
+  cs::core::Settings::serialize(j, "displayMode", o.mDisplayMode);
 
   // Transform settings
   cs::core::Settings::serialize(j, "anchor", o.mAnchor);

@@ -44,7 +44,6 @@ class Plugin : public cs::core::PluginBase {
     cs::utils::DefaultProperty<float>               mSamplingRate{0.05f};
     cs::utils::DefaultProperty<bool>                mDenoiseColor{true};
     cs::utils::DefaultProperty<bool>                mDenoiseDepth{true};
-    cs::utils::DefaultProperty<bool>                mShading{true};
     cs::utils::DefaultProperty<Renderer::DepthMode> mDepthMode{Renderer::DepthMode::eNone};
 
     // Display settings
