@@ -174,11 +174,9 @@ void Plugin::init() {
   mOnSaveConnection = mAllSettings->onSave().connect(
       [this]() { mAllSettings->mPlugins["csp-volume-rendering"] = mPluginSettings; });
 
-  onLoad();
   initUI();
+  onLoad();
   connectSettings();
-
-  mRenderState = RenderState::eRequestImage;
 
   // Init buffers for predictive rendering
   mFrameIntervals.resize(mFrameIntervalsLength);
@@ -255,10 +253,31 @@ void Plugin::onLoad() {
   from_json(mAllSettings->mPlugins.at("csp-volume-rendering"), mPluginSettings);
 
   // Init data manager and volume renderer
+  mRenderState = RenderState::eWaitForData;
   mDataManager = std::make_unique<DataManager>(mPluginSettings.mVolumeDataPath.get(),
       mPluginSettings.mVolumeDataPattern.get(), mPluginSettings.mVolumeDataType.get());
   mRenderer    = std::make_unique<OSPRayRenderer>(
       mDataManager, mPluginSettings.mVolumeStructure.get(), mPluginSettings.mVolumeShape.get());
+
+  // Connect to data manager properties
+  mDataManager->pScalars.connectAndTouch([this](std::vector<std::string> scalars) {
+    for (std::string scalar : scalars) {
+      mGuiManager->getGui()->callJavascript(
+          "CosmoScout.gui.addDropdownValue", "volumeRendering.setScalar", scalar, scalar, false);
+    }
+    if (scalars.size() > 0) {
+      mGuiManager->getGui()->callJavascript(
+          "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", scalars[0]);
+      if (mRenderState == RenderState::eWaitForData) {
+        mRenderState = RenderState::eRequestImage;
+      }
+    }
+  });
+  mDataManager->pTimesteps.connectAndTouch([this](std::vector<int> timesteps) {
+    nlohmann::json timestepsJson(timesteps);
+    mGuiManager->getGui()->callJavascript(
+        "CosmoScout.volumeRendering.setTimesteps", timestepsJson.dump());
+  });
 
   // If the volume representations already exist, remove them from the solar system
   if (mBillboard) {
@@ -382,23 +401,6 @@ void Plugin::connectSettings() {
       mGuiManager->setRadioChecked("stars.setDisplayMode1");
     }
   });
-
-  // Connect to data manager properties
-  mDataManager->pScalars.connectAndTouch([this](std::vector<std::string> scalars) {
-    for (std::string scalar : scalars) {
-      mGuiManager->getGui()->callJavascript(
-          "CosmoScout.gui.addDropdownValue", "volumeRendering.setScalar", scalar, scalar, false);
-    }
-    if (scalars.size() > 0) {
-      mGuiManager->getGui()->callJavascript(
-          "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", scalars[0]);
-    }
-  });
-  mDataManager->pTimesteps.connectAndTouch([this](std::vector<int> timesteps) {
-    nlohmann::json timestepsJson(timesteps);
-    mGuiManager->getGui()->callJavascript(
-        "CosmoScout.volumeRendering.setTimesteps", timestepsJson.dump());
-  });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -490,6 +492,18 @@ void Plugin::initUI() {
         mDataManager->setTimestep((int)std::lround(value));
         mNextFrame.mTimestep = (int)std::lround(value);
         mRenderedFrames.clear();
+      }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.preloadTimestep",
+      "Prepares the renderer for rendering.", std::function([this](double value) {
+        DataManager::State state = mDataManager->getState();
+        state.mTimestep          = (int)std::lround(value);
+        mRenderer->preloadData(state);
+      }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setAnimationSpeed",
+      "Time units per second when animating.", std::function([this](double value) {
+        // Callback is only registered to suppress warnings
       }));
 
   // Transferfunction

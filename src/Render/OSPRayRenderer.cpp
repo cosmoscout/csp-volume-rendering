@@ -43,47 +43,60 @@ OSPRayRenderer::~OSPRayRenderer() {
 
 std::future<Renderer::RenderedImage> OSPRayRenderer::getFrame(glm::mat4 cameraTransform) {
   return std::async(std::launch::async,
-      [this, cameraTransform](Renderer::VolumeShape shape, Parameters parameters) {
-        Volume                   volume = getVolume(shape);
+      [this, cameraTransform](Parameters parameters, DataManager::State dataState) {
+        const Volume&            volume = getVolume(dataState);
         ospray::cpp::World       world  = getWorld(volume, parameters);
         Camera                   camera = getCamera(volume.mHeight, cameraTransform);
         ospray::cpp::FrameBuffer frame  = renderFrame(world, camera.mOsprayCamera, parameters);
         RenderedImage renderedImage = extractImageData(frame, camera, volume.mHeight, parameters);
         return renderedImage;
       },
-      mShape, mParameters);
+      mParameters, mDataManager->getState());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-OSPRayRenderer::Volume OSPRayRenderer::getVolume(Renderer::VolumeShape shape) {
-  Volume                      volume;
-  bool                        recreateVolume = mDataManager->isDirty();
-  vtkSmartPointer<vtkDataSet> volumeData     = mDataManager->getData();
-
-  if (recreateVolume) {
-    switch (mStructure) {
-    case VolumeStructure::eUnstructured:
-      volume.mOsprayData = OSPRayUtility::createOSPRayVolumeUnstructured(
-          vtkUnstructuredGrid::SafeDownCast(volumeData));
-      break;
-    case VolumeStructure::eStructured:
-      volume.mOsprayData = OSPRayUtility::createOSPRayVolumeStructured(
-          vtkStructuredPoints::SafeDownCast(volumeData));
-      break;
-    }
-    mVolume = volume.mOsprayData;
-  } else {
-    volume.mOsprayData = *mVolume;
+void OSPRayRenderer::preloadData(DataManager::State state) {
+  if (mCachedVolumes.find(state) == mCachedVolumes.end()) {
+    mCachedVolumes[state] =
+        std::async(std::launch::async, [this, state]() { return loadVolume(state); });
   }
-  volume.mHeight       = getHeight(volumeData, shape);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const OSPRayRenderer::Volume& OSPRayRenderer::getVolume(DataManager::State state) {
+  auto cachedVolume = mCachedVolumes.find(state);
+  if (cachedVolume == mCachedVolumes.end()) {
+    mCachedVolumes[state] =
+        std::async(std::launch::deferred, [this, state]() { return loadVolume(state); });
+  }
+  return mCachedVolumes[state].get();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+OSPRayRenderer::Volume OSPRayRenderer::loadVolume(DataManager::State state) {
+  Volume                      volume;
+  vtkSmartPointer<vtkDataSet> volumeData = mDataManager->getData(state);
+  switch (mStructure) {
+  case VolumeStructure::eUnstructured:
+    volume.mOsprayData = OSPRayUtility::createOSPRayVolumeUnstructured(
+        vtkUnstructuredGrid::SafeDownCast(volumeData));
+    break;
+  case VolumeStructure::eStructured:
+    volume.mOsprayData =
+        OSPRayUtility::createOSPRayVolumeStructured(vtkStructuredPoints::SafeDownCast(volumeData));
+    break;
+  }
+  volume.mHeight       = getHeight(volumeData);
   volume.mScalarBounds = getScalarBounds(volumeData);
   return volume;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-float OSPRayRenderer::getHeight(vtkSmartPointer<vtkDataSet> data, Renderer::VolumeShape shape) {
+float OSPRayRenderer::getHeight(vtkSmartPointer<vtkDataSet> data) {
   data->ComputeBounds();
   std::vector<float> bounds(6);
   for (int i = 0; i < 6; i++) {
@@ -94,7 +107,7 @@ float OSPRayRenderer::getHeight(vtkSmartPointer<vtkDataSet> data, Renderer::Volu
   float z = (bounds[5] - bounds[4]) / 2;
   float height;
 
-  switch (shape) {
+  switch (mShape) {
   case Renderer::VolumeShape::eCubic: {
     float diagonal = sqrtf(x * x + y * y + z * z);
     height         = diagonal;
@@ -120,7 +133,7 @@ std::array<float, 2> OSPRayRenderer::getScalarBounds(vtkSmartPointer<vtkDataSet>
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ospray::cpp::TransferFunction OSPRayRenderer::getTransferFunction(
-    Volume& volume, Parameters& parameters) {
+    const Volume& volume, const Parameters& parameters) {
   if (parameters.mTransferFunction.size() > 0) {
     return OSPRayUtility::createOSPRayTransferFunction(
         volume.mScalarBounds[0], volume.mScalarBounds[1], parameters.mTransferFunction);
@@ -131,7 +144,7 @@ ospray::cpp::TransferFunction OSPRayRenderer::getTransferFunction(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ospray::cpp::World OSPRayRenderer::getWorld(Volume& volume, Parameters& parameters) {
+ospray::cpp::World OSPRayRenderer::getWorld(const Volume& volume, const Parameters& parameters) {
   ospray::cpp::TransferFunction transferFunction = getTransferFunction(volume, parameters);
 
   ospray::cpp::VolumetricModel volumetricModel(volume.mOsprayData);
@@ -279,7 +292,7 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ospray::cpp::FrameBuffer OSPRayRenderer::renderFrame(
-    ospray::cpp::World world, ospray::cpp::Camera camera, Parameters& parameters) {
+    ospray::cpp::World& world, ospray::cpp::Camera& camera, const Parameters& parameters) {
   ospray::cpp::Renderer renderer("volume_depth");
   renderer.setParam("aoSamples", 0);
   renderer.setParam("shadows", false);
@@ -304,8 +317,8 @@ ospray::cpp::FrameBuffer OSPRayRenderer::renderFrame(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Renderer::RenderedImage OSPRayRenderer::extractImageData(
-    ospray::cpp::FrameBuffer frame, Camera camera, float volumeHeight, Parameters& parameters) {
+Renderer::RenderedImage OSPRayRenderer::extractImageData(ospray::cpp::FrameBuffer& frame,
+    const Camera& camera, float volumeHeight, const Parameters& parameters) {
   float*             colorFrame = (float*)frame.map(OSP_FB_COLOR);
   std::vector<float> colorData(
       colorFrame, colorFrame + 4 * parameters.mResolution * parameters.mResolution);
@@ -357,8 +370,8 @@ Renderer::RenderedImage OSPRayRenderer::extractImageData(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::vector<float> OSPRayRenderer::normalizeDepthData(
-    std::vector<float> data, Camera camera, float volumeHeight, Parameters& parameters) {
+std::vector<float> OSPRayRenderer::normalizeDepthData(std::vector<float> data, const Camera& camera,
+    float volumeHeight, const Parameters& parameters) {
   std::vector<float> depthData(parameters.mResolution * parameters.mResolution);
 
   for (int i = 0; i < depthData.size(); i++) {

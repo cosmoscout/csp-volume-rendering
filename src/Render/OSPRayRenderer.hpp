@@ -31,6 +31,7 @@ class OSPRayRenderer : public Renderer {
   OSPRayRenderer& operator=(const OSPRayRenderer& other) = delete;
 
   std::future<Renderer::RenderedImage> getFrame(glm::mat4 cameraTransform) override;
+  void                                 preloadData(DataManager::State state) override;
 
  private:
   struct Volume {
@@ -45,20 +46,22 @@ class OSPRayRenderer : public Renderer {
     glm::mat4           mTransformationMatrix;
   };
 
-  std::optional<ospray::cpp::Volume> mVolume;
+  std::map<DataManager::State, std::shared_future<Volume>> mCachedVolumes;
 
-  Volume               getVolume(Renderer::VolumeShape shape);
-  float                getHeight(vtkSmartPointer<vtkDataSet> data, Renderer::VolumeShape shape);
-  std::array<float, 2> getScalarBounds(vtkSmartPointer<vtkDataSet> data);
-  ospray::cpp::TransferFunction getTransferFunction(Volume& volume, Parameters& parameters);
-  ospray::cpp::World            getWorld(Volume& volume, Parameters& parameters);
-  OSPRayRenderer::Camera        getCamera(float volumeHeight, glm::mat4 observerTransform);
-  ospray::cpp::FrameBuffer      renderFrame(
-           ospray::cpp::World world, ospray::cpp::Camera camera, Parameters& parameters);
-  Renderer::RenderedImage extractImageData(
-      ospray::cpp::FrameBuffer frame, Camera camera, float volumeHeight, Parameters& parameters);
-  std::vector<float> normalizeDepthData(
-      std::vector<float> data, Camera camera, float volumeHeight, Parameters& parameters);
+  const Volume&                 getVolume(DataManager::State state);
+  Volume                        loadVolume(DataManager::State state);
+  float                         getHeight(vtkSmartPointer<vtkDataSet> data);
+  std::array<float, 2>          getScalarBounds(vtkSmartPointer<vtkDataSet> data);
+  ospray::cpp::TransferFunction getTransferFunction(
+      const Volume& volume, const Parameters& parameters);
+  ospray::cpp::World       getWorld(const Volume& volume, const Parameters& parameters);
+  OSPRayRenderer::Camera   getCamera(float volumeHeight, glm::mat4 observerTransform);
+  ospray::cpp::FrameBuffer renderFrame(
+      ospray::cpp::World& world, ospray::cpp::Camera& camera, const Parameters& parameters);
+  Renderer::RenderedImage extractImageData(ospray::cpp::FrameBuffer& frame, const Camera& camera,
+      float volumeHeight, const Parameters& parameters);
+  std::vector<float>      normalizeDepthData(std::vector<float> data, const Camera& camera,
+           float volumeHeight, const Parameters& parameters);
 };
 
 } // namespace csp::volumerendering

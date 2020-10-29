@@ -51,7 +51,8 @@ class Renderer {
   void setAmbientLight(float strength);
   void setSunDirection(glm::vec3 sunDirection);
 
-  virtual std::future<Renderer::RenderedImage> getFrame(glm::mat4 cameraTransform) = 0;
+  virtual std::future<Renderer::RenderedImage> getFrame(glm::mat4 cameraTransform)   = 0;
+  virtual void                                 preloadData(DataManager::State state) = 0;
 
  protected:
   struct Parameters {
@@ -70,8 +71,8 @@ class Renderer {
 
   std::shared_ptr<DataManager> mDataManager;
 
-  VolumeStructure mStructure;
-  VolumeShape     mShape;
+  const VolumeStructure mStructure;
+  const VolumeShape     mShape;
 
   Parameters mParameters;
 };

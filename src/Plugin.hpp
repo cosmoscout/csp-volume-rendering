@@ -85,7 +85,7 @@ class Plugin : public cs::core::PluginBase {
     bool operator==(const Frame& other);
   };
 
-  enum class RenderState { eIdle, eRequestImage, eRenderingImage };
+  enum class RenderState { eWaitForData, eIdle, eRequestImage, eRenderingImage };
 
   void initUI();
   void onLoad();
@@ -123,7 +123,7 @@ class Plugin : public cs::core::PluginBase {
 
   std::future<Renderer::RenderedImage> mFutureFrameData;
 
-  RenderState mRenderState = RenderState::eIdle;
+  RenderState mRenderState = RenderState::eWaitForData;
 
   Frame              mNextFrame;
   Frame              mRenderingFrame;

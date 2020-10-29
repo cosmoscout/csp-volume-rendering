@@ -75,12 +75,24 @@
                 this.playing = false;
             }
             else {
-                const timeSlider = document.querySelector(`[data-callback="volumeRendering.setTimestep"]`);
-                this.time = parseInt(timeSlider.noUiSlider.get());
+                const timeSlider = document.querySelector(`[data-callback="volumeRendering.setTimestep"]`).noUiSlider;
+                this.time = parseInt(timeSlider.get());
+                let prevNext = this.time;
                 this.playHandle = setInterval(() => {
-                    CosmoScout.gui.setSliderValue("volumeRendering.setTimestep", true, this.time);
-                    const speedSlider = document.querySelector(`[data-callback="volumeRendering.setAnimationSpeed"]`);
-                    this.time += parseInt(speedSlider.noUiSlider.get()) / 10;
+                    // reverse() changes the original array, so it is called twice to return the array to the original state
+                    const last = this.timesteps.reverse().find(t => t <= parseInt(this.time));
+                    const next = this.timesteps.reverse().find(t => t > parseInt(this.time));
+                    if (!next) {
+                        this.play();
+                    }
+                    let preload = CosmoScout.callbacks.find("volumeRendering.preloadTimestep");
+                    if (next && next != prevNext && preload !== undefined) {
+                        preload(next);
+                        prevNext = next;
+                    }
+                    CosmoScout.gui.setSliderValue("volumeRendering.setTimestep", true, last);
+                    const speedSlider = document.querySelector(`[data-callback="volumeRendering.setAnimationSpeed"]`).noUiSlider;
+                    this.time += parseInt(speedSlider.get()) / 10;
                 }, 100);
                 playButton.getElementsByTagName("i")[0].innerHTML = "pause";
                 this.playing = true;
@@ -88,12 +100,12 @@
         }
 
         setTimesteps(timestepsJson) {
-            var timesteps = JSON.parse(timestepsJson);
-            timesteps.sort();
-            var min = timesteps[0];
-            var max = timesteps[timesteps.length - 1];
+            this.timesteps = JSON.parse(timestepsJson);
+            this.timesteps.sort();
+            var min = this.timesteps[0];
+            var max = this.timesteps[this.timesteps.length - 1];
             var range = {};
-            timesteps.forEach((t, i) => {
+            this.timesteps.forEach((t, i) => {
                 var percent = ((t - min) / (max - min) * 100) + "%";
                 if (t == min) {
                     percent = "min";
@@ -104,10 +116,10 @@
                 range[percent] = [];
                 range[percent][0] = t;
                 if (t != max) {
-                    range[percent][1] = timesteps[i + 1] - t;
+                    range[percent][1] = this.timesteps[i + 1] - t;
                 }
             });
-            CosmoScout.gui.initSliderRange("volumeRendering.setTimestep", range, timesteps[0], [100]);
+            CosmoScout.gui.initSliderRange("volumeRendering.setTimestep", range, this.timesteps[0], [100]);
         }
 
         ready() {

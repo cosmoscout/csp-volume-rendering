@@ -35,7 +35,6 @@ DataManager::DataManager(std::string path, std::string filenamePattern, VolumeFi
   for (std::string file :
       cs::utils::filesystem::listFiles(path, std::regex(".*" + filenamePattern))) {
     file = std::regex_replace(file, std::regex(R"(\\)"), "/");
-    logger().trace(file);
     std::smatch match;
     std::regex_search(file, match, std::regex(filenamePattern));
     int timestep = std::stoi(match[1].str());
@@ -83,11 +82,27 @@ void DataManager::setActiveScalar(std::string scalar) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 vtkSmartPointer<vtkDataSet> DataManager::getData() {
-  mDirty                              = false;
-  auto                        data    = mCache.find(mCurrentTimestep);
+  return getData(getState());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+vtkSmartPointer<vtkDataSet> DataManager::getData(State state) {
+  mDirty    = false;
+  auto data = mCache.find(state.mTimestep);
+  if (data == mCache.end()) {
+    loadData(state.mTimestep);
+    data = mCache.find(state.mTimestep);
+  }
   vtkSmartPointer<vtkDataSet> dataset = data->second.get();
-  dataset->GetPointData()->SetActiveScalars(mActiveScalar.c_str());
+  dataset->GetPointData()->SetActiveScalars(state.mScalar.c_str());
   return dataset;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+DataManager::State DataManager::getState() {
+  return State{mCurrentTimestep, mActiveScalar};
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,8 +134,8 @@ void DataManager::loadData(int timestep) {
               scalars.push_back(data->GetPointData()->GetArrayName(i));
             }
           }
-          pScalars.set(scalars);
           mActiveScalar = scalars[0];
+          pScalars.set(scalars);
         }
         return data;
       },

@@ -7,6 +7,8 @@
 #ifndef CSP_VOLUME_RENDERING_DATAMANAGER_HPP
 #define CSP_VOLUME_RENDERING_DATAMANAGER_HPP
 
+#include "../logger.hpp"
+
 #include "../../../src/cs-utils/Property.hpp"
 
 #include <vtk-8.2/vtkCellArray.h>
@@ -22,6 +24,23 @@ namespace csp::volumerendering {
 
 class DataManager {
  public:
+  struct State {
+    int         mTimestep;
+    std::string mScalar;
+
+    bool operator<(const State& other) const {
+      if (mTimestep < other.mTimestep)
+        return true;
+      if (other.mTimestep < mTimestep)
+        return false;
+      if (mScalar < other.mScalar)
+        return true;
+      if (other.mScalar < mScalar)
+        return false;
+      return false;
+    }
+  };
+
   enum class VolumeFileType { eInvalid = -1, eGaia, eVtk };
 
   DataManager(std::string path, std::string filenamePattern, VolumeFileType type);
@@ -36,6 +55,8 @@ class DataManager {
   void setActiveScalar(std::string scalar);
 
   vtkSmartPointer<vtkDataSet> getData();
+  vtkSmartPointer<vtkDataSet> getData(State state);
+  State                       getState();
 
  private:
   VolumeFileType mType;
