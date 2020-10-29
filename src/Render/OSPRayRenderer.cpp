@@ -322,11 +322,13 @@ Renderer::RenderedImage OSPRayRenderer::extractImageData(ospray::cpp::FrameBuffe
   float*             colorFrame = (float*)frame.map(OSP_FB_COLOR);
   std::vector<float> colorData(
       colorFrame, colorFrame + 4 * parameters.mResolution * parameters.mResolution);
+	frame.unmap(colorFrame);
   std::vector<float> depthData(parameters.mResolution * parameters.mResolution, INFINITY);
 
   if (parameters.mDepthMode != Renderer::DepthMode::eNone) {
     float* depthFrame = (float*)frame.map(OSP_FB_DEPTH);
     depthData         = std::vector(depthFrame, depthFrame + depthData.size());
+    frame.unmap(depthFrame);
   }
 
   depthData = normalizeDepthData(depthData, camera, volumeHeight, parameters);
