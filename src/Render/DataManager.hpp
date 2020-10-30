@@ -65,6 +65,8 @@ class DataManager {
   bool           mDirty;
 
   std::mutex mReadMutex;
+  std::mutex mStateMutex;
+  std::mutex mDataMutex;
 
   std::map<int, std::string> mTimestepFiles;
 

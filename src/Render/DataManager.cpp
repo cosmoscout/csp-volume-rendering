@@ -48,6 +48,7 @@ DataManager::DataManager(std::string path, std::string filenamePattern, VolumeFi
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void DataManager::setTimestep(int timestep) {
+  std::scoped_lock lock(mStateMutex, mDataMutex);
   mCurrentTimestep = timestep;
   mDirty           = true;
   if (mCache.find(timestep) == mCache.end()) {
@@ -58,7 +59,10 @@ void DataManager::setTimestep(int timestep) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void DataManager::cacheTimestep(int timestep) {
-  loadData(timestep);
+  std::scoped_lock lock(mDataMutex);
+  if (mCache.find(timestep) == mCache.end()) {
+    loadData(timestep);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -71,6 +75,7 @@ bool DataManager::isDirty() {
 
 void DataManager::setActiveScalar(std::string scalar) {
   if (std::find(pScalars.get().begin(), pScalars.get().end(), scalar) != pScalars.get().end()) {
+    std::scoped_lock lock(mStateMutex);
     mActiveScalar = scalar;
     mDirty        = true;
   } else {
@@ -88,13 +93,18 @@ vtkSmartPointer<vtkDataSet> DataManager::getData() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 vtkSmartPointer<vtkDataSet> DataManager::getData(State state) {
-  mDirty    = false;
-  auto data = mCache.find(state.mTimestep);
-  if (data == mCache.end()) {
-    loadData(state.mTimestep);
-    data = mCache.find(state.mTimestep);
+  std::shared_future<vtkSmartPointer<vtkDataSet>> futureData;
+  {
+    std::scoped_lock lock(mDataMutex);
+    mDirty          = false;
+    auto cacheEntry = mCache.find(state.mTimestep);
+    if (cacheEntry == mCache.end()) {
+      loadData(state.mTimestep);
+      cacheEntry = mCache.find(state.mTimestep);
+    }
+    futureData = cacheEntry->second;
   }
-  vtkSmartPointer<vtkDataSet> dataset = data->second.get();
+  vtkSmartPointer<vtkDataSet> dataset = futureData.get();
   dataset->GetPointData()->SetActiveScalars(state.mScalar.c_str());
   return dataset;
 }
@@ -102,7 +112,9 @@ vtkSmartPointer<vtkDataSet> DataManager::getData(State state) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 DataManager::State DataManager::getState() {
-  return State{mCurrentTimestep, mActiveScalar};
+  std::scoped_lock lock(mStateMutex);
+  State            state{mCurrentTimestep, mActiveScalar};
+  return state;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -111,7 +123,7 @@ void DataManager::loadData(int timestep) {
   logger().info("Loading data from {}, timestep {}...", mTimestepFiles[timestep], timestep);
   auto data        = std::async(std::launch::async,
       [this](std::string path, VolumeFileType type, int timestep) {
-        std::lock_guard<std::mutex> lock(mReadMutex);
+        std::scoped_lock            lock(mReadMutex);
         auto                        timer = std::chrono::high_resolution_clock::now();
         vtkSmartPointer<vtkDataSet> data;
 
@@ -134,6 +146,7 @@ void DataManager::loadData(int timestep) {
               scalars.push_back(data->GetPointData()->GetArrayName(i));
             }
           }
+          std::scoped_lock lock(mStateMutex);
           mActiveScalar = scalars[0];
           pScalars.set(scalars);
         }
