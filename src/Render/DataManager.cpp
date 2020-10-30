@@ -43,6 +43,13 @@ DataManager::DataManager(std::string path, std::string filenamePattern, VolumeFi
   }
   pTimesteps.set(timesteps);
   setTimestep(timesteps[0]);
+  mInitScalarsThread = std::thread(&DataManager::initScalars, this);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+DataManager::~DataManager() {
+  mInitScalarsThread.join();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,6 +126,21 @@ DataManager::State DataManager::getState() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void DataManager::initScalars() {
+  vtkSmartPointer<vtkDataSet> data = getData();
+  std::vector<std::string>    scalars;
+  for (int i = 0; i < data->GetPointData()->GetNumberOfArrays(); i++) {
+    if (data->GetPointData()->GetAbstractArray(i)->GetNumberOfComponents() == 1) {
+      scalars.push_back(data->GetPointData()->GetArrayName(i));
+    }
+  }
+  std::scoped_lock lock(mStateMutex);
+  mActiveScalar = scalars[0];
+  pScalars.set(scalars);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void DataManager::loadData(int timestep) {
   logger().info("Loading data from {}, timestep {}...", mTimestepFiles[timestep], timestep);
   auto data        = std::async(std::launch::async,
@@ -139,17 +161,6 @@ void DataManager::loadData(int timestep) {
         logger().info("Finished loading data from {}, timestep {}. Took {}s", path, timestep,
             (float)(std::chrono::high_resolution_clock::now() - timer).count() / 1000000000);
 
-        if (mActiveScalar == "") {
-          std::vector<std::string> scalars;
-          for (int i = 0; i < data->GetPointData()->GetNumberOfArrays(); i++) {
-            if (data->GetPointData()->GetAbstractArray(i)->GetNumberOfComponents() == 1) {
-              scalars.push_back(data->GetPointData()->GetArrayName(i));
-            }
-          }
-          std::scoped_lock lock(mStateMutex);
-          mActiveScalar = scalars[0];
-          pScalars.set(scalars);
-        }
         return data;
       },
       mTimestepFiles[timestep], mType, timestep);

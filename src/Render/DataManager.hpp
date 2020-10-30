@@ -44,6 +44,7 @@ class DataManager {
   enum class VolumeFileType { eInvalid = -1, eGaia, eVtk };
 
   DataManager(std::string path, std::string filenamePattern, VolumeFileType type);
+  ~DataManager();
 
   cs::utils::Property<std::vector<int>>         pTimesteps;
   cs::utils::Property<std::vector<std::string>> pScalars;
@@ -73,6 +74,10 @@ class DataManager {
   std::map<int, std::shared_future<vtkSmartPointer<vtkDataSet>>> mCache;
 
   vtkSmartPointer<vtkCellArray> mGaiaCells;
+
+  std::thread mInitScalarsThread;
+
+  void initScalars();
 
   void                        loadData(int timestep);
   vtkSmartPointer<vtkDataSet> loadGaiaData(int timestep);
