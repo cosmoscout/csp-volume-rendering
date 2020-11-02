@@ -42,6 +42,7 @@ OSPRayRenderer::~OSPRayRenderer() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::future<Renderer::RenderedImage> OSPRayRenderer::getFrame(glm::mat4 cameraTransform) {
+  std::scoped_lock lock(mParameterMutex);
   return std::async(std::launch::async,
       [this, cameraTransform](Parameters parameters, DataManager::State dataState) {
         const Volume&            volume = getVolume(dataState);

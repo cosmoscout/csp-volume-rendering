@@ -69,6 +69,8 @@ class Renderer {
     glm::vec3              mSunDirection;
   };
 
+  std::mutex mParameterMutex;
+
   std::shared_ptr<DataManager> mDataManager;
 
   const VolumeStructure mStructure;
