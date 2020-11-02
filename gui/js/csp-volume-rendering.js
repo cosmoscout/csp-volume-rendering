@@ -588,17 +588,23 @@
                     points[index].b = transferFunction.RGBPoints[i++];
                     index++;
                 }
-                for (let i = 0; i < transferFunction.Points.length;) {
-                    if (!points.some(point => Number(point.position) === Number(transferFunction.Points[i]))) {
-                        points[index] = {};
-                        points[index].position = transferFunction.Points[i++];
-                        points[index].a = transferFunction.Points[i++];
-                        i += 2;
-                        index++;
-                    } else {
-                        points.find(point => Number(point.position) === Number(transferFunction.Points[i])).a = transferFunction.Points[++i];
-                        i += 3;
+                if (transferFunction.Points != null) {
+                    for (let i = 0; i < transferFunction.Points.length;) {
+                        if (!points.some(point => Number(point.position) === Number(transferFunction.Points[i]))) {
+                            points[index] = {};
+                            points[index].position = transferFunction.Points[i++];
+                            points[index].a = transferFunction.Points[i++];
+                            i += 2;
+                            index++;
+                        } else {
+                            points.find(point => Number(point.position) === Number(transferFunction.Points[i])).a = transferFunction.Points[++i];
+                            i += 3;
+                        }
                     }
+                }
+                else {
+                    points[0].a = 0;
+                    points[points.length - 1].a = 1;
                 }
             } else {
                 // Cosmoscout transfer function format
