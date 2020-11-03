@@ -158,12 +158,7 @@ bool Plugin::Frame::operator==(const Frame& other) {
          glm::all(glm::epsilonEqual(mCameraTransform[0], other.mCameraTransform[0], 0.0001f)) &&
          glm::all(glm::epsilonEqual(mCameraTransform[1], other.mCameraTransform[1], 0.0001f)) &&
          glm::all(glm::epsilonEqual(mCameraTransform[2], other.mCameraTransform[2], 0.0001f)) &&
-         glm::all(glm::epsilonEqual(mCameraTransform[3], other.mCameraTransform[3], 0.0001f)) &&
-         mSamplingRate == other.mSamplingRate && mTransferFunction == other.mTransferFunction &&
-         mDenoiseColor == other.mDenoiseColor && mDenoiseDepth == other.mDenoiseDepth &&
-         mDepthMode == other.mDepthMode && mShading == other.mShading && mScalar == other.mScalar &&
-         mTimestep == other.mTimestep && mAmbientLight == other.mAmbientLight &&
-         mSunStrength == other.mSunStrength && mDensityScale == other.mDensityScale;
+         glm::all(glm::epsilonEqual(mCameraTransform[3], other.mCameraTransform[3], 0.0001f));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -324,14 +319,14 @@ void Plugin::onLoad() {
 void Plugin::connectSettings() {
   // Connect to global CosmoScout graphics settings
   mAllSettings->mGraphics.pEnableLighting.connectAndTouch([this](bool enable) {
-    mRenderer->setShading(enable);
-    mNextFrame.mShading = enable;
     mRenderedFrames.clear();
+    mRenderer->setShading(enable);
+    mParametersDirty = true;
   });
   mAllSettings->mGraphics.pAmbientBrightness.connectAndTouch([this](float value) {
-    mRenderer->setAmbientLight(value);
-    mNextFrame.mAmbientLight = value;
     mRenderedFrames.clear();
+    mRenderer->setAmbientLight(value);
+    mParametersDirty = true;
   });
 
   // Connect to plugin settings
@@ -340,39 +335,46 @@ void Plugin::connectSettings() {
     mGuiManager->setCheckboxValue("volumeRendering.setEnableRequestImages", enable);
   });
   mPluginSettings.mResolution.connectAndTouch([this](int value) {
+    mRenderedFrames.clear();
     mNextFrame.mResolution = value;
     mRenderer->setResolution(value);
+    mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setResolution", value);
   });
   mPluginSettings.mSamplingRate.connectAndTouch([this](float value) {
-    mNextFrame.mSamplingRate = value;
+    mRenderedFrames.clear();
     mRenderer->setSamplingRate(value);
+    mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setSamplingRate", value);
   });
   mPluginSettings.mSunStrength.connectAndTouch([this](float value) {
-    mNextFrame.mSunStrength = value;
+    mRenderedFrames.clear();
     mRenderer->setSunStrength(value);
+    mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setSunStrength", value);
   });
   mPluginSettings.mDensityScale.connectAndTouch([this](float value) {
-    mNextFrame.mDensityScale = value;
+    mRenderedFrames.clear();
     mRenderer->setDensityScale(value);
+    mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setDensityScale", value);
   });
   mPluginSettings.mDenoiseColor.connectAndTouch([this](bool enable) {
-    mNextFrame.mDenoiseColor = enable;
+    mRenderedFrames.clear();
     mRenderer->setDenoiseColor(enable);
+    mParametersDirty = true;
     mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseColor", enable);
   });
   mPluginSettings.mDenoiseDepth.connectAndTouch([this](bool enable) {
-    mNextFrame.mDenoiseDepth = enable;
+    mRenderedFrames.clear();
     mRenderer->setDenoiseDepth(enable);
+    mParametersDirty = true;
     mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseDepth", enable);
   });
   mPluginSettings.mDepthMode.connectAndTouch([this](Renderer::DepthMode drawMode) {
-    mNextFrame.mDepthMode = drawMode;
-    mRenderer->setDepthMode(drawMode);
     mRenderedFrames.clear();
+    mRenderer->setDepthMode(drawMode);
+    mParametersDirty = true;
     if (drawMode == Renderer::DepthMode::eNone) {
       mGuiManager->setRadioChecked("stars.setDrawMode0");
     } else if (drawMode == Renderer::DepthMode::eIsosurface) {
@@ -505,16 +507,16 @@ void Plugin::initUI() {
   // Data settings
   mGuiManager->getGui()->registerCallback("volumeRendering.setScalar",
       "Set the scalar to be rendered.", std::function([this](std::string scalar) {
-        mDataManager->setActiveScalar(scalar);
-        mNextFrame.mScalar = scalar;
         mRenderedFrames.clear();
+        mDataManager->setActiveScalar(scalar);
+        mParametersDirty = true;
       }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setTimestep",
       "Sets the timestep of the rendered volume images.", std::function([this](double value) {
-        mDataManager->setTimestep((int)std::lround(value));
-        mNextFrame.mTimestep = (int)std::lround(value);
         mRenderedFrames.clear();
+        mDataManager->setTimestep((int)std::lround(value));
+        mParametersDirty = true;
       }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.preloadTimestep",
@@ -533,10 +535,10 @@ void Plugin::initUI() {
   mGuiManager->getGui()->registerCallback("volumeRendering.setTransferFunction",
       "Sets the transfer function for rendering the volume.",
       std::function([this](std::string json) {
+        mRenderedFrames.clear();
         cs::graphics::ColorMap colorMap(json, false);
         mRenderer->setTransferFunction(colorMap.getRawData());
-        mNextFrame.mTransferFunction = colorMap.getRawData();
-        mRenderedFrames.clear();
+        mParametersDirty = true;
       }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.importTransferFunction",
@@ -580,7 +582,7 @@ void Plugin::requestFrame(glm::mat4 cameraTransform) {
     mNextFrame.mCameraTransform = cameraTransform;
   }
 
-  if (!(mNextFrame == mRenderingFrame)) {
+  if (!(mNextFrame == mRenderingFrame) || mParametersDirty) {
     mRenderingFrame = mNextFrame;
 
     glm::vec4 dir = glm::vec4(mSolarSystem->getSunDirection(mBillboard->getWorldPosition()), 1);
@@ -589,6 +591,7 @@ void Plugin::requestFrame(glm::mat4 cameraTransform) {
     mFutureFrameData   = mRenderer->getFrame(cameraTransform);
     mRenderState       = RenderState::eRenderingImage;
     mLastFrameInterval = 0;
+    mParametersDirty   = false;
   }
 }
 
@@ -614,7 +617,7 @@ void Plugin::tryReuseFrame(glm::mat4 cameraTransform) {
       bestFrame = f;
     }
   }
-  if (minDiff > 0) {
+  if (!(bestFrame == mDisplayedFrame) && minDiff > 0) {
     displayFrame(bestFrame);
   }
 }
@@ -622,20 +625,18 @@ void Plugin::tryReuseFrame(glm::mat4 cameraTransform) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Plugin::displayFrame(Frame& frame) {
-  if (!(frame == mDisplayedFrame)) {
-    cs::utils::FrameTimings::ScopedTimer timer("Display volume frame");
+  cs::utils::FrameTimings::ScopedTimer timer("Display volume frame");
 
-    mBillboard->setTexture(frame.mColorImage, frame.mResolution, frame.mResolution);
-    mPoints->setTexture(frame.mColorImage, frame.mResolution, frame.mResolution);
-    mBillboard->setDepthTexture(frame.mDepthImage, frame.mResolution, frame.mResolution);
-    mPoints->setDepthTexture(frame.mDepthImage, frame.mResolution, frame.mResolution);
-    mBillboard->setTransform(glm::toMat4(glm::toQuat(frame.mCameraTransform)));
-    mPoints->setTransform(glm::toMat4(glm::toQuat(frame.mCameraTransform)));
+  mBillboard->setTexture(frame.mColorImage, frame.mResolution, frame.mResolution);
+  mPoints->setTexture(frame.mColorImage, frame.mResolution, frame.mResolution);
+  mBillboard->setDepthTexture(frame.mDepthImage, frame.mResolution, frame.mResolution);
+  mPoints->setDepthTexture(frame.mDepthImage, frame.mResolution, frame.mResolution);
+  mBillboard->setTransform(glm::toMat4(glm::toQuat(frame.mCameraTransform)));
+  mPoints->setTransform(glm::toMat4(glm::toQuat(frame.mCameraTransform)));
 
-    mBillboard->setMVPMatrix(frame.mModelViewProjection);
-    mPoints->setMVPMatrix(frame.mModelViewProjection);
-    mDisplayedFrame = frame;
-  }
+  mBillboard->setMVPMatrix(frame.mModelViewProjection);
+  mPoints->setMVPMatrix(frame.mModelViewProjection);
+  mDisplayedFrame = frame;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -68,23 +68,11 @@ class Plugin : public cs::core::PluginBase {
 
  private:
   struct Frame {
-    std::string            mScalar;
-    int                    mTimestep;
-    int                    mResolution;
-    float                  mSamplingRate;
-    float                  mSunStrength;
-    float                  mDensityScale;
-    glm::mat4              mCameraTransform;
-    std::vector<glm::vec4> mTransferFunction;
-    Renderer::DepthMode    mDepthMode;
-    bool                   mDenoiseColor;
-    bool                   mDenoiseDepth;
-    bool                   mShading;
-    float                  mAmbientLight;
-
+    glm::mat4            mCameraTransform;
+    glm::mat4            mModelViewProjection;
+    int                  mResolution;
     std::vector<uint8_t> mColorImage;
     std::vector<float>   mDepthImage;
-    glm::mat4            mModelViewProjection;
 
     bool operator==(const Frame& other);
   };
@@ -128,6 +116,8 @@ class Plugin : public cs::core::PluginBase {
   std::future<Renderer::RenderedImage> mFutureFrameData;
 
   RenderState mRenderState = RenderState::eWaitForData;
+
+  bool mParametersDirty;
 
   Frame              mNextFrame;
   Frame              mRenderingFrame;
