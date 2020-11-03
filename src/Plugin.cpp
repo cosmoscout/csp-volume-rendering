@@ -417,6 +417,9 @@ void Plugin::connectSettings() {
       mPoints->setEnabled(true);
       mGuiManager->setRadioChecked("stars.setDisplayMode1");
     }
+    if (mDisplayedFrame.has_value()) {
+      displayFrame(*mDisplayedFrame);
+    }
   });
 }
 
@@ -617,7 +620,7 @@ void Plugin::tryReuseFrame(glm::mat4 cameraTransform) {
       bestFrame = f;
     }
   }
-  if (!(bestFrame == mDisplayedFrame) && minDiff > 0) {
+  if (mDisplayedFrame.has_value() && !(bestFrame == *mDisplayedFrame) && minDiff > 0) {
     displayFrame(bestFrame);
   }
 }
@@ -627,15 +630,21 @@ void Plugin::tryReuseFrame(glm::mat4 cameraTransform) {
 void Plugin::displayFrame(Frame& frame) {
   cs::utils::FrameTimings::ScopedTimer timer("Display volume frame");
 
-  mBillboard->setTexture(frame.mColorImage, frame.mResolution, frame.mResolution);
-  mPoints->setTexture(frame.mColorImage, frame.mResolution, frame.mResolution);
-  mBillboard->setDepthTexture(frame.mDepthImage, frame.mResolution, frame.mResolution);
-  mPoints->setDepthTexture(frame.mDepthImage, frame.mResolution, frame.mResolution);
-  mBillboard->setTransform(glm::toMat4(glm::toQuat(frame.mCameraTransform)));
-  mPoints->setTransform(glm::toMat4(glm::toQuat(frame.mCameraTransform)));
+  switch (mPluginSettings.mDisplayMode.get()) {
+  case Settings::DisplayMode::eMesh:
+    mBillboard->setTexture(frame.mColorImage, frame.mResolution, frame.mResolution);
+    mBillboard->setDepthTexture(frame.mDepthImage, frame.mResolution, frame.mResolution);
+    mBillboard->setTransform(glm::toMat4(glm::toQuat(frame.mCameraTransform)));
+    mBillboard->setMVPMatrix(frame.mModelViewProjection);
+    break;
+  case Settings::DisplayMode::ePoints:
+    mPoints->setTexture(frame.mColorImage, frame.mResolution, frame.mResolution);
+    mPoints->setDepthTexture(frame.mDepthImage, frame.mResolution, frame.mResolution);
+    mPoints->setTransform(glm::toMat4(glm::toQuat(frame.mCameraTransform)));
+    mPoints->setMVPMatrix(frame.mModelViewProjection);
+    break;
+  }
 
-  mBillboard->setMVPMatrix(frame.mModelViewProjection);
-  mPoints->setMVPMatrix(frame.mModelViewProjection);
   mDisplayedFrame = frame;
 }
 

@@ -19,6 +19,7 @@
 
 #include <future>
 #include <map>
+#include <optional>
 #include <string>
 
 namespace csp::volumerendering {
@@ -119,10 +120,10 @@ class Plugin : public cs::core::PluginBase {
 
   bool mParametersDirty;
 
-  Frame              mNextFrame;
-  Frame              mRenderingFrame;
-  Frame              mDisplayedFrame;
-  std::vector<Frame> mRenderedFrames;
+  Frame                mNextFrame;
+  Frame                mRenderingFrame;
+  std::optional<Frame> mDisplayedFrame;
+  std::vector<Frame>   mRenderedFrames;
 };
 
 } // namespace csp::volumerendering
