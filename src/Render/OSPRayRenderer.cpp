@@ -204,7 +204,7 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
       observerTransform[3] * glm::vec4(volumeHeight, volumeHeight, volumeHeight, 1);
 
   // Define vertical field of view for ospray camera
-  float fov    = 60;
+  float fov    = 90;
   float fovRad = fov / 180 * (float)M_PI;
 
   // Create camera transform looking along negative z
@@ -237,10 +237,20 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
   float modelAngleY = asin(volumeHeight / sqrt(camYLen * camYLen + camZLen * camZLen));
 
   // Get angle between rays at edges of volume and forward vector
-  float leftAngle  = cameraAngleX - modelAngleX;
-  float rightAngle = cameraAngleX + modelAngleX;
-  float downAngle  = cameraAngleY - modelAngleY;
-  float upAngle    = cameraAngleY + modelAngleY;
+  float leftAngle, rightAngle, downAngle, upAngle;
+  if (!isnan(modelAngleX) && !isnan(modelAngleY)) {
+    leftAngle  = cameraAngleX - modelAngleX;
+    rightAngle = cameraAngleX + modelAngleX;
+    downAngle  = cameraAngleY - modelAngleY;
+    upAngle    = cameraAngleY + modelAngleY;
+  } else {
+    // If the camera is inside the volume the model angles will be NaN,
+    // so the angles are set to the edges of the field of view
+    leftAngle  = -fovRad / 2;
+    rightAngle = fovRad / 2;
+    downAngle  = -fovRad / 2;
+    upAngle    = fovRad / 2;
+  }
 
   // Get edges of volume in image space coordinates
   float leftPercent  = 0.5f + tan(leftAngle) / (2 * tan(fovRad / 2));
@@ -268,8 +278,11 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
   glm::mat4 view =
       glm::translate(glm::mat4(1.f), -glm::vec3(camXLen, camYLen, -camZLen) / volumeHeight);
 
-  float     nearClip  = -camZLen / volumeHeight - 1;
-  float     farClip   = -camZLen / volumeHeight + 1;
+  float nearClip = -camZLen / volumeHeight - 1;
+  float farClip  = -camZLen / volumeHeight + 1;
+  if (nearClip < 0) {
+    nearClip = 0.00001f;
+  }
   float     leftClip  = tan(leftAngle) * nearClip;
   float     rightClip = tan(rightAngle) * nearClip;
   float     downClip  = tan(downAngle) * nearClip;
@@ -323,7 +336,7 @@ Renderer::RenderedImage OSPRayRenderer::extractImageData(ospray::cpp::FrameBuffe
   float*             colorFrame = (float*)frame.map(OSP_FB_COLOR);
   std::vector<float> colorData(
       colorFrame, colorFrame + 4 * parameters.mResolution * parameters.mResolution);
-	frame.unmap(colorFrame);
+  frame.unmap(colorFrame);
   std::vector<float> depthData(parameters.mResolution * parameters.mResolution, INFINITY);
 
   if (parameters.mDepthMode != Renderer::DepthMode::eNone) {
