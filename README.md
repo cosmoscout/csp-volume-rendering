@@ -46,6 +46,8 @@ These settings can be dynamically changed in the CosmoScout UI.
 | *requestImages* | bool | `true` | When false, no new images of the volumetric data will be rendered. |
 | *resolution* | int | `256` | Horizontal and vertical resolution of the rendered images in pixels. |
 | *samplingRate* | float | `0.05` | Sampling rate to be used while rendering. Higher values result in higher quality images with less noise. |
+| *sunStrength* | float | `1` | Factor for the strength of the sunlight. Only used, when shading is enabled in CosmoScout. |
+| *densityScale* | float | `1` | Sets the density of the volume. |
 | *denoiseColor* | bool | `true` | Use the OIDN library to denoise the color image of the volume before displaying it in CosmoScout. |
 | *denoiseDepth* | bool | `true` | Use the OIDN library to denoise the image containing depth information of the volume before using it for image based rendering. |
 | *depthMode* | `"none"` / `"isosurface"` / `"firstHit"` / `"lastHit"` / `"threshold"` / `"multiThreshold"` | `"none"` | Heuristic for determining per pixel depth values for the rendered images. |

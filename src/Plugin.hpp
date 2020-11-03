@@ -42,6 +42,8 @@ class Plugin : public cs::core::PluginBase {
     cs::utils::DefaultProperty<bool>                mRequestImages{true};
     cs::utils::DefaultProperty<int>                 mResolution{256};
     cs::utils::DefaultProperty<float>               mSamplingRate{0.05f};
+    cs::utils::DefaultProperty<float>               mSunStrength{1.f};
+    cs::utils::DefaultProperty<float>               mDensityScale{1.f};
     cs::utils::DefaultProperty<bool>                mDenoiseColor{true};
     cs::utils::DefaultProperty<bool>                mDenoiseDepth{true};
     cs::utils::DefaultProperty<Renderer::DepthMode> mDepthMode{Renderer::DepthMode::eNone};
@@ -70,6 +72,8 @@ class Plugin : public cs::core::PluginBase {
     int                    mTimestep;
     int                    mResolution;
     float                  mSamplingRate;
+    float                  mSunStrength;
+    float                  mDensityScale;
     glm::mat4              mCameraTransform;
     std::vector<glm::vec4> mTransferFunction;
     Renderer::DepthMode    mDepthMode;

@@ -150,6 +150,7 @@ ospray::cpp::World OSPRayRenderer::getWorld(const Volume& volume, const Paramete
 
   ospray::cpp::VolumetricModel volumetricModel(volume.mOsprayData);
   volumetricModel.setParam("transferFunction", transferFunction);
+  volumetricModel.setParam("densityScale", parameters.mDensityScale);
   volumetricModel.setParam("gradientShadingScale", parameters.mShading ? 1.f : 0.f);
   volumetricModel.commit();
 
@@ -179,7 +180,7 @@ ospray::cpp::World OSPRayRenderer::getWorld(const Volume& volume, const Paramete
   light.commit();
 
   ospray::cpp::Light sun("distant");
-  sun.setParam("intensity", 5.f);
+  sun.setParam("intensity", parameters.mSunStrength);
   sun.setParam("color", rkcommon::math::vec3f(1, 1, 1));
   sun.setParam("direction", rkcommon::math::vec3f{parameters.mSunDirection[0],
                                 parameters.mSunDirection[1], parameters.mSunDirection[2]});

@@ -99,6 +99,8 @@ void from_json(nlohmann::json const& j, Plugin::Settings& o) {
   cs::core::Settings::deserialize(j, "requestImages", o.mRequestImages);
   cs::core::Settings::deserialize(j, "resolution", o.mResolution);
   cs::core::Settings::deserialize(j, "samplingRate", o.mSamplingRate);
+  cs::core::Settings::deserialize(j, "sunStrength", o.mSunStrength);
+  cs::core::Settings::deserialize(j, "densityScale", o.mDensityScale);
   cs::core::Settings::deserialize(j, "denoiseColor", o.mDenoiseColor);
   cs::core::Settings::deserialize(j, "denoiseDepth", o.mDenoiseDepth);
   cs::core::Settings::deserialize(j, "depthMode", o.mDepthMode);
@@ -129,6 +131,8 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
   cs::core::Settings::serialize(j, "requestImages", o.mRequestImages);
   cs::core::Settings::serialize(j, "resolution", o.mResolution);
   cs::core::Settings::serialize(j, "samplingRate", o.mSamplingRate);
+  cs::core::Settings::serialize(j, "sunStrength", o.mSunStrength);
+  cs::core::Settings::serialize(j, "densityScale", o.mDensityScale);
   cs::core::Settings::serialize(j, "denoiseColor", o.mDenoiseColor);
   cs::core::Settings::serialize(j, "denoiseDepth", o.mDenoiseDepth);
   cs::core::Settings::serialize(j, "depthMode", o.mDepthMode);
@@ -158,7 +162,8 @@ bool Plugin::Frame::operator==(const Frame& other) {
          mSamplingRate == other.mSamplingRate && mTransferFunction == other.mTransferFunction &&
          mDenoiseColor == other.mDenoiseColor && mDenoiseDepth == other.mDenoiseDepth &&
          mDepthMode == other.mDepthMode && mShading == other.mShading && mScalar == other.mScalar &&
-         mTimestep == other.mTimestep && mAmbientLight == other.mAmbientLight;
+         mTimestep == other.mTimestep && mAmbientLight == other.mAmbientLight &&
+         mSunStrength == other.mSunStrength && mDensityScale == other.mDensityScale;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -344,6 +349,16 @@ void Plugin::connectSettings() {
     mRenderer->setSamplingRate(value);
     mGuiManager->setSliderValue("volumeRendering.setSamplingRate", value);
   });
+  mPluginSettings.mSunStrength.connectAndTouch([this](float value) {
+    mNextFrame.mSunStrength = value;
+    mRenderer->setSunStrength(value);
+    mGuiManager->setSliderValue("volumeRendering.setSunStrength", value);
+  });
+  mPluginSettings.mDensityScale.connectAndTouch([this](float value) {
+    mNextFrame.mDensityScale = value;
+    mRenderer->setDensityScale(value);
+    mGuiManager->setSliderValue("volumeRendering.setDensityScale", value);
+  });
   mPluginSettings.mDenoiseColor.connectAndTouch([this](bool enable) {
     mNextFrame.mDenoiseColor = enable;
     mRenderer->setDenoiseColor(enable);
@@ -424,6 +439,14 @@ void Plugin::initUI() {
   mGuiManager->getGui()->registerCallback("volumeRendering.setSamplingRate",
       "Sets the sampling rate for volume rendering.",
       std::function([this](double value) { mPluginSettings.mSamplingRate = (float)value; }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setSunStrength",
+      "Sets the strength of the sun when shading is enabled.",
+      std::function([this](double value) { mPluginSettings.mSunStrength = (float)value; }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setDensityScale",
+      "Sets the density scale of the volume.",
+      std::function([this](double value) { mPluginSettings.mDensityScale = (float)value; }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDenoiseColor",
       "Enables use of OIDN for displaying color data.",

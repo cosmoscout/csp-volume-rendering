@@ -171,7 +171,7 @@ ospray::cpp::TransferFunction createOSPRayTransferFunction(
 
   for (glm::vec4 c : colors) {
     color.push_back(rkcommon::math::vec3f(c[0], c[1], c[2]));
-    opacity.push_back(powf(10, c[3]) - 1);
+    opacity.push_back(c[3]);
   }
 
   rkcommon::math::vec2f valueRange = {min, max};

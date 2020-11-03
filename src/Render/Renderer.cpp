@@ -61,6 +61,13 @@ void Renderer::setTransferFunction(std::vector<glm::vec4> transferFunction) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void Renderer::setDensityScale(float densityScale) {
+  std::scoped_lock lock(mParameterMutex);
+  mParameters.mDensityScale = densityScale;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void Renderer::setShading(bool shading) {
   std::scoped_lock lock(mParameterMutex);
   mParameters.mShading = shading;
@@ -78,6 +85,13 @@ void Renderer::setAmbientLight(float strength) {
 void Renderer::setSunDirection(glm::vec3 sunDirection) {
   std::scoped_lock lock(mParameterMutex);
   mParameters.mSunDirection = sunDirection;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Renderer::setSunStrength(float strength) {
+  std::scoped_lock lock(mParameterMutex);
+  mParameters.mSunStrength = strength;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

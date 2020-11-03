@@ -47,9 +47,12 @@ class Renderer {
   void setDenoiseDepth(bool denoiseDepth);
 
   void setTransferFunction(std::vector<glm::vec4> transferFunction);
+  void setDensityScale(float densityScale);
+
   void setShading(bool shading);
   void setAmbientLight(float strength);
   void setSunDirection(glm::vec3 sunDirection);
+  void setSunStrength(float strength);
 
   virtual std::future<Renderer::RenderedImage> getFrame(glm::mat4 cameraTransform)   = 0;
   virtual void                                 preloadData(DataManager::State state) = 0;
@@ -64,9 +67,12 @@ class Renderer {
     bool mDenoiseDepth;
 
     std::vector<glm::vec4> mTransferFunction;
-    bool                   mShading;
-    float                  mAmbientLight;
-    glm::vec3              mSunDirection;
+    float                  mDensityScale;
+
+    bool      mShading;
+    float     mAmbientLight;
+    glm::vec3 mSunDirection;
+    float     mSunStrength;
   };
 
   std::mutex mParameterMutex;
