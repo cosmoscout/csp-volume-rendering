@@ -1,223 +1,310 @@
-<div class="strike">
-  <span>Data</span>
-</div>
+<div class="accordion" id="volumeRenderingTab-accordion">
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-data"
+         data-toggle="collapse" data-target="#collapseVolume-data" aria-expanded="false"
+         aria-controls="collapseVolume-data" type="button">
+      <i class="material-icons">storage</i>
+      <span>Data</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-data"
+         aria-labelledby="headingVolume-data" data-parent="#volumeRenderingTab-accordion">
+      <div class="row">
+        <div class="col-5">
+          Scalar
+        </div>
+        <div class="col-7">
+          <select data-callback="volumeRendering.setScalar" class="simple-value-dropdown"></select>
+        </div>
+      </div>
 
-<div class="row">
-  <div class="col-5">
-    Scalar
-  </div>
-  <div class="col-7">
-    <select data-callback="volumeRendering.setScalar" class="simple-value-dropdown"></select>
-  </div>
-</div>
+      <div class="row">
+        <div class="col-5">
+          Timestep
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setTimestep">
+          </div>
+        </div>
+      </div>
 
-<div class="row">
-  <div class="col-5">
-    Timestep
-  </div>
-  <div class="col-7">
-    <div data-callback="volumeRendering.setTimestep">
+      <div class="row">
+        <div class="col-5">
+          Animation speed
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setAnimationSpeed">
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-12">
+          <a class="btn glass block px-3" id="volumeRendering.play" onclick="CosmoScout.volumeRendering.play()">
+            <i class="material-icons">play_arrow</i>
+          </a>
+        </div>
+      </div>
     </div>
   </div>
-</div>
 
-<div class="row">
-  <div class="col-5">
-    Animation speed
-  </div>
-  <div class="col-7">
-    <div data-callback="volumeRendering.setAnimationSpeed">
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-rendering"
+         data-toggle="collapse" data-target="#collapseVolume-rendering" aria-expanded="false"
+         aria-controls="collapseVolume-rendering" type="button">
+      <i class="material-icons">camera</i>
+      <span>Rendering</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-rendering"
+         aria-labelledby="headingVolume-rendering" data-parent="#volumeRenderingTab-accordion">
+      <div class="col-7 offset-5">
+        <label class="checklabel">
+          <input type="checkbox" data-callback="volumeRendering.setEnableRequestImages" />
+          <i class="material-icons"></i>
+          <span>Request new images</span>
+        </label>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Resolution
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setResolution">
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Sampling rate
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setSamplingRate">
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Sun strength
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setSunStrength">
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Density scale
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setDensityScale">
+          </div>
+        </div>
+      </div>
     </div>
   </div>
-</div>
 
-<div class="row">
-  <div class="col-12">
-    <a class="btn glass block px-3" id="volumeRendering.play" onclick="CosmoScout.volumeRendering.play()">
-      <i class="material-icons">play_arrow</i>
-    </a>
-  </div>
-</div>
-
-<div class="strike">
-  <span>Rendering</span>
-</div>
-
-<div class="col-7 offset-5">
-  <label class="checklabel">
-    <input type="checkbox" data-callback="volumeRendering.setEnableRequestImages" />
-    <i class="material-icons"></i>
-    <span>Request new images</span>
-  </label>
-</div>
-
-<div class="row">
-  <div class="col-5">
-    Resolution
-  </div>
-  <div class="col-7">
-    <div data-callback="volumeRendering.setResolution">
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-transferFunction"
+         data-toggle="collapse" data-target="#collapseVolume-transferFunction" aria-expanded="false"
+         aria-controls="collapseVolume-transferFunction" type="button">
+      <i class="material-icons">show_chart</i>
+      <span>Transfer function</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-transferFunction"
+         aria-labelledby="headingVolume-transferFunction" data-parent="#volumeRenderingTab-accordion">
+      <div class="row">
+        <svg id="volumeRendering.tfGraph" width="420" height="150"></svg>
+      </div>
+      <div class="row">
+        <div class="col-2">
+          <a id="volumeRendering.tfColorLock" class="btn glass block" title="Lock Color">
+            <i class="material-icons">lock</i>
+          </a>
+        </div>
+        <div class="col-3">
+          <input type="text" class="form-control color-input" id="volumeRendering.tfColorPicker" style="color: black;" value="#FF0000">
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-5">
+          <button id="volumeRendering.tfExport" class="waves-effect waves-light block btn glass text">Export</button>
+        </div>
+        <div class="col-7">
+          <input type="text" id="volumeRendering.tfExportLocation" placeholder="Filename" class="text-input text">
+        </div>
+      </div>
+      <div class="row">
+        <div class="col-5">
+          <button id="volumeRendering.tfImport" class="waves-effect waves-light block btn glass text">Import</button>
+        </div>
+        <div class="col-7">
+          <select id="volumeRendering.tfImportSelect">
+            <option value="-1">none</option>
+          </select>
+        </div>
+      </div>
     </div>
   </div>
-</div>
 
-<div class="row">
-  <div class="col-5">
-    Sampling rate
-  </div>
-  <div class="col-7">
-    <div data-callback="volumeRendering.setSamplingRate">
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-display"
+         data-toggle="collapse" data-target="#collapseVolume-display" aria-expanded="false"
+         aria-controls="collapseVolume-display" type="button">
+      <i class="material-icons">image</i>
+      <span>Display</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-display"
+         aria-labelledby="headingVolume-display" data-parent="#volumeRenderingTab-accordion">
+      <div class="row">
+        <div class="col-5">
+          Display method
+        </div>
+        <div class="col-7">
+          <label class="radiolabel">
+            <input name="display_method" type="radio" data-callback="volumeRendering.setDisplayMode0" checked />
+            <span>Mesh</span>
+          </label>
+        </div>
+        <div class="col-7 offset-5">
+          <label class="radiolabel">
+            <input name="display_method" type="radio" data-callback="volumeRendering.setDisplayMode1" />
+            <span>Points</span>
+          </label>
+        </div>
+      </div>
     </div>
   </div>
-</div>
 
-<div class="row">
-  <div class="col-5">
-    Sun strength
-  </div>
-  <div class="col-7">
-    <div data-callback="volumeRendering.setSunStrength">
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-depth"
+         data-toggle="collapse" data-target="#collapseVolume-depth" aria-expanded="false"
+         aria-controls="collapseVolume-depth" type="button">
+      <i class="material-icons">blur_on</i>
+      <span>Depth</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-depth"
+         aria-labelledby="headingVolume-depth" data-parent="#volumeRenderingTab-accordion">
+      <div class="col-7 offset-5">
+        <label class="checklabel">
+          <input type="checkbox" data-callback="volumeRendering.setEnableDepthData" />
+          <i class="material-icons"></i>
+          <span>Use depth data</span>
+        </label>
+      </div>
+
+      <div class="col-7 offset-5">
+        <label class="checklabel">
+          <input type="checkbox" data-callback="volumeRendering.setEnableDrawDepth" />
+          <i class="material-icons"></i>
+          <span>Draw depth data</span>
+        </label>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Depth source
+        </div>
+        <div class="col-7">
+          <label class="radiolabel">
+            <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode0" checked />
+            <span>None</span>
+          </label>
+        </div>
+        <div class="col-7 offset-5">
+          <label class="radiolabel">
+            <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode1" />
+            <span>Isosurface</span>
+          </label>
+        </div>
+        <div class="col-7 offset-5">
+          <label class="radiolabel">
+            <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode2" />
+            <span>First hit</span>
+          </label>
+        </div>
+        <div class="col-7 offset-5">
+          <label class="radiolabel">
+            <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode3" />
+            <span>Last hit</span>
+          </label>
+        </div>
+        <div class="col-7 offset-5">
+          <label class="radiolabel">
+            <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode4" />
+            <span>Opacity threshold</span>
+          </label>
+        </div>
+        <div class="col-7 offset-5">
+          <label class="radiolabel">
+            <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode5" />
+            <span>Multiple opacity thresholds</span>
+          </label>
+        </div>
+      </div>
     </div>
   </div>
-</div>
 
-<div class="row">
-  <div class="col-5">
-    Density scale
-  </div>
-  <div class="col-7">
-    <div data-callback="volumeRendering.setDensityScale">
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-denoising"
+         data-toggle="collapse" data-target="#collapseVolume-denoising" aria-expanded="false"
+         aria-controls="collapseVolume-denoising" type="button">
+      <i class="material-icons">gradient</i>
+      <span>Denoising</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-denoising"
+         aria-labelledby="headingVolume-denoising" data-parent="#volumeRenderingTab-accordion">
+      <div class="col-7 offset-5">
+        <label class="checklabel">
+          <input type="checkbox" data-callback="volumeRendering.setEnableDenoiseColor" />
+          <i class="material-icons"></i>
+          <span>Denoise color image</span>
+        </label>
+      </div>
+
+      <div class="col-7 offset-5">
+        <label class="checklabel">
+          <input type="checkbox" data-callback="volumeRendering.setEnableDenoiseDepth" />
+          <i class="material-icons"></i>
+          <span>Denoise depth image</span>
+        </label>
+      </div>
     </div>
   </div>
-</div>
 
-<div class="strike">
-  <span>Display</span>
-</div>
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-latencyCompensation"
+         data-toggle="collapse" data-target="#collapseVolume-latencyCompensation" aria-expanded="false"
+         aria-controls="collapseVolume-latencyCompensation" type="button">
+      <i class="material-icons">timer</i>
+      <span>Latency compensation</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-latencyCompensation"
+         aria-labelledby="headingVolume-latencyCompensation" data-parent="#volumeRenderingTab-accordion">
+      <div class="col-7 offset-5">
+        <label class="checklabel">
+          <input type="checkbox" data-callback="volumeRendering.setEnablePredictiveRendering" />
+          <i class="material-icons"></i>
+          <span>Predictive Rendering</span>
+        </label>
+      </div>
 
-<div class="row">
-  <div class="col-5">
-    Display method
+      <div class="col-7 offset-5">
+        <label class="checklabel">
+          <input type="checkbox" data-callback="volumeRendering.setEnableReuseImages" />
+          <i class="material-icons"></i>
+          <span>Reuse images</span>
+        </label>
+      </div>
+    </div>
   </div>
-  <div class="col-7">
-    <label class="radiolabel">
-      <input name="display_method" type="radio" data-callback="volumeRendering.setDisplayMode0" checked />
-      <span>Mesh</span>
-    </label>
-  </div>
-  <div class="col-7 offset-5">
-    <label class="radiolabel">
-      <input name="display_method" type="radio" data-callback="volumeRendering.setDisplayMode1" />
-      <span>Points</span>
-    </label>
-  </div>
-</div>
-
-<div class="strike">
-  <span>Depth</span>
-</div>
-
-<div class="col-7 offset-5">
-  <label class="checklabel">
-    <input type="checkbox" data-callback="volumeRendering.setEnableDepthData" />
-    <i class="material-icons"></i>
-    <span>Use depth data</span>
-  </label>
-</div>
-
-<div class="col-7 offset-5">
-  <label class="checklabel">
-    <input type="checkbox" data-callback="volumeRendering.setEnableDrawDepth" />
-    <i class="material-icons"></i>
-    <span>Draw depth data</span>
-  </label>
-</div>
-
-<div class="row">
-  <div class="col-5">
-    Depth source
-  </div>
-  <div class="col-7">
-    <label class="radiolabel">
-      <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode0" checked />
-      <span>None</span>
-    </label>
-  </div>
-  <div class="col-7 offset-5">
-    <label class="radiolabel">
-      <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode1" />
-      <span>Isosurface</span>
-    </label>
-  </div>
-  <div class="col-7 offset-5">
-    <label class="radiolabel">
-      <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode2" />
-      <span>First hit</span>
-    </label>
-  </div>
-  <div class="col-7 offset-5">
-    <label class="radiolabel">
-      <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode3" />
-      <span>Last hit</span>
-    </label>
-  </div>
-  <div class="col-7 offset-5">
-    <label class="radiolabel">
-      <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode4" />
-      <span>Opacity threshold</span>
-    </label>
-  </div>
-  <div class="col-7 offset-5">
-    <label class="radiolabel">
-      <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode5" />
-      <span>Multiple opacity thresholds</span>
-    </label>
-  </div>
-</div>
-
-<div class="strike">
-  <span>Denoising</span>
-</div>
-
-<div class="col-7 offset-5">
-  <label class="checklabel">
-    <input type="checkbox" data-callback="volumeRendering.setEnableDenoiseColor" />
-    <i class="material-icons"></i>
-    <span>Denoise color image</span>
-  </label>
-</div>
-
-<div class="col-7 offset-5">
-  <label class="checklabel">
-    <input type="checkbox" data-callback="volumeRendering.setEnableDenoiseDepth" />
-    <i class="material-icons"></i>
-    <span>Denoise depth image</span>
-  </label>
-</div>
-
-<div class="strike">
-  <span>Latency Compensation</span>
-</div>
-
-<div class="col-7 offset-5">
-  <label class="checklabel">
-    <input type="checkbox" data-callback="volumeRendering.setEnablePredictiveRendering" />
-    <i class="material-icons"></i>
-    <span>Predictive Rendering</span>
-  </label>
-</div>
-
-<div class="col-7 offset-5">
-  <label class="checklabel">
-    <input type="checkbox" data-callback="volumeRendering.setEnableReuseImages" />
-    <i class="material-icons"></i>
-    <span>Reuse images</span>
-  </label>
-</div>
-
-<div class="strike">
-  <span>Transfer Function</span>
-</div>
-
-<div id="tf-editor-container">
 </div>

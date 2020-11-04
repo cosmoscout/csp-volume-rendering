@@ -14,6 +14,7 @@
          * @inheritDoc
          */
         init() {
+            CosmoScout.gui.initInputs();
             CosmoScout.gui.initSlider("volumeRendering.setAnimationSpeed", 10, 1000, 10, [100]);
             CosmoScout.gui.initSlider("volumeRendering.setResolution", 32, 2048, 32, [256]);
             CosmoScout.gui.initSliderRange("volumeRendering.setSamplingRate", { "min": 0.001, "33%": 0.01, "66%": 0.1, "max": 1 }, 0.001, [0.005]);
@@ -24,56 +25,15 @@
             var timestepSlider = document.querySelector(`[data-callback="volumeRendering.setTimestep"]`);
             timestepSlider.dataset.event = "update";
 
-            const html = `
-                <div>
-                    <div>
-                        <svg id="tf-graph" width="420" height="150"></svg>
-                    </div>
-                    <div class="row">
-                        <div class="col-2">
-                            <a id="color-lock" class="btn glass block" title="Lock Color">
-                                <i class="material-icons">lock</i>
-                            </a>
-                        </div>
-                        <div class="col-2">
-                            <input type="text" class="form-control color-input" id="tf-editor-color" style="color: black;" value="#FF0000">
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-4">
-                            <button id="export" class="waves-effect waves-light block btn glass text">Export</button>
-                        </div>
-                        <div class="col-8">
-                            <input type="text" id="export-location" placeholder="Filename" class="text-input text">
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col-4">
-                            <button id="import" class="waves-effect waves-light block btn glass text">Import</button>
-                        </div>
-                        <div class="col-8">
-                            <select id="import-box">
-                                <option value="-1">none</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            `;
-            CosmoScout.gui.registerHtml("tf-editor", html, "tf-editor-container");
-
             this.createElements();
-
-            setTimeout(() => {
-                CosmoScout.gui.initInputs();
-                this.ready();
-            }, 500);
+            this.ready();
         }
 
         play() {
-            const playButton = document.getElementById("volumeRendering.play");
+            const playButtonIcon = $("#volumeRendering\\.play i");
             if (this.playing) {
                 clearInterval(this.playHandle);
-                playButton.getElementsByTagName("i")[0].innerHTML = "play_arrow";
+                playButtonIcon.html("play_arrow");
                 this.playing = false;
             }
             else {
@@ -96,7 +56,7 @@
                     const speedSlider = document.querySelector(`[data-callback="volumeRendering.setAnimationSpeed"]`).noUiSlider;
                     this.time += parseInt(speedSlider.get()) / 10;
                 }, 100);
-                playButton.getElementsByTagName("i")[0].innerHTML = "pause";
+                playButtonIcon.html("pause");
                 this.playing = true;
             }
         }
@@ -126,14 +86,12 @@
 
         ready() {
             // Access the svg dom element
-            this.svg = d3.select("#tf-graph");
+            this.svg = d3.select("#volumeRendering\\.tfGraph");
             this._width = +this.svg.attr("width") - this.margin.left - this.margin.right;
             this._height = +this.svg.attr("height") - this.margin.top - this.margin.bottom - 15;
-            if (this.id != "tf-1") {
-                this.initialized = true;
-                this.initializeElements();
-                this.drawChart();
-            }
+            this.initialized = true;
+            this.initializeElements();
+            this.drawChart();
         }
 
         createElements() {
@@ -187,7 +145,7 @@
                     'locked': true
                 });
             }
-            this.selected = this.controlPoints[0];
+            this.selected = this.controlPoints[1];
             this.area
                 .x(function (d) {
                     return me.xScale(d.x);
@@ -198,23 +156,22 @@
                 .y1(this._height);
 
             // Access the color selector
-            this.colorPicker = document.querySelector("#tf-editor-color");
-            this.colorPicker.picker.set(255, 0, 0, 255);
+            this.colorPicker = $("#volumeRendering\\.tfColorPicker").get(0);
             this.colorPicker.picker.on("change", () => {
                 me.selected.color = this.colorPicker.value;
                 me.redraw();
             });
             // Export button listener
-            $("#export").on("click", function () {
-                CosmoScout.callbacks.volumeRendering.exportTransferFunction(document.querySelector("#export-location").value, me.getJsonString());
+            $("#volumeRendering\\.tfExport").on("click", function () {
+                CosmoScout.callbacks.volumeRendering.exportTransferFunction($("#volumeRendering\\.tfExportLocation").val(), me.getJsonString());
             });
             // Import button listener
-            $("#import").on("click", function () {
-                CosmoScout.callbacks.volumeRendering.importTransferFunction($(document.querySelector("#import-box")).val());
+            $("#volumeRendering\\.tfImport").on("click", function () {
+                CosmoScout.callbacks.volumeRendering.importTransferFunction($("#volumeRendering\\.tfImportSelect").val());
             });
 
             // Lock button listener
-            $("#color-lock").on("click", function () {
+            $("#volumeRendering\\.tfColorLock").on("click", function () {
                 if (me.controlPoints.some(point => point.locked && point !== me.selected)) {
                     me.selected.locked = !me.selected.locked;
                     me.redraw();
@@ -224,7 +181,7 @@
         }
 
         updateLockButtonState() {
-            var colorLockButton = $("#color-lock i");
+            var colorLockButton = $("#volumeRendering\\.tfColorLock i");
             if (this.selected.locked) {
                 $(colorLockButton).html("lock");
             }
@@ -244,7 +201,7 @@
 
             // Gradient definitions
             g.append("defs").append("linearGradient")
-                .attr("id", "tfGradient")
+                .attr("id", "volumeRendering.tfGradient")
                 //.attr("gradientUnits", "userSpaceOnUse")
                 .attr("gradientUnits", "objectBoundingBox")
                 .attr("spreadMethod", "pad")
@@ -257,7 +214,7 @@
             g.append("path")
                 .datum(me.controlPoints)
                 .attr("class", "line")
-                .attr("fill", "url(#tfGradient" + ")")
+                .attr("fill", "url(#volumeRendering.tfGradient)")
                 .attr("stroke", "black");
 
             g.append("path")
@@ -323,7 +280,7 @@
 
         // update the axis with the new data input
         updateAxis() {
-            let svg = d3.select($('svg')).select("g");
+            let svg = d3.select("svg").select("g");
             var xTicks = this.xScale.ticks(this.numberTicks);
             xTicks[xTicks.length - 1] = this.xScale.domain()[1];
             svg.selectAll(".axis.axis--x").call(d3.axisBottom(this.xScale).tickValues(xTicks));
@@ -369,9 +326,10 @@
                 }
             });
 
-            CosmoScout.callbacks.volumeRendering.setTransferFunction(this.getJsonString());
+            if (CosmoScout.callbacks.volumeRendering != null && CosmoScout.callbacks.volumeRendering.setTransferFunction != null)
+                CosmoScout.callbacks.volumeRendering.setTransferFunction(this.getJsonString());
 
-            var svg = d3.select("#tf-graph").select("g");
+            var svg = d3.select("#volumeRendering\\.tfGraph").select("g");
             svg.selectAll("path.line").datum(me.controlPoints).attr("d", me.area);
 
             // Add circle to connect and interact with the control points
@@ -475,7 +433,7 @@
             if (unit == "")
                 unit = "-";
             var me = this;
-            var svg = d3.select($('svg')).select("g");
+            var svg = d3.select("svg").select("g");
             svg.select(".label").text("Unit: " + unit);
         }
 
@@ -666,10 +624,10 @@
             availableFiles.forEach((file) => {
                 options += `<option>${file}</option>`;
             });
-            const selector = "#import-box";
-            $(selector).html(options);
-            $(selector).selectpicker();
-            $(selector).selectpicker("refresh");
+            const importSelect = $("#volumeRendering\\.tfImportSelect");
+            importSelect.html(options);
+            importSelect.selectpicker();
+            importSelect.selectpicker("refresh");
         }
     }
 
