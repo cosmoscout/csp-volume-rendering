@@ -221,10 +221,7 @@
                 .datum(me.controlPoints)
                 .attr("class", "line")
                 .attr("fill", "none")
-                .attr("stroke", "black")
-                .call(function () {
-                    me.redraw();
-                });
+                .attr("stroke", "black");
 
             // Mouse interaction handler
             g.append("rect")
