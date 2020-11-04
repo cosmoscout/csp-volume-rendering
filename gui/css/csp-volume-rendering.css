@@ -1,0 +1,9 @@
+#volumeRendering\.tfGraph circle {
+    cursor: grab;
+    stroke: black;
+    stroke-width: 1.5px;
+}
+
+#volumeRendering\.tfGraph .selected {
+    stroke: #ff7f0e;
+}

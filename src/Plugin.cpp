@@ -427,6 +427,7 @@ void Plugin::connectSettings() {
 
 void Plugin::initUI() {
   // Add the volume rendering user interface components to the CosmoScout user interface.
+  mGuiManager->addCssToGui("css/csp-volume-rendering.css");
   mGuiManager->addPluginTabToSideBarFromHTML(
       "Volume Rendering", "blur_circular", "../share/resources/gui/volume_rendering_tab.html");
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
