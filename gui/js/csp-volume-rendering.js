@@ -63,7 +63,7 @@
 
         setTimesteps(timestepsJson) {
             this.timesteps = JSON.parse(timestepsJson);
-            this.timesteps.sort();
+            this.timesteps.sort((a, b) => a - b);
             var min = this.timesteps[0];
             var max = this.timesteps[this.timesteps.length - 1];
             var range = {};
@@ -81,7 +81,7 @@
                     range[percent][1] = this.timesteps[i + 1] - t;
                 }
             });
-            CosmoScout.gui.initSliderRange("volumeRendering.setTimestep", range, this.timesteps[0], [100]);
+            CosmoScout.gui.initSliderRange("volumeRendering.setTimestep", range, 0, [this.timesteps[0]]);
         }
 
         ready() {
