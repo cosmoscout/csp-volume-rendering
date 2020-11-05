@@ -554,7 +554,7 @@ void Plugin::initUI() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool csp::volumerendering::Plugin::tryRequestFrame() {
-  if (!(mNextFrame == mRenderingFrame) || mParametersDirty) {
+  if ((!(mNextFrame == mRenderingFrame) || mParametersDirty) && mBillboard->pVisible.get()) {
     cs::utils::FrameTimings::ScopedTimer timer("Request frame");
 
     mRenderingFrame = mNextFrame;
