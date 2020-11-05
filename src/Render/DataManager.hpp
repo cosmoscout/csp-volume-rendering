@@ -49,6 +49,8 @@ class DataManager {
   cs::utils::Property<std::vector<int>>         pTimesteps;
   cs::utils::Property<std::vector<std::string>> pScalars;
 
+  bool isReady();
+
   void setTimestep(int timestep);
   void cacheTimestep(int timestep);
   bool isDirty();

@@ -78,15 +78,21 @@ class Plugin : public cs::core::PluginBase {
     bool operator==(const Frame& other);
   };
 
-  enum class RenderState { eWaitForData, eIdle, eRequestImage, eRenderingImage };
+  enum class RenderState { eWaitForData, eIdle, ePaused, eRenderingImage };
 
   void initUI();
   void onLoad();
   void connectSettings();
 
-  void requestFrame(glm::mat4 cameraTransform);
-  void tryReuseFrame(glm::mat4 cameraTransform);
+  bool tryRequestFrame();
+
+  glm::mat4 getCurrentCameraTransform();
+  glm::mat4 predictCameraTransform(glm::mat4 currentTransform);
+
+  void receiveFrame();
   void displayFrame(Frame& frame);
+  void displayFrame(Frame& frame, Settings::DisplayMode displayMode);
+  void tryReuseFrame(glm::mat4 cameraTransform);
 
   void exportTransferFunction(std::string const& path, std::string const& jsonTransferFunction);
   void importTransferFunction(std::string const& path);

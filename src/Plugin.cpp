@@ -204,46 +204,43 @@ void Plugin::deInit() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Plugin::update() {
-  glm::mat4 currentCameraTransform = mBillboard->getRelativeTransform(
-      mTimeControl->pSimulationTime.get(), mSolarSystem->getObserver());
-  float     scale = (float)mBillboard->getRelativeScale(mSolarSystem->getObserver());
-  glm::vec3 r     = cs::core::SolarSystem::getRadii(mBillboard->getCenterName());
-  currentCameraTransform =
-      glm::scale(currentCameraTransform, glm::vec3(1.f / scale, 1.f / scale, 1.f / scale));
-  currentCameraTransform[3] *= glm::vec4(1 / r[0], 1 / r[1], 1 / r[2], 1);
+  mNextFrame.mCameraTransform = getCurrentCameraTransform();
 
-  if (mRenderState == RenderState::eRenderingImage) {
-    if (mFutureFrameData.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-      Renderer::RenderedImage renderedImage = mFutureFrameData.get();
-      mRenderingFrame.mColorImage           = renderedImage.mColorData;
-      mRenderingFrame.mDepthImage           = renderedImage.mDepthData;
-      mRenderingFrame.mModelViewProjection  = renderedImage.mMVP;
-      mRenderedFrames.push_back(mRenderingFrame);
-
-      displayFrame(mRenderingFrame);
-
-      mRenderState                          = RenderState::eRequestImage;
-      mFrameIntervals[mFrameIntervalsIndex] = mLastFrameInterval;
-      if (++mFrameIntervalsIndex >= mFrameIntervalsLength) {
-        mFrameIntervalsIndex = 0;
+  switch (mRenderState) {
+  case RenderState::eWaitForData:
+    if (mDataManager->isReady()) {
+      mRenderState = RenderState::eIdle;
+    }
+    break;
+  case RenderState::ePaused:
+    if (mPluginSettings.mRequestImages.get()) {
+      mRenderState = RenderState::eIdle;
+    }
+    break;
+  case RenderState::eIdle:
+    if (!mPluginSettings.mRequestImages.get()) {
+      mRenderState = RenderState::ePaused;
+    } else if (tryRequestFrame()) {
+      mRenderState = RenderState::eRenderingImage;
+    }
+    break;
+  case RenderState::eRenderingImage:
+    if (!mPluginSettings.mRequestImages.get()) {
+      mRenderState = RenderState::ePaused;
+    } else if (mFutureFrameData.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+      receiveFrame();
+      if (!tryRequestFrame()) {
+        mRenderState = RenderState::eIdle;
       }
     }
-  }
-  if (mRenderState == RenderState::eRequestImage && mPluginSettings.mRequestImages.get()) {
-    requestFrame(currentCameraTransform);
+    break;
   }
 
   if (mPluginSettings.mReuseImages.get() && mRenderedFrames.size() > 0) {
-    tryReuseFrame(currentCameraTransform);
+    tryReuseFrame(mNextFrame.mCameraTransform);
   }
 
   mLastFrameInterval++;
-  mCameraTransforms[mCameraTransformsIndex] =
-      currentCameraTransform * glm::inverse(mLastCameraTransform);
-  mLastCameraTransform = currentCameraTransform;
-  if (++mCameraTransformsIndex >= mCameraTransformsLength) {
-    mCameraTransformsIndex = 0;
-  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -268,9 +265,6 @@ void Plugin::onLoad() {
     if (scalars.size() > 0) {
       mGuiManager->getGui()->callJavascript(
           "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", scalars[0]);
-      if (mRenderState == RenderState::eWaitForData) {
-        mRenderState = RenderState::eRequestImage;
-      }
     }
   });
   mDataManager->pTimesteps.connectAndTouch([this](std::vector<int> timesteps) {
@@ -418,7 +412,7 @@ void Plugin::connectSettings() {
       mGuiManager->setRadioChecked("stars.setDisplayMode1");
     }
     if (mDisplayedFrame.has_value()) {
-      displayFrame(*mDisplayedFrame);
+      displayFrame(*mDisplayedFrame, displayMode);
     }
   });
 }
@@ -559,43 +553,82 @@ void Plugin::initUI() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Plugin::requestFrame(glm::mat4 cameraTransform) {
-  cs::utils::FrameTimings::ScopedTimer timer("Request frame");
-
-  if (mPluginSettings.mPredictiveRendering.get()) {
-    glm::mat4 predictedCameraTransform = cameraTransform;
-    int       meanFrameInterval =
-        std::accumulate(mFrameIntervals.begin(), mFrameIntervals.end(), 0) / mFrameIntervalsLength;
-    glm::vec3 predictedTranslation(0);
-    glm::quat predictedRotation(1, 0, 0, 0);
-
-    for (int i = 0; i < mCameraTransformsLength; i++) {
-      predictedTranslation +=
-          glm::vec3(mCameraTransforms[i][3].xyz) / (float)mCameraTransformsLength;
-      predictedRotation =
-          glm::slerp(predictedRotation, glm::quat_cast(mCameraTransforms[i]), 1.f / (i + 1));
-    }
-
-    for (int i = 0; i < meanFrameInterval; i++) {
-      predictedCameraTransform = glm::mat4_cast(predictedRotation) * predictedCameraTransform;
-      predictedCameraTransform = glm::translate(predictedCameraTransform, predictedTranslation);
-    }
-
-    mNextFrame.mCameraTransform = predictedCameraTransform;
-  } else {
-    mNextFrame.mCameraTransform = cameraTransform;
-  }
-
+bool csp::volumerendering::Plugin::tryRequestFrame() {
   if (!(mNextFrame == mRenderingFrame) || mParametersDirty) {
-    mRenderingFrame = mNextFrame;
+    cs::utils::FrameTimings::ScopedTimer timer("Request frame");
 
-    glm::vec4 dir = glm::vec4(mSolarSystem->getSunDirection(mBillboard->getWorldPosition()), 1);
-    dir           = dir * glm::inverse(cameraTransform);
+    mRenderingFrame = mNextFrame;
+    glm::vec4 dir   = glm::vec4(mSolarSystem->getSunDirection(mBillboard->getWorldPosition()), 1);
+    dir             = dir * glm::inverse(mRenderingFrame.mCameraTransform);
     mRenderer->setSunDirection(dir);
-    mFutureFrameData   = mRenderer->getFrame(cameraTransform);
-    mRenderState       = RenderState::eRenderingImage;
+    mFutureFrameData   = mRenderer->getFrame(mRenderingFrame.mCameraTransform);
     mLastFrameInterval = 0;
     mParametersDirty   = false;
+    return true;
+  }
+  return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+glm::mat4 csp::volumerendering::Plugin::getCurrentCameraTransform() {
+  glm::mat4 currentCameraTransform = mBillboard->getRelativeTransform(
+      mTimeControl->pSimulationTime.get(), mSolarSystem->getObserver());
+  float     scale = (float)mBillboard->getRelativeScale(mSolarSystem->getObserver());
+  glm::vec3 r     = cs::core::SolarSystem::getRadii(mBillboard->getCenterName());
+  currentCameraTransform =
+      glm::scale(currentCameraTransform, glm::vec3(1.f / scale, 1.f / scale, 1.f / scale));
+  currentCameraTransform[3] *= glm::vec4(1 / r[0], 1 / r[1], 1 / r[2], 1);
+
+  mCameraTransforms[mCameraTransformsIndex] =
+      currentCameraTransform * glm::inverse(mLastCameraTransform);
+  mLastCameraTransform = currentCameraTransform;
+  if (++mCameraTransformsIndex >= mCameraTransformsLength) {
+    mCameraTransformsIndex = 0;
+  }
+
+  if (mPluginSettings.mPredictiveRendering.get()) {
+    currentCameraTransform = predictCameraTransform(currentCameraTransform);
+  }
+  return currentCameraTransform;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+glm::mat4 csp::volumerendering::Plugin::predictCameraTransform(glm::mat4 currentTransform) {
+  glm::mat4 predictedCameraTransform = currentTransform;
+  int       meanFrameInterval =
+      std::accumulate(mFrameIntervals.begin(), mFrameIntervals.end(), 0) / mFrameIntervalsLength;
+  glm::vec3 predictedTranslation(0);
+  glm::quat predictedRotation(1, 0, 0, 0);
+
+  for (int i = 0; i < mCameraTransformsLength; i++) {
+    predictedTranslation += glm::vec3(mCameraTransforms[i][3].xyz) / (float)mCameraTransformsLength;
+    predictedRotation =
+        glm::slerp(predictedRotation, glm::quat_cast(mCameraTransforms[i]), 1.f / (i + 1));
+  }
+
+  for (int i = 0; i < meanFrameInterval; i++) {
+    predictedCameraTransform = glm::mat4_cast(predictedRotation) * predictedCameraTransform;
+    predictedCameraTransform = glm::translate(predictedCameraTransform, predictedTranslation);
+  }
+  return predictedCameraTransform;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void csp::volumerendering::Plugin::receiveFrame() {
+  Renderer::RenderedImage renderedImage = mFutureFrameData.get();
+  mRenderingFrame.mColorImage           = renderedImage.mColorData;
+  mRenderingFrame.mDepthImage           = renderedImage.mDepthData;
+  mRenderingFrame.mModelViewProjection  = renderedImage.mMVP;
+  mRenderedFrames.push_back(mRenderingFrame);
+
+  displayFrame(mRenderingFrame);
+
+  mFrameIntervals[mFrameIntervalsIndex] = mLastFrameInterval;
+  if (++mFrameIntervalsIndex >= mFrameIntervalsLength) {
+    mFrameIntervalsIndex = 0;
   }
 }
 
@@ -629,9 +662,15 @@ void Plugin::tryReuseFrame(glm::mat4 cameraTransform) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Plugin::displayFrame(Frame& frame) {
+  displayFrame(frame, mPluginSettings.mDisplayMode.get());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void csp::volumerendering::Plugin::displayFrame(Frame& frame, Settings::DisplayMode displayMode) {
   cs::utils::FrameTimings::ScopedTimer timer("Display volume frame");
 
-  switch (mPluginSettings.mDisplayMode.get()) {
+  switch (displayMode) {
   case Settings::DisplayMode::eMesh:
     mBillboard->setTexture(frame.mColorImage, frame.mResolution, frame.mResolution);
     mBillboard->setDepthTexture(frame.mDepthImage, frame.mResolution, frame.mResolution);
