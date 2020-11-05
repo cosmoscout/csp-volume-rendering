@@ -124,6 +124,7 @@ class Plugin : public cs::core::PluginBase {
 
   RenderState mRenderState = RenderState::eWaitForData;
 
+  bool mFrameInvalid;
   bool mParametersDirty;
 
   Frame                mNextFrame;

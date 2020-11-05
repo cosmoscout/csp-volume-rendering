@@ -66,6 +66,14 @@ void OSPRayRenderer::preloadData(DataManager::State state) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void OSPRayRenderer::cancelRendering() {
+  if (mRenderFuture.has_value()) {
+    mRenderFuture->cancel();
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const OSPRayRenderer::Volume& OSPRayRenderer::getVolume(DataManager::State state) {
   auto cachedVolume = mCachedVolumes.find(state);
   if (cachedVolume == mCachedVolumes.end()) {
@@ -325,8 +333,9 @@ ospray::cpp::FrameBuffer OSPRayRenderer::renderFrame(
   framebuffer.clear();
   framebuffer.commit();
 
-  ospray::cpp::Future renderFuture = framebuffer.renderFrame(renderer, camera, world);
-  renderFuture.wait();
+  mRenderFuture = framebuffer.renderFrame(renderer, camera, world);
+  mRenderFuture->wait();
+  mRenderFuture.reset();
   return framebuffer;
 }
 

@@ -56,6 +56,7 @@ class Renderer {
 
   virtual std::future<Renderer::RenderedImage> getFrame(glm::mat4 cameraTransform)   = 0;
   virtual void                                 preloadData(DataManager::State state) = 0;
+  virtual void                                 cancelRendering()                     = 0;
 
  protected:
   struct Parameters {

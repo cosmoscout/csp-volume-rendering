@@ -226,6 +226,8 @@ void Plugin::update() {
     break;
   case RenderState::eRenderingImage:
     if (!mPluginSettings.mRequestImages.get()) {
+      mFrameInvalid = true;
+      mRenderer->cancelRendering();
       mRenderState = RenderState::ePaused;
     } else if (mFutureFrameData.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
       receiveFrame();
@@ -431,6 +433,12 @@ void Plugin::initUI() {
       "If disabled no new images will be rendered.",
       std::function([this](bool enable) { mPluginSettings.mRequestImages = enable; }));
 
+  mGuiManager->getGui()->registerCallback("volumeRendering.cancel",
+      "If an image is currently rendered, cancel it.", std::function([this]() {
+        mFrameInvalid = true;
+        mRenderer->cancelRendering();
+      }));
+
   mGuiManager->getGui()->registerCallback("volumeRendering.setResolution",
       "Sets the resolution of the rendered volume images.", std::function([this](double value) {
         mPluginSettings.mResolution = (int)std::lround(value);
@@ -554,7 +562,8 @@ void Plugin::initUI() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool csp::volumerendering::Plugin::tryRequestFrame() {
-  if ((!(mNextFrame == mRenderingFrame) || mParametersDirty) && mBillboard->pVisible.get()) {
+  if ((!(mNextFrame == mRenderingFrame) || mParametersDirty || mFrameInvalid) &&
+      mBillboard->pVisible.get()) {
     cs::utils::FrameTimings::ScopedTimer timer("Request frame");
 
     mRenderingFrame = mNextFrame;
@@ -564,6 +573,7 @@ bool csp::volumerendering::Plugin::tryRequestFrame() {
     mFutureFrameData   = mRenderer->getFrame(mRenderingFrame.mCameraTransform);
     mLastFrameInterval = 0;
     mParametersDirty   = false;
+    mFrameInvalid      = false;
     return true;
   }
   return false;
@@ -618,13 +628,15 @@ glm::mat4 csp::volumerendering::Plugin::predictCameraTransform(glm::mat4 current
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void csp::volumerendering::Plugin::receiveFrame() {
-  Renderer::RenderedImage renderedImage = mFutureFrameData.get();
-  mRenderingFrame.mColorImage           = renderedImage.mColorData;
-  mRenderingFrame.mDepthImage           = renderedImage.mDepthData;
-  mRenderingFrame.mModelViewProjection  = renderedImage.mMVP;
-  mRenderedFrames.push_back(mRenderingFrame);
+  if (!mFrameInvalid) {
+    Renderer::RenderedImage renderedImage = mFutureFrameData.get();
+    mRenderingFrame.mColorImage           = renderedImage.mColorData;
+    mRenderingFrame.mDepthImage           = renderedImage.mDepthData;
+    mRenderingFrame.mModelViewProjection  = renderedImage.mMVP;
+    mRenderedFrames.push_back(mRenderingFrame);
 
-  displayFrame(mRenderingFrame);
+    displayFrame(mRenderingFrame);
+  }
 
   mFrameIntervals[mFrameIntervalsIndex] = mLastFrameInterval;
   if (++mFrameIntervalsIndex >= mFrameIntervalsLength) {

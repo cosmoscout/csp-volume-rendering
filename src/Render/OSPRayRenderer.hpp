@@ -32,6 +32,7 @@ class OSPRayRenderer : public Renderer {
 
   std::future<Renderer::RenderedImage> getFrame(glm::mat4 cameraTransform) override;
   void                                 preloadData(DataManager::State state) override;
+  void                                 cancelRendering() override;
 
  private:
   struct Volume {
@@ -47,6 +48,8 @@ class OSPRayRenderer : public Renderer {
   };
 
   std::map<DataManager::State, std::shared_future<Volume>> mCachedVolumes;
+
+  std::optional<ospray::cpp::Future> mRenderFuture;
 
   const Volume&                 getVolume(DataManager::State state);
   Volume                        loadVolume(DataManager::State state);
