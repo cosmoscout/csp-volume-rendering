@@ -82,6 +82,7 @@ class Plugin : public cs::core::PluginBase {
 
   void initUI();
   void onLoad();
+  void registerUICallbacks();
   void connectSettings();
 
   bool tryRequestFrame();

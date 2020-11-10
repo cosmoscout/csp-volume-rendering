@@ -174,8 +174,9 @@ void Plugin::init() {
   mOnSaveConnection = mAllSettings->onSave().connect(
       [this]() { mAllSettings->mPlugins["csp-volume-rendering"] = mPluginSettings; });
 
-  initUI();
   onLoad();
+  registerUICallbacks();
+  initUI();
   connectSettings();
 
   // Init buffers for predictive rendering
@@ -258,23 +259,6 @@ void Plugin::onLoad() {
   mRenderer    = std::make_unique<OSPRayRenderer>(
       mDataManager, mPluginSettings.mVolumeStructure.get(), mPluginSettings.mVolumeShape.get());
 
-  // Connect to data manager properties
-  mDataManager->pScalars.connectAndTouch([this](std::vector<std::string> scalars) {
-    for (std::string scalar : scalars) {
-      mGuiManager->getGui()->callJavascript(
-          "CosmoScout.gui.addDropdownValue", "volumeRendering.setScalar", scalar, scalar, false);
-    }
-    if (scalars.size() > 0) {
-      mGuiManager->getGui()->callJavascript(
-          "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", scalars[0]);
-    }
-  });
-  mDataManager->pTimesteps.connectAndTouch([this](std::vector<int> timesteps) {
-    nlohmann::json timestepsJson(timesteps);
-    mGuiManager->getGui()->callJavascript(
-        "CosmoScout.volumeRendering.setTimesteps", timestepsJson.dump());
-  });
-
   // If the volume representations already exist, remove them from the solar system
   if (mBillboard) {
     mSolarSystem->unregisterAnchor(mBillboard);
@@ -312,122 +296,7 @@ void Plugin::onLoad() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Plugin::connectSettings() {
-  // Connect to global CosmoScout graphics settings
-  mAllSettings->mGraphics.pEnableLighting.connectAndTouch([this](bool enable) {
-    mRenderedFrames.clear();
-    mRenderer->setShading(enable);
-    mParametersDirty = true;
-  });
-  mAllSettings->mGraphics.pAmbientBrightness.connectAndTouch([this](float value) {
-    mRenderedFrames.clear();
-    mRenderer->setAmbientLight(value);
-    mParametersDirty = true;
-  });
-
-  // Connect to plugin settings
-  // Rendering settings
-  mPluginSettings.mRequestImages.connectAndTouch([this](bool enable) {
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableRequestImages", enable);
-  });
-  mPluginSettings.mResolution.connectAndTouch([this](int value) {
-    mRenderedFrames.clear();
-    mNextFrame.mResolution = value;
-    mRenderer->setResolution(value);
-    mParametersDirty = true;
-    mGuiManager->setSliderValue("volumeRendering.setResolution", value);
-  });
-  mPluginSettings.mSamplingRate.connectAndTouch([this](float value) {
-    mRenderedFrames.clear();
-    mRenderer->setSamplingRate(value);
-    mParametersDirty = true;
-    mGuiManager->setSliderValue("volumeRendering.setSamplingRate", value);
-  });
-  mPluginSettings.mSunStrength.connectAndTouch([this](float value) {
-    mRenderedFrames.clear();
-    mRenderer->setSunStrength(value);
-    mParametersDirty = true;
-    mGuiManager->setSliderValue("volumeRendering.setSunStrength", value);
-  });
-  mPluginSettings.mDensityScale.connectAndTouch([this](float value) {
-    mRenderedFrames.clear();
-    mRenderer->setDensityScale(value);
-    mParametersDirty = true;
-    mGuiManager->setSliderValue("volumeRendering.setDensityScale", value);
-  });
-  mPluginSettings.mDenoiseColor.connectAndTouch([this](bool enable) {
-    mRenderedFrames.clear();
-    mRenderer->setDenoiseColor(enable);
-    mParametersDirty = true;
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseColor", enable);
-  });
-  mPluginSettings.mDenoiseDepth.connectAndTouch([this](bool enable) {
-    mRenderedFrames.clear();
-    mRenderer->setDenoiseDepth(enable);
-    mParametersDirty = true;
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseDepth", enable);
-  });
-  mPluginSettings.mDepthMode.connectAndTouch([this](Renderer::DepthMode drawMode) {
-    mRenderedFrames.clear();
-    mRenderer->setDepthMode(drawMode);
-    mParametersDirty = true;
-    if (drawMode == Renderer::DepthMode::eNone) {
-      mGuiManager->setRadioChecked("stars.setDrawMode0");
-    } else if (drawMode == Renderer::DepthMode::eIsosurface) {
-      mGuiManager->setRadioChecked("stars.setDrawMode1");
-    } else if (drawMode == Renderer::DepthMode::eFirstHit) {
-      mGuiManager->setRadioChecked("stars.setDrawMode2");
-    } else if (drawMode == Renderer::DepthMode::eLastHit) {
-      mGuiManager->setRadioChecked("stars.setDrawMode3");
-    } else if (drawMode == Renderer::DepthMode::eThreshold) {
-      mGuiManager->setRadioChecked("stars.setDrawMode4");
-    } else if (drawMode == Renderer::DepthMode::eMultiThreshold) {
-      mGuiManager->setRadioChecked("stars.setDrawMode5");
-    }
-  });
-
-  // Display settings
-  mPluginSettings.mPredictiveRendering.connectAndTouch([this](bool enable) {
-    mGuiManager->setCheckboxValue("volumeRendering.setEnablePredictiveRendering", enable);
-  });
-  mPluginSettings.mReuseImages.connectAndTouch([this](bool enable) {
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableReuseImages", enable);
-  });
-  mPluginSettings.mDepthData.connectAndTouch([this](bool enable) {
-    mBillboard->setUseDepth(enable);
-    mPoints->setUseDepth(enable);
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableDepthData", enable);
-  });
-  mPluginSettings.mDrawDepth.connectAndTouch([this](bool enable) {
-    mBillboard->setDrawDepth(enable);
-    mPoints->setDrawDepth(enable);
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableDrawDepth", enable);
-  });
-  mPluginSettings.mDisplayMode.connectAndTouch([this](Settings::DisplayMode displayMode) {
-    if (displayMode == Settings::DisplayMode::eMesh) {
-      mBillboard->setEnabled(true);
-      mPoints->setEnabled(false);
-      mGuiManager->setRadioChecked("stars.setDisplayMode0");
-    } else if (displayMode == Settings::DisplayMode::ePoints) {
-      mBillboard->setEnabled(false);
-      mPoints->setEnabled(true);
-      mGuiManager->setRadioChecked("stars.setDisplayMode1");
-    }
-    if (mDisplayedFrame.has_value()) {
-      displayFrame(*mDisplayedFrame, displayMode);
-    }
-  });
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Plugin::initUI() {
-  // Add the volume rendering user interface components to the CosmoScout user interface.
-  mGuiManager->addCssToGui("css/csp-volume-rendering.css");
-  mGuiManager->addPluginTabToSideBarFromHTML(
-      "Volume Rendering", "blur_circular", "../share/resources/gui/volume_rendering_tab.html");
-  mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
-
+void csp::volumerendering::Plugin::registerUICallbacks() {
   // Rendering settings
   mGuiManager->getGui()->registerCallback("volumeRendering.setEnableRequestImages",
       "If disabled no new images will be rendered.",
@@ -555,6 +424,142 @@ void Plugin::initUI() {
       std::function([this](std::string name, std::string jsonTransferFunction) {
         exportTransferFunction(name, jsonTransferFunction);
       }));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Plugin::connectSettings() {
+  // Connect to data manager properties
+  mDataManager->pScalars.connectAndTouch([this](std::vector<std::string> scalars) {
+    for (std::string scalar : scalars) {
+      mGuiManager->getGui()->callJavascript(
+          "CosmoScout.gui.addDropdownValue", "volumeRendering.setScalar", scalar, scalar, false);
+    }
+    if (scalars.size() > 0) {
+      mGuiManager->getGui()->callJavascript(
+          "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", scalars[0]);
+    }
+  });
+  mDataManager->pTimesteps.connectAndTouch([this](std::vector<int> timesteps) {
+    nlohmann::json timestepsJson(timesteps);
+    mGuiManager->getGui()->callJavascript(
+        "CosmoScout.volumeRendering.setTimesteps", timestepsJson.dump());
+  });
+
+  // Connect to global CosmoScout graphics settings
+  mAllSettings->mGraphics.pEnableLighting.connectAndTouch([this](bool enable) {
+    mRenderedFrames.clear();
+    mRenderer->setShading(enable);
+    mParametersDirty = true;
+  });
+  mAllSettings->mGraphics.pAmbientBrightness.connectAndTouch([this](float value) {
+    mRenderedFrames.clear();
+    mRenderer->setAmbientLight(value);
+    mParametersDirty = true;
+  });
+
+  // Connect to plugin settings
+  // Rendering settings
+  mPluginSettings.mRequestImages.connectAndTouch([this](bool enable) {
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableRequestImages", enable);
+  });
+  mPluginSettings.mResolution.connectAndTouch([this](int value) {
+    mRenderedFrames.clear();
+    mNextFrame.mResolution = value;
+    mRenderer->setResolution(value);
+    mParametersDirty = true;
+    mGuiManager->setSliderValue("volumeRendering.setResolution", value);
+  });
+  mPluginSettings.mSamplingRate.connectAndTouch([this](float value) {
+    mRenderedFrames.clear();
+    mRenderer->setSamplingRate(value);
+    mParametersDirty = true;
+    mGuiManager->setSliderValue("volumeRendering.setSamplingRate", value);
+  });
+  mPluginSettings.mSunStrength.connectAndTouch([this](float value) {
+    mRenderedFrames.clear();
+    mRenderer->setSunStrength(value);
+    mParametersDirty = true;
+    mGuiManager->setSliderValue("volumeRendering.setSunStrength", value);
+  });
+  mPluginSettings.mDensityScale.connectAndTouch([this](float value) {
+    mRenderedFrames.clear();
+    mRenderer->setDensityScale(value);
+    mParametersDirty = true;
+    mGuiManager->setSliderValue("volumeRendering.setDensityScale", value);
+  });
+  mPluginSettings.mDenoiseColor.connectAndTouch([this](bool enable) {
+    mRenderedFrames.clear();
+    mRenderer->setDenoiseColor(enable);
+    mParametersDirty = true;
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseColor", enable);
+  });
+  mPluginSettings.mDenoiseDepth.connectAndTouch([this](bool enable) {
+    mRenderedFrames.clear();
+    mRenderer->setDenoiseDepth(enable);
+    mParametersDirty = true;
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseDepth", enable);
+  });
+  mPluginSettings.mDepthMode.connectAndTouch([this](Renderer::DepthMode drawMode) {
+    mRenderedFrames.clear();
+    mRenderer->setDepthMode(drawMode);
+    mParametersDirty = true;
+    if (drawMode == Renderer::DepthMode::eNone) {
+      mGuiManager->setRadioChecked("stars.setDrawMode0");
+    } else if (drawMode == Renderer::DepthMode::eIsosurface) {
+      mGuiManager->setRadioChecked("stars.setDrawMode1");
+    } else if (drawMode == Renderer::DepthMode::eFirstHit) {
+      mGuiManager->setRadioChecked("stars.setDrawMode2");
+    } else if (drawMode == Renderer::DepthMode::eLastHit) {
+      mGuiManager->setRadioChecked("stars.setDrawMode3");
+    } else if (drawMode == Renderer::DepthMode::eThreshold) {
+      mGuiManager->setRadioChecked("stars.setDrawMode4");
+    } else if (drawMode == Renderer::DepthMode::eMultiThreshold) {
+      mGuiManager->setRadioChecked("stars.setDrawMode5");
+    }
+  });
+
+  // Display settings
+  mPluginSettings.mPredictiveRendering.connectAndTouch([this](bool enable) {
+    mGuiManager->setCheckboxValue("volumeRendering.setEnablePredictiveRendering", enable);
+  });
+  mPluginSettings.mReuseImages.connectAndTouch([this](bool enable) {
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableReuseImages", enable);
+  });
+  mPluginSettings.mDepthData.connectAndTouch([this](bool enable) {
+    mBillboard->setUseDepth(enable);
+    mPoints->setUseDepth(enable);
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableDepthData", enable);
+  });
+  mPluginSettings.mDrawDepth.connectAndTouch([this](bool enable) {
+    mBillboard->setDrawDepth(enable);
+    mPoints->setDrawDepth(enable);
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableDrawDepth", enable);
+  });
+  mPluginSettings.mDisplayMode.connectAndTouch([this](Settings::DisplayMode displayMode) {
+    if (displayMode == Settings::DisplayMode::eMesh) {
+      mBillboard->setEnabled(true);
+      mPoints->setEnabled(false);
+      mGuiManager->setRadioChecked("stars.setDisplayMode0");
+    } else if (displayMode == Settings::DisplayMode::ePoints) {
+      mBillboard->setEnabled(false);
+      mPoints->setEnabled(true);
+      mGuiManager->setRadioChecked("stars.setDisplayMode1");
+    }
+    if (mDisplayedFrame.has_value()) {
+      displayFrame(*mDisplayedFrame, displayMode);
+    }
+  });
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Plugin::initUI() {
+  // Add the volume rendering user interface components to the CosmoScout user interface.
+  mGuiManager->addCssToGui("css/csp-volume-rendering.css");
+  mGuiManager->addPluginTabToSideBarFromHTML(
+      "Volume Rendering", "blur_circular", "../share/resources/gui/volume_rendering_tab.html");
+  mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
 
   updateAvailableTransferFunctions();
 }
