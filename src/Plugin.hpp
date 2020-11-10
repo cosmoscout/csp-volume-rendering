@@ -104,6 +104,9 @@ class Plugin : public cs::core::PluginBase {
   int mOnLoadConnection = -1;
   int mOnSaveConnection = -1;
 
+  int mLightingConnection = -1;
+  int mAmbientConnection  = -1;
+
   int              mLastFrameInterval;
   std::vector<int> mFrameIntervals;
   int              mFrameIntervalsLength = 3;

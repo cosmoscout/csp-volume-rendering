@@ -198,6 +198,8 @@ void Plugin::deInit() {
 
   mAllSettings->onLoad().disconnect(mOnLoadConnection);
   mAllSettings->onSave().disconnect(mOnSaveConnection);
+  mAllSettings->mGraphics.pEnableLighting.disconnect(mLightingConnection);
+  mAllSettings->mGraphics.pAmbientBrightness.disconnect(mAmbientConnection);
 
   logger().info("Unloading done.");
 }
@@ -447,16 +449,18 @@ void Plugin::connectSettings() {
   });
 
   // Connect to global CosmoScout graphics settings
-  mAllSettings->mGraphics.pEnableLighting.connectAndTouch([this](bool enable) {
-    mRenderedFrames.clear();
-    mRenderer->setShading(enable);
-    mParametersDirty = true;
-  });
-  mAllSettings->mGraphics.pAmbientBrightness.connectAndTouch([this](float value) {
-    mRenderedFrames.clear();
-    mRenderer->setAmbientLight(value);
-    mParametersDirty = true;
-  });
+  mLightingConnection =
+      mAllSettings->mGraphics.pEnableLighting.connectAndTouch([this](bool enable) {
+        mRenderedFrames.clear();
+        mRenderer->setShading(enable);
+        mParametersDirty = true;
+      });
+  mAmbientConnection =
+      mAllSettings->mGraphics.pAmbientBrightness.connectAndTouch([this](float value) {
+        mRenderedFrames.clear();
+        mRenderer->setAmbientLight(value);
+        mParametersDirty = true;
+      });
 
   // Connect to plugin settings
   // Rendering settings
