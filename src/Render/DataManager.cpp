@@ -29,17 +29,58 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+constexpr char* DATAMANAGER_ERROR_MESSAGE = "Failed to initialize DataManager.";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 DataManager::DataManager(std::string path, std::string filenamePattern, VolumeFileType type)
     : mType(type) {
+  std::regex patternRegex;
+  try {
+    patternRegex = std::regex(".*" + filenamePattern);
+  } catch (const std::regex_error& e) {
+    logger().error(
+        "Filename pattern '{}' is not a valid regular expression: {}", filenamePattern, e.what());
+    throw std::exception(DATAMANAGER_ERROR_MESSAGE);
+  }
+  if (patternRegex.mark_count() != 1) {
+    logger().error(
+        "Filename pattern '{}' has the wrong amount of capture groups: {}! The pattern should "
+        "contain only one capture group capturing the timestep component of the filename.",
+        filenamePattern, patternRegex.mark_count());
+    throw std::exception(DATAMANAGER_ERROR_MESSAGE);
+  }
+
+  std::set<std::string> files;
+  try {
+    files = cs::utils::filesystem::listFiles(path, patternRegex);
+  } catch (const boost::filesystem::filesystem_error& e) {
+    logger().error("Loading volume data from '{}' failed: {}", path, e.what());
+    throw std::exception(DATAMANAGER_ERROR_MESSAGE);
+  }
+
   std::vector<int> timesteps;
-  for (std::string file :
-      cs::utils::filesystem::listFiles(path, std::regex(".*" + filenamePattern))) {
+  for (std::string file : files) {
     file = std::regex_replace(file, std::regex(R"(\\)"), "/");
     std::smatch match;
-    std::regex_search(file, match, std::regex(filenamePattern));
-    int timestep = std::stoi(match[1].str());
+    std::regex_search(file, match, patternRegex);
+
+    int timestep;
+    try {
+      timestep = std::stoi(match[1].str());
+    } catch (const std::invalid_argument&) {
+      logger().error("Capture group in filename pattern '{}' does not match an integer for file "
+                     "'{}': Match of group is '{}'! A suitable capture group could be '([0-9])+'.",
+          filenamePattern, file, match[1].str());
+      throw std::exception(DATAMANAGER_ERROR_MESSAGE);
+    }
+
     timesteps.push_back(timestep);
     mTimestepFiles[timestep] = file;
+  }
+  if (timesteps.size() == 0) {
+    logger().error("No files matching '{}' found in '{}'!", filenamePattern, path);
+    throw std::exception(DATAMANAGER_ERROR_MESSAGE);
   }
   pTimesteps.set(timesteps);
   setTimestep(timesteps[0]);
@@ -55,6 +96,7 @@ DataManager::~DataManager() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool DataManager::isReady() {
+  std::scoped_lock lock(mStateMutex);
   return pScalars.get().size() > 0;
 }
 
@@ -62,8 +104,14 @@ bool DataManager::isReady() {
 
 void DataManager::setTimestep(int timestep) {
   std::scoped_lock lock(mStateMutex, mDataMutex);
-  mCurrentTimestep = timestep;
-  mDirty           = true;
+  if (std::find(pTimesteps.get().begin(), pTimesteps.get().end(), timestep) !=
+      pTimesteps.get().end()) {
+    mCurrentTimestep = timestep;
+    mDirty           = true;
+  } else {
+    logger().warn("'{}' is not a timestep in the current dataset. '{}' will be used instead.",
+        timestep, mCurrentTimestep);
+  }
   if (mCache.find(timestep) == mCache.end()) {
     loadData(timestep);
   }
@@ -87,12 +135,12 @@ bool DataManager::isDirty() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void DataManager::setActiveScalar(std::string scalar) {
+  std::scoped_lock lock(mStateMutex);
   if (std::find(pScalars.get().begin(), pScalars.get().end(), scalar) != pScalars.get().end()) {
-    std::scoped_lock lock(mStateMutex);
     mActiveScalar = scalar;
     mDirty        = true;
   } else {
-    logger().warn("{} is not a scalar in the current dataset. {} will be used instead.", scalar,
+    logger().warn("'{}' is not a scalar in the current dataset. '{}' will be used instead.", scalar,
         mActiveScalar);
   }
 }
@@ -140,6 +188,10 @@ void DataManager::initScalars() {
       scalars.push_back(data->GetPointData()->GetArrayName(i));
     }
   }
+  if (scalars.size() == 0) {
+    logger().error("No scalars found in volume data!");
+    return;
+  }
   std::scoped_lock lock(mStateMutex);
   mActiveScalar = scalars[0];
   pScalars.set(scalars);
@@ -164,7 +216,7 @@ void DataManager::loadData(int timestep) {
           break;
         }
 
-        logger().info("Finished loading data from {}, timestep {}. Took {}s", path, timestep,
+        logger().info("Finished loading data from {}, timestep {}. Took {}s.", path, timestep,
             (float)(std::chrono::high_resolution_clock::now() - timer).count() / 1000000000);
 
         return data;
