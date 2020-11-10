@@ -11,8 +11,6 @@
 #include "Renderer.hpp"
 
 #include <ospray/ospray_cpp.h>
-// Boost defines a function called likely so this macro from platform.h has to be undeffed
-#undef likely
 
 #include <glm/gtc/type_ptr.hpp>
 

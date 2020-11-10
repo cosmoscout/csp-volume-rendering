@@ -10,14 +10,7 @@
 
 #include "../../../src/cs-utils/filesystem.hpp"
 
-#include <vtk-8.2/vtkCellData.h>
-#include <vtk-8.2/vtkCellSizeFilter.h>
-#include <vtk-8.2/vtkDoubleArray.h>
-#include <vtk-8.2/vtkExtractSelection.h>
 #include <vtk-8.2/vtkPointData.h>
-#include <vtk-8.2/vtkSelection.h>
-#include <vtk-8.2/vtkSelectionNode.h>
-#include <vtk-8.2/vtkUnstructuredGrid.h>
 
 #include <ViracochaBackend/DataManager/VrcGenericDataLoader.h>
 
@@ -33,8 +26,7 @@ constexpr char* DATAMANAGER_ERROR_MESSAGE = "Failed to initialize DataManager.";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-DataManager::DataManager(std::string path, std::string filenamePattern, VolumeFileType type)
-    : mType(type) {
+DataManager::DataManager(std::string path, std::string filenamePattern) {
   std::regex patternRegex;
   try {
     patternRegex = std::regex(".*" + filenamePattern);
@@ -83,14 +75,14 @@ DataManager::DataManager(std::string path, std::string filenamePattern, VolumeFi
     throw std::exception(DATAMANAGER_ERROR_MESSAGE);
   }
   pTimesteps.set(timesteps);
-  setTimestep(timesteps[0]);
-  mInitScalarsThread = std::thread(&DataManager::initScalars, this);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 DataManager::~DataManager() {
-  mInitScalarsThread.join();
+  if (mInitScalarsThread.joinable()) {
+    mInitScalarsThread.join();
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -180,6 +172,14 @@ DataManager::State DataManager::getState() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void DataManager::initState() {
+  std::scoped_lock(mStateMutex);
+  setTimestep(pTimesteps.get()[0]);
+  mInitScalarsThread = std::thread(&DataManager::initScalars, this);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void DataManager::initScalars() {
   vtkSmartPointer<vtkDataSet> data = getData();
   std::vector<std::string>    scalars;
@@ -202,68 +202,18 @@ void DataManager::initScalars() {
 void DataManager::loadData(int timestep) {
   logger().info("Loading data from {}, timestep {}...", mTimestepFiles[timestep], timestep);
   auto data        = std::async(std::launch::async,
-      [this](std::string path, VolumeFileType type, int timestep) {
+      [this](std::string path, int timestep) {
         std::scoped_lock            lock(mReadMutex);
         auto                        timer = std::chrono::high_resolution_clock::now();
-        vtkSmartPointer<vtkDataSet> data;
-
-        switch (type) {
-        case VolumeFileType::eGaia:
-          data = loadGaiaData(timestep);
-          break;
-        case VolumeFileType::eVtk:
-          data = VrcGenericDataLoader::LoadVtkDataSet(path.c_str());
-          break;
-        }
+        vtkSmartPointer<vtkDataSet> data  = loadDataImpl(timestep);
 
         logger().info("Finished loading data from {}, timestep {}. Took {}s.", path, timestep,
             (float)(std::chrono::high_resolution_clock::now() - timer).count() / 1000000000);
 
         return data;
       },
-      mTimestepFiles[timestep], mType, timestep);
+      mTimestepFiles[timestep], timestep);
   mCache[timestep] = std::move(data);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-vtkSmartPointer<vtkDataSet> DataManager::loadGaiaData(int timestep) {
-  vtkSmartPointer<vtkDataSet> data;
-  data =
-      VrcGenericDataLoader::LoadGaiaDataSet(mTimestepFiles[timestep].c_str(), timestep, mGaiaCells);
-  if (mGaiaCells == nullptr) {
-    mGaiaCells = vtkUnstructuredGrid::SafeDownCast(data)->GetCells();
-  }
-
-  vtkSmartPointer<vtkCellSizeFilter> sizeFilter = vtkSmartPointer<vtkCellSizeFilter>::New();
-  sizeFilter->SetComputeArea(false);
-  sizeFilter->SetComputeLength(false);
-  sizeFilter->SetComputeSum(false);
-  sizeFilter->SetComputeVertexCount(false);
-  sizeFilter->SetComputeVolume(true);
-  sizeFilter->SetInputData(data);
-  sizeFilter->Update();
-  data = vtkDataSet::SafeDownCast(sizeFilter->GetOutput());
-  data->GetCellData()->SetActiveScalars("Volume");
-
-  vtkSmartPointer<vtkDoubleArray> thresholds = vtkSmartPointer<vtkDoubleArray>::New();
-  thresholds->SetNumberOfComponents(2);
-  thresholds->InsertNextTuple2(1.e-06, 2.59941e-05);
-
-  vtkSmartPointer<vtkSelectionNode> selectionNode = vtkSmartPointer<vtkSelectionNode>::New();
-  selectionNode->SetContentType(vtkSelectionNode::SelectionContent::THRESHOLDS);
-  selectionNode->SetFieldType(vtkSelectionNode::SelectionField::CELL);
-  selectionNode->SetSelectionList(thresholds);
-
-  vtkSmartPointer<vtkSelection> selection = vtkSmartPointer<vtkSelection>::New();
-  selection->AddNode(selectionNode);
-
-  vtkSmartPointer<vtkExtractSelection> extract = vtkSmartPointer<vtkExtractSelection>::New();
-  extract->SetInputData(0, data);
-  extract->SetInputData(1, selection);
-  extract->Update();
-  data = vtkDataSet::SafeDownCast(extract->GetOutput());
-  return data;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

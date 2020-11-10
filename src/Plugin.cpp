@@ -6,6 +6,8 @@
 
 #include "Plugin.hpp"
 
+#include "Data/GaiaDataManager.hpp"
+#include "Data/VtkDataManager.hpp"
 #include "Display/Billboard.hpp"
 #include "Display/PointsForwardWarped.hpp"
 #include "Render/OSPRayRenderer.hpp"
@@ -51,11 +53,11 @@ namespace csp::volumerendering {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 NLOHMANN_JSON_SERIALIZE_ENUM(
-    DataManager::VolumeFileType, {
-                                     {DataManager::VolumeFileType::eInvalid, nullptr},
-                                     {DataManager::VolumeFileType::eGaia, "gaia"},
-                                     {DataManager::VolumeFileType::eVtk, "vtk"},
-                                 })
+    Plugin::Settings::VolumeFileType, {
+                                          {Plugin::Settings::VolumeFileType::eInvalid, nullptr},
+                                          {Plugin::Settings::VolumeFileType::eGaia, "gaia"},
+                                          {Plugin::Settings::VolumeFileType::eVtk, "vtk"},
+                                      })
 
 NLOHMANN_JSON_SERIALIZE_ENUM(
     Renderer::VolumeStructure, {
@@ -256,9 +258,19 @@ void Plugin::onLoad() {
 
   // Init data manager and volume renderer
   mRenderState = RenderState::eWaitForData;
-  mDataManager = std::make_unique<DataManager>(mPluginSettings.mVolumeDataPath.get(),
-      mPluginSettings.mVolumeDataPattern.get(), mPluginSettings.mVolumeDataType.get());
-  mRenderer    = std::make_unique<OSPRayRenderer>(
+
+  switch (mPluginSettings.mVolumeDataType.get()) {
+  case Settings::VolumeFileType::eGaia:
+    mDataManager = std::make_shared<GaiaDataManager>(
+        mPluginSettings.mVolumeDataPath.get(), mPluginSettings.mVolumeDataPattern.get());
+    break;
+  case Settings::VolumeFileType::eVtk:
+    mDataManager = std::make_shared<VtkDataManager>(
+        mPluginSettings.mVolumeDataPath.get(), mPluginSettings.mVolumeDataPattern.get());
+    break;
+  }
+
+  mRenderer = std::make_unique<OSPRayRenderer>(
       mDataManager, mPluginSettings.mVolumeStructure.get(), mPluginSettings.mVolumeShape.get());
 
   // If the volume representations already exist, remove them from the solar system

@@ -7,7 +7,7 @@
 #ifndef CSP_VOLUME_RENDERING_RENDERER_HPP
 #define CSP_VOLUME_RENDERING_RENDERER_HPP
 
-#include "DataManager.hpp"
+#include "../Data/DataManager.hpp"
 
 #include "../../../../src/cs-utils/DefaultProperty.hpp"
 

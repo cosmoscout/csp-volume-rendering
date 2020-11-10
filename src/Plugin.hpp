@@ -7,7 +7,7 @@
 #ifndef CSP_VOLUME_RENDERING_PLUGIN_HPP
 #define CSP_VOLUME_RENDERING_PLUGIN_HPP
 
-#include "Render/DataManager.hpp"
+#include "Data/DataManager.hpp"
 #include "Render/Renderer.hpp"
 
 #include "../../../src/cs-core/PluginBase.hpp"
@@ -30,14 +30,15 @@ class PointsForwardWarped;
 class Plugin : public cs::core::PluginBase {
  public:
   struct Settings {
+    enum class VolumeFileType { eInvalid = -1, eGaia, eVtk };
     enum class DisplayMode { eMesh, ePoints };
 
     // Data settings
-    cs::utils::Property<std::string>                 mVolumeDataPath;
-    cs::utils::Property<std::string>                 mVolumeDataPattern;
-    cs::utils::Property<DataManager::VolumeFileType> mVolumeDataType;
-    cs::utils::Property<Renderer::VolumeStructure>   mVolumeStructure;
-    cs::utils::Property<Renderer::VolumeShape>       mVolumeShape;
+    cs::utils::Property<std::string>               mVolumeDataPath;
+    cs::utils::Property<std::string>               mVolumeDataPattern;
+    cs::utils::Property<VolumeFileType>            mVolumeDataType;
+    cs::utils::Property<Renderer::VolumeStructure> mVolumeStructure;
+    cs::utils::Property<Renderer::VolumeShape>     mVolumeShape;
 
     // Rendering settings
     cs::utils::DefaultProperty<bool>                mRequestImages{true};

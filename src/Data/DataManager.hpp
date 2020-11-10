@@ -41,12 +41,7 @@ class DataManager {
     }
   };
 
-  enum class VolumeFileType { eInvalid = -1, eGaia, eVtk };
-
-  /// Create a data manager reading files matching "filenamePattern" from the directory "path".
-  /// The manager will use an appropriate reader for the given file type.
-  DataManager(std::string path, std::string filenamePattern, VolumeFileType type);
-  ~DataManager();
+  virtual ~DataManager();
 
   /// List of timesteps for which files were found.
   cs::utils::Property<std::vector<int>> pTimesteps;
@@ -80,11 +75,10 @@ class DataManager {
   /// If isReady() returns false, the scalar won't be set yet.
   State getState();
 
- private:
-  VolumeFileType mType;
-  int            mCurrentTimestep;
-  std::string    mActiveScalar;
-  bool           mDirty;
+ protected:
+  int         mCurrentTimestep;
+  std::string mActiveScalar;
+  bool        mDirty;
 
   std::mutex mReadMutex;
   std::mutex mStateMutex;
@@ -98,10 +92,13 @@ class DataManager {
 
   std::thread mInitScalarsThread;
 
+  DataManager(std::string path, std::string filenamePattern);
+
+  void initState();
   void initScalars();
 
-  void                        loadData(int timestep);
-  vtkSmartPointer<vtkDataSet> loadGaiaData(int timestep);
+  void                                loadData(int timestep);
+  virtual vtkSmartPointer<vtkDataSet> loadDataImpl(int timestep) = 0;
 };
 
 } // namespace csp::volumerendering
