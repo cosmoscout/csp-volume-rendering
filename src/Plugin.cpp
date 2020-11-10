@@ -521,17 +521,17 @@ void Plugin::connectSettings() {
     mRenderer->setDepthMode(drawMode);
     mParametersDirty = true;
     if (drawMode == Renderer::DepthMode::eNone) {
-      mGuiManager->setRadioChecked("stars.setDrawMode0");
+      mGuiManager->setRadioChecked("volumeRendering.setDepthMode0");
     } else if (drawMode == Renderer::DepthMode::eIsosurface) {
-      mGuiManager->setRadioChecked("stars.setDrawMode1");
+      mGuiManager->setRadioChecked("volumeRendering.setDepthMode1");
     } else if (drawMode == Renderer::DepthMode::eFirstHit) {
-      mGuiManager->setRadioChecked("stars.setDrawMode2");
+      mGuiManager->setRadioChecked("volumeRendering.setDepthMode2");
     } else if (drawMode == Renderer::DepthMode::eLastHit) {
-      mGuiManager->setRadioChecked("stars.setDrawMode3");
+      mGuiManager->setRadioChecked("volumeRendering.setDepthMode3");
     } else if (drawMode == Renderer::DepthMode::eThreshold) {
-      mGuiManager->setRadioChecked("stars.setDrawMode4");
+      mGuiManager->setRadioChecked("volumeRendering.setDepthMode4");
     } else if (drawMode == Renderer::DepthMode::eMultiThreshold) {
-      mGuiManager->setRadioChecked("stars.setDrawMode5");
+      mGuiManager->setRadioChecked("volumeRendering.setDepthMode5");
     }
   });
 
@@ -556,11 +556,11 @@ void Plugin::connectSettings() {
     if (displayMode == Settings::DisplayMode::eMesh) {
       mBillboard->setEnabled(true);
       mPoints->setEnabled(false);
-      mGuiManager->setRadioChecked("stars.setDisplayMode0");
+      mGuiManager->setRadioChecked("volumeRendering.setDisplayMode0");
     } else if (displayMode == Settings::DisplayMode::ePoints) {
       mBillboard->setEnabled(false);
       mPoints->setEnabled(true);
-      mGuiManager->setRadioChecked("stars.setDisplayMode1");
+      mGuiManager->setRadioChecked("volumeRendering.setDisplayMode1");
     }
     if (mDisplayedFrame.has_value()) {
       displayFrame(*mDisplayedFrame, displayMode);
