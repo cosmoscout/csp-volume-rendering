@@ -8,7 +8,10 @@
 
 #include "../logger.hpp"
 
-#include <ViracochaBackend/DataManager/VrcGenericDataLoader.h>
+#include <vtk-8.2/vtkCellDataToPointData.h>
+#include <vtk-8.2/vtkDataSetReader.h>
+#include <vtk-8.2/vtkXMLFileReadTester.h>
+#include <vtk-8.2/vtkXMLGenericDataObjectReader.h>
 
 namespace csp::volumerendering {
 
@@ -22,7 +25,28 @@ VtkDataManager::VtkDataManager(std::string path, std::string filenamePattern)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 vtkSmartPointer<vtkDataSet> VtkDataManager::loadDataImpl(int timestep) {
-  return VrcGenericDataLoader::LoadVtkDataSet(mTimestepFiles[timestep].c_str());
+  vtkSmartPointer<vtkDataSet> data;
+
+  auto fileTester = vtkSmartPointer<vtkXMLFileReadTester>::New();
+  fileTester->SetFileName(mTimestepFiles[timestep].c_str());
+
+  if (fileTester->TestReadFile() > 0) {
+    // Is an XML File in new vtk data format
+    auto reader = vtkSmartPointer<vtkXMLGenericDataObjectReader>::New();
+    reader->SetFileName(mTimestepFiles[timestep].c_str());
+    reader->Update();
+
+    data = reader->GetOutputAsDataSet();
+  } else {
+    auto reader = vtkSmartPointer<vtkDataSetReader>::New();
+    reader->SetFileName(mTimestepFiles[timestep].c_str());
+    reader->ReadAllScalarsOn();
+    reader->Update();
+
+    data = reader->GetOutput();
+  }
+
+  return data;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
