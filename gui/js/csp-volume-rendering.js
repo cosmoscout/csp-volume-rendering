@@ -25,6 +25,8 @@
             var timestepSlider = document.querySelector(`[data-callback="volumeRendering.setTimestep"]`);
             timestepSlider.dataset.event = "update";
 
+            this.progressBar = document.getElementById("volumeRendering.progressBar");
+
             this.createElements();
             this.ready();
         }
@@ -59,6 +61,16 @@
                 playButtonIcon.html("pause");
                 this.playing = true;
             }
+        }
+
+        setRenderProgress(progress, animate) {
+            if (animate) {
+                this.progressBar.classList.add('animated');
+            } else {
+                this.progressBar.classList.remove('animated');
+            }
+
+            this.progressBar.style.width = Math.round(progress * 100) + "%";
         }
 
         setTimesteps(timestepsJson) {

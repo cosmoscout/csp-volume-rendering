@@ -62,6 +62,16 @@ std::future<Renderer::RenderedImage> OSPRayRenderer::getFrame(glm::mat4 cameraTr
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+float OSPRayRenderer::getProgress() {
+  if (mRenderFuture.has_value()) {
+    return mRenderFuture->progress();
+  } else {
+    return 1.f;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void OSPRayRenderer::preloadData(DataManager::State state) {
   if (mCachedVolumes.find(state) == mCachedVolumes.end()) {
     mCachedVolumes[state] =

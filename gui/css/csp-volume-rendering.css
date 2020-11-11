@@ -7,3 +7,23 @@
 #volumeRendering\.tfGraph .selected {
     stroke: #ff7f0e;
 }
+
+#volumeRendering\.progressContainer {
+    height: 100%;
+    display: flex;
+    align-items: center;
+}
+
+#volumeRendering\.progress {
+    width: 100%;
+    margin: auto;
+    height: 0.5vmin;
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+#volumeRendering\.progressBar {
+    width: 0;
+    height: 100%;
+    background: linear-gradient(to right, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.7));
+    box-shadow: 0 0 3vmin rgba(255, 255, 255, 0.5), 0 0 1vmin rgba(255, 255, 255, 0.5);
+}

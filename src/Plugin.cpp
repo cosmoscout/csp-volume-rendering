@@ -230,6 +230,7 @@ void Plugin::update() {
     }
     break;
   case RenderState::eRenderingImage:
+    showRenderProgress();
     if (!mPluginSettings.mRequestImages.get()) {
       mFrameInvalid = true;
       mRenderer->cancelRendering();
@@ -653,6 +654,14 @@ glm::mat4 csp::volumerendering::Plugin::predictCameraTransform(glm::mat4 current
     predictedCameraTransform = glm::translate(predictedCameraTransform, predictedTranslation);
   }
   return predictedCameraTransform;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void csp::volumerendering::Plugin::showRenderProgress() {
+  std::stringstream code;
+  code << "CosmoScout.volumeRendering.setRenderProgress(" << mRenderer->getProgress() << ", false)";
+  mGuiManager->addScriptToGui(code.str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -91,6 +91,8 @@ class Plugin : public cs::core::PluginBase {
   glm::mat4 getCurrentCameraTransform();
   glm::mat4 predictCameraTransform(glm::mat4 currentTransform);
 
+  void showRenderProgress();
+
   void receiveFrame();
   void displayFrame(Frame& frame);
   void displayFrame(Frame& frame, Settings::DisplayMode displayMode);

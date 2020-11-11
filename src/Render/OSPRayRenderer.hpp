@@ -29,6 +29,7 @@ class OSPRayRenderer : public Renderer {
   OSPRayRenderer& operator=(const OSPRayRenderer& other) = delete;
 
   std::future<Renderer::RenderedImage> getFrame(glm::mat4 cameraTransform) override;
+  float                                getProgress() override;
   void                                 preloadData(DataManager::State state) override;
   void                                 cancelRendering() override;
 

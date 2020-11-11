@@ -56,6 +56,7 @@ class Renderer {
   void setSunStrength(float strength);
 
   virtual std::future<Renderer::RenderedImage> getFrame(glm::mat4 cameraTransform)   = 0;
+  virtual float                                getProgress()                         = 0;
   virtual void                                 preloadData(DataManager::State state) = 0;
   virtual void                                 cancelRendering()                     = 0;
 
