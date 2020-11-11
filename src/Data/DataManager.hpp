@@ -22,6 +22,9 @@
 
 namespace csp::volumerendering {
 
+/// The DataManager class provides an interface for accessing multiple volumetric data files in one
+/// directory. Implementations for reading different kinds of data formats are supplied in
+/// subclasses. The DataManager class can't be instantiated, use one of the subclasses instead.
 class DataManager {
  public:
   struct State {
@@ -89,8 +92,6 @@ class DataManager {
   std::map<int, std::string> mTimestepFiles;
 
   std::map<int, std::shared_future<vtkSmartPointer<vtkDataSet>>> mCache;
-
-  vtkSmartPointer<vtkCellArray> mGaiaCells;
 
   std::thread mInitScalarsThread;
 

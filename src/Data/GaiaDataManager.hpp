@@ -13,6 +13,7 @@
 
 namespace csp::volumerendering {
 
+/// DataManager with an implementation for reading files produced by the GAIA simulation code.
 class GaiaDataManager : public DataManager {
  public:
   /// Create a DataManager that can read files produced with the GAIA simulation code.

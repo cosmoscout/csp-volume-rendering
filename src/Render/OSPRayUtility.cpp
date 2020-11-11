@@ -63,7 +63,6 @@ void initOSPRay() {
   ospDeviceSetStatusCallback(ospGetCurrentDevice(),
       [](void* userData, const char* message) { osprayLogger().info(message); }, nullptr);
 
-  ospLoadModule("denoiser");
   ospLoadModule("volume_depth");
 }
 
@@ -150,7 +149,7 @@ ospray::cpp::Volume createOSPRayVolumeStructured(vtkSmartPointer<vtkStructuredPo
 ospray::cpp::TransferFunction createOSPRayTransferFunction() {
   std::vector<rkcommon::math::vec3f> color   = {rkcommon::math::vec3f(0.f, 0.f, 1.f),
       rkcommon::math::vec3f(0.f, 1.f, 0.f), rkcommon::math::vec3f(1.f, 0.f, 0.f)};
-  std::vector<float>                 opacity = {.0f, 5.f};
+  std::vector<float>                 opacity = {.0f, 1.f};
 
   rkcommon::math::vec2f valueRange = {0.f, 1.f};
 
@@ -214,7 +213,7 @@ std::vector<float> grayscaleToDepth(const std::vector<float>& grayscale) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::vector<float> denoiseImage(std::vector<float>& image, int componentCount, int resolution) {
+std::vector<float> denoiseImage(std::vector<float>& image, int channelCount, int resolution) {
   oidn::DeviceRef device = oidn::newDevice();
   device.setErrorFunction([](void* userPtr, oidn::Error e, const char* errorDetails) {
     oidnLogger().error(errorDetails);
@@ -223,9 +222,9 @@ std::vector<float> denoiseImage(std::vector<float>& image, int componentCount, i
 
   oidn::FilterRef filter = device.newFilter("RT");
   filter.setImage("color", image.data(), oidn::Format::Float3, resolution, resolution, 0,
-      sizeof(float) * componentCount, sizeof(float) * componentCount * resolution);
+      sizeof(float) * channelCount, sizeof(float) * channelCount * resolution);
   filter.setImage("output", image.data(), oidn::Format::Float3, resolution, resolution, 0,
-      sizeof(float) * componentCount, sizeof(float) * componentCount * resolution);
+      sizeof(float) * channelCount, sizeof(float) * channelCount * resolution);
   filter.commit();
 
   filter.execute();

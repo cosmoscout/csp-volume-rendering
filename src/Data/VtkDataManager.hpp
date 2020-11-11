@@ -13,6 +13,7 @@
 
 namespace csp::volumerendering {
 
+/// DataManager with an implementation for reading vtk data files.
 class VtkDataManager : public DataManager {
  public:
   /// Create a DataManager that can read files in the vtk data format.
