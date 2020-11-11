@@ -35,6 +35,7 @@ class Renderer {
     std::vector<uint8_t> mColorData;
     std::vector<float>   mDepthData;
     glm::mat4            mMVP;
+    bool                 mValid;
   };
 
   Renderer(std::shared_ptr<DataManager> dataManager, VolumeStructure structure, VolumeShape shape);

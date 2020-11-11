@@ -10,11 +10,25 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+constexpr char* RENDERER_ERROR_MESSAGE = "Failed to initialize Renderer.";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 Renderer::Renderer(
     std::shared_ptr<DataManager> dataManager, VolumeStructure structure, VolumeShape shape)
     : mDataManager(dataManager)
     , mStructure(structure)
     , mShape(shape) {
+  if (shape == VolumeShape::eInvalid) {
+    logger().error("Invalid volume shape given in settings! Should be one of 'cubic', "
+                   "'shperical'.");
+    throw std::exception(RENDERER_ERROR_MESSAGE);
+  }
+  if (structure == VolumeStructure::eInvalid) {
+    logger().error("Invalid volume structure given in settings! Should be one of 'structured', "
+                   "'unstructured'.");
+    throw std::exception(RENDERER_ERROR_MESSAGE);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

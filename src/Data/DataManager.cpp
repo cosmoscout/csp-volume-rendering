@@ -158,7 +158,13 @@ vtkSmartPointer<vtkDataSet> DataManager::getData(State state) {
     futureData = cacheEntry->second;
   }
   vtkSmartPointer<vtkDataSet> dataset = futureData.get();
-  dataset->GetPointData()->SetActiveScalars(state.mScalar.c_str());
+  if (!dataset) {
+    logger().error("Loaded data is null! Is the data type correctly set in the settings?");
+    throw std::exception("Loaded data is null.");
+  }
+  if (state.mScalar != "") {
+    dataset->GetPointData()->SetActiveScalars(state.mScalar.c_str());
+  }
   return dataset;
 }
 
@@ -181,15 +187,23 @@ void DataManager::initState() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void DataManager::initScalars() {
-  vtkSmartPointer<vtkDataSet> data = getData();
-  std::vector<std::string>    scalars;
+  vtkSmartPointer<vtkDataSet> data;
+  try {
+    data = getData();
+  } catch (const std::exception&) {
+    logger().error("Could not load initial data for determining available scalars! "
+                   "Requested data may have no active scalar.");
+    return;
+  }
+
+  std::vector<std::string> scalars;
   for (int i = 0; i < data->GetPointData()->GetNumberOfArrays(); i++) {
     if (data->GetPointData()->GetAbstractArray(i)->GetNumberOfComponents() == 1) {
       scalars.push_back(data->GetPointData()->GetArrayName(i));
     }
   }
   if (scalars.size() == 0) {
-    logger().error("No scalars found in volume data!");
+    logger().error("No scalars found in volume data! Requested data may have no active scalar.");
     return;
   }
   std::scoped_lock lock(mStateMutex);

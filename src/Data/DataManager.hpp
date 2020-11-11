@@ -66,10 +66,12 @@ class DataManager {
 
   /// Returns the data for the current state.
   /// May block, if the requested data is not yet loaded.
-  /// If isReady() returns false, the data will have no active scalar.
+  /// If isReady() returns false, the data may have no active scalar.
+  /// Will throw an std::exception if the data is null.
   vtkSmartPointer<vtkDataSet> getData();
   /// Returns the data for the given state.
   /// May block, if the requested data is not yet loaded.
+  /// Will throw an std::exception if the data is null.
   vtkSmartPointer<vtkDataSet> getData(State state);
   /// Returns the current state.
   /// If isReady() returns false, the scalar won't be set yet.
@@ -77,7 +79,7 @@ class DataManager {
 
  protected:
   int         mCurrentTimestep;
-  std::string mActiveScalar;
+  std::string mActiveScalar = "";
   bool        mDirty;
 
   std::mutex mReadMutex;

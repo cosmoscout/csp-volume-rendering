@@ -268,6 +268,10 @@ void Plugin::onLoad() {
     mDataManager = std::make_shared<VtkDataManager>(
         mPluginSettings.mVolumeDataPath.get(), mPluginSettings.mVolumeDataPattern.get());
     break;
+  default:
+    logger().error("Invalid volume data type given in settings! Should be one of 'vtk', 'gaia'.");
+    throw std::exception("Failed to initialize DataManager.");
+    break;
   }
 
   mRenderer = std::make_unique<OSPRayRenderer>(
@@ -285,6 +289,11 @@ void Plugin::onLoad() {
 
   // Init volume representation
   auto anchor = mAllSettings->mAnchors.find(mPluginSettings.mAnchor.get());
+  if (anchor == mAllSettings->mAnchors.end()) {
+    logger().error("No anchor with name '{}' found!", mPluginSettings.mAnchor.get());
+    throw std::exception("Failed to initialize CelestialObjects.");
+  }
+
   auto [tStartExistence, tEndExistence] = anchor->second.getExistence();
   mBillboard = std::make_shared<Billboard>(anchor->second.mCenter, anchor->second.mFrame,
       tStartExistence, tEndExistence, cs::core::SolarSystem::getRadii(anchor->second.mCenter));
@@ -649,19 +658,23 @@ glm::mat4 csp::volumerendering::Plugin::predictCameraTransform(glm::mat4 current
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void csp::volumerendering::Plugin::receiveFrame() {
-  if (!mFrameInvalid) {
-    Renderer::RenderedImage renderedImage = mFutureFrameData.get();
-    mRenderingFrame.mColorImage           = renderedImage.mColorData;
-    mRenderingFrame.mDepthImage           = renderedImage.mDepthData;
-    mRenderingFrame.mModelViewProjection  = renderedImage.mMVP;
-    mRenderedFrames.push_back(mRenderingFrame);
-
-    displayFrame(mRenderingFrame);
-  }
-
   mFrameIntervals[mFrameIntervalsIndex] = mLastFrameInterval;
   if (++mFrameIntervalsIndex >= mFrameIntervalsLength) {
     mFrameIntervalsIndex = 0;
+  }
+
+  if (!mFrameInvalid) {
+    Renderer::RenderedImage renderedImage = mFutureFrameData.get();
+    if (!renderedImage.mValid) {
+      return;
+    }
+
+    mRenderingFrame.mColorImage          = renderedImage.mColorData;
+    mRenderingFrame.mDepthImage          = renderedImage.mDepthData;
+    mRenderingFrame.mModelViewProjection = renderedImage.mMVP;
+    mRenderedFrames.push_back(mRenderingFrame);
+
+    displayFrame(mRenderingFrame);
   }
 }
 

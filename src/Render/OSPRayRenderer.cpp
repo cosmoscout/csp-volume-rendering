@@ -45,11 +45,16 @@ std::future<Renderer::RenderedImage> OSPRayRenderer::getFrame(glm::mat4 cameraTr
   std::scoped_lock lock(mParameterMutex);
   return std::async(std::launch::async,
       [this, cameraTransform](Parameters parameters, DataManager::State dataState) {
-        const Volume&            volume = getVolume(dataState);
-        ospray::cpp::World       world  = getWorld(volume, parameters);
-        Camera                   camera = getCamera(volume.mHeight, cameraTransform);
-        ospray::cpp::FrameBuffer frame  = renderFrame(world, camera.mOsprayCamera, parameters);
-        RenderedImage renderedImage = extractImageData(frame, camera, volume.mHeight, parameters);
+        RenderedImage renderedImage;
+        try {
+          const Volume&            volume = getVolume(dataState);
+          ospray::cpp::World       world  = getWorld(volume, parameters);
+          Camera                   camera = getCamera(volume.mHeight, cameraTransform);
+          ospray::cpp::FrameBuffer frame  = renderFrame(world, camera.mOsprayCamera, parameters);
+          renderedImage = extractImageData(frame, camera, volume.mHeight, parameters);
+        } catch (const std::exception&) {
+          renderedImage.mValid = false;
+        }
         return renderedImage;
       },
       mParameters, mDataManager->getState());
@@ -391,6 +396,7 @@ Renderer::RenderedImage OSPRayRenderer::extractImageData(ospray::cpp::FrameBuffe
   renderedImage.mColorData = colorDataInt;
   renderedImage.mDepthData = depthData;
   renderedImage.mMVP       = camera.mTransformationMatrix;
+  renderedImage.mValid     = true;
   return renderedImage;
 }
 
