@@ -42,7 +42,8 @@ OSPRayRenderer::~OSPRayRenderer() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::future<Renderer::RenderedImage> OSPRayRenderer::getFrame(glm::mat4 cameraTransform) {
-  std::scoped_lock lock(mParameterMutex);
+  std::scoped_lock lock(mParameterMutex, mCancelMutex);
+  mRenderingCancelled = false;
   return std::async(std::launch::async,
       [this, cameraTransform](Parameters parameters, DataManager::State dataState) {
         RenderedImage renderedImage;
@@ -52,9 +53,9 @@ std::future<Renderer::RenderedImage> OSPRayRenderer::getFrame(glm::mat4 cameraTr
           Camera                   camera = getCamera(volume.mHeight, cameraTransform);
           ospray::cpp::FrameBuffer frame  = renderFrame(world, camera.mOsprayCamera, parameters);
           renderedImage = extractImageData(frame, camera, volume.mHeight, parameters);
-        } catch (const std::exception&) {
-          renderedImage.mValid = false;
-        }
+          std::scoped_lock(mCancelMutex);
+          renderedImage.mValid = !mRenderingCancelled;
+        } catch (const std::exception&) { renderedImage.mValid = false; }
         return renderedImage;
       },
       mParameters, mDataManager->getState());
@@ -83,7 +84,9 @@ void OSPRayRenderer::preloadData(DataManager::State state) {
 
 void OSPRayRenderer::cancelRendering() {
   if (mRenderFuture.has_value()) {
+    std::scoped_lock(mCancelMutex);
     mRenderFuture->cancel();
+    mRenderingCancelled = true;
   }
 }
 

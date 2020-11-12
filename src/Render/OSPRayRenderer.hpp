@@ -49,6 +49,8 @@ class OSPRayRenderer : public Renderer {
   std::map<DataManager::State, std::shared_future<Volume>> mCachedVolumes;
 
   std::optional<ospray::cpp::Future> mRenderFuture;
+  bool                               mRenderingCancelled;
+  std::mutex                         mCancelMutex;
 
   const Volume&                 getVolume(DataManager::State state);
   Volume                        loadVolume(DataManager::State state);

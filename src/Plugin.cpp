@@ -232,7 +232,6 @@ void Plugin::update() {
   case RenderState::eRenderingImage:
     showRenderProgress();
     if (!mPluginSettings.mRequestImages.get()) {
-      mFrameInvalid = true;
       mRenderer->cancelRendering();
       mRenderState = RenderState::ePaused;
     } else if (mFutureFrameData.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
@@ -327,10 +326,8 @@ void csp::volumerendering::Plugin::registerUICallbacks() {
       std::function([this](bool enable) { mPluginSettings.mRequestImages = enable; }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.cancel",
-      "If an image is currently rendered, cancel it.", std::function([this]() {
-        mFrameInvalid = true;
-        mRenderer->cancelRendering();
-      }));
+      "If an image is currently rendered, cancel it.",
+      std::function([this]() { mRenderer->cancelRendering(); }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setResolution",
       "Sets the resolution of the rendered volume images.", std::function([this](double value) {
@@ -672,19 +669,18 @@ void csp::volumerendering::Plugin::receiveFrame() {
     mFrameIntervalsIndex = 0;
   }
 
-  if (!mFrameInvalid) {
-    Renderer::RenderedImage renderedImage = mFutureFrameData.get();
-    if (!renderedImage.mValid) {
-      return;
-    }
-
-    mRenderingFrame.mColorImage          = renderedImage.mColorData;
-    mRenderingFrame.mDepthImage          = renderedImage.mDepthData;
-    mRenderingFrame.mModelViewProjection = renderedImage.mMVP;
-    mRenderedFrames.push_back(mRenderingFrame);
-
-    displayFrame(mRenderingFrame);
+  Renderer::RenderedImage renderedImage = mFutureFrameData.get();
+  if (!renderedImage.mValid) {
+    mFrameInvalid = true;
+    return;
   }
+
+  mRenderingFrame.mColorImage          = renderedImage.mColorData;
+  mRenderingFrame.mDepthImage          = renderedImage.mDepthData;
+  mRenderingFrame.mModelViewProjection = renderedImage.mMVP;
+  mRenderedFrames.push_back(mRenderingFrame);
+
+  displayFrame(mRenderingFrame);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
