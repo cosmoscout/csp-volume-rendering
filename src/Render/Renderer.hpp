@@ -18,6 +18,8 @@
 
 namespace csp::volumerendering {
 
+/// The abstract Renderer class provides an interface for controlling a volume renderer and
+/// providing it with parameters.
 class Renderer {
  public:
   enum class VolumeStructure { eInvalid = -1, eStructured, eUnstructured };
@@ -31,35 +33,66 @@ class Renderer {
     eMultiThreshold = 16
   };
 
+  /// A RenderedImage object contains all relevant information on a rendered image.
   struct RenderedImage {
+    /// Contains the color values of the image as RGBA values.
     std::vector<uint8_t> mColorData;
-    std::vector<float>   mDepthData;
-    glm::mat4            mMVP;
-    bool                 mValid;
+    /// Contains the depth values of the image as float values in the range [-1,1].
+    std::vector<float> mDepthData;
+    /// Contains the model-view-projection matrix used by the renderer.
+    glm::mat4 mMVP;
+    /// Specifies, whether the other fields of this object contain valid information (true),
+    /// or if there was an error resulting in invalid data (false).
+    bool mValid;
   };
 
+  /// Creates a Renderer for volumes of the given structure and shape.
+  /// The data is provided by the given DataManager.
   Renderer(std::shared_ptr<DataManager> dataManager, VolumeStructure structure, VolumeShape shape);
   virtual ~Renderer() = default;
 
+  /// Sets the desired resolution of the rendered images horizontally and vertically.
   void setResolution(int resolution);
+  /// Sets the sampling rate used by the renderer. Higher sampling rates result in images with
+  /// less noise.
   void setSamplingRate(float samplingRate);
+  /// Sets the heuristic with which the depth image should be rendered.
   void setDepthMode(Renderer::DepthMode depthMode);
 
+  /// Enables or disables denoising of the color image.
   void setDenoiseColor(bool denoiseColor);
+  /// Enables or disables denoising of the depth image.
   void setDenoiseDepth(bool denoiseDepth);
 
+  /// Sets the transfer function to be used in rendering.
+  /// The transferFunction parameter should contain a vector of RGBA color values.
+  /// The colors are evenly spaced over the domain of the function.
   void setTransferFunction(std::vector<glm::vec4> transferFunction);
+  /// Sets a factor making the volume more or less dense.
+  /// The higher the density, the more opaque the volume will appear.
   void setDensityScale(float densityScale);
 
+  /// Enables or disables shading of the volume.
   void setShading(bool shading);
+  /// Sets the strength of the ambient light that should be used in shading.
   void setAmbientLight(float strength);
+  /// Sets the direction from the volume towards the sun.
   void setSunDirection(glm::vec3 sunDirection);
+  /// Sets the strength of the light of the sun.
   void setSunStrength(float strength);
 
+  /// Starts asynchronously rendering an image of the volume for the given camera perspective.
+  /// The rendering process will use all parameters set before calling this method
+  /// and will not be influenced by any later changes to the parameters.
+  /// Returns a future that will eventually contain the rendered image.
   std::future<Renderer::RenderedImage> getFrame(glm::mat4 cameraTransform);
-  virtual float                                getProgress()                         = 0;
-  virtual void                                 preloadData(DataManager::State state) = 0;
-  virtual void                                 cancelRendering()                     = 0;
+  /// Returns the current progress of the rendering processon the range [0,1].
+  /// Returns 1 if no image is currently being rendered.
+  virtual float getProgress() = 0;
+  /// Requests the renderer to start preparing data matching the given state for rendering.
+  virtual void preloadData(DataManager::State state) = 0;
+  /// Requests to cancel the current rendering process.
+  virtual void cancelRendering() = 0;
 
  protected:
   struct Parameters {

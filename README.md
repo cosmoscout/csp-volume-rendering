@@ -142,7 +142,14 @@ The animation can be started and paused using the button at the bottom of the se
 
 #### Rendering
 
-**TODO**
+The rendering section contains sliders for setting several the rendering parameters resolution, sampling rate, density scale and sun strength that can also be set using properties in the settings.json file.
+Information on these settings can be found under [Configuration - Rendering settings](#rendering-settings).
+
+The section also allows disabling/enabling rendering new images using the checkbox at the top.
+When the box is unchecked no new images will be rendered and if there is an ongoing render process it is cancelled and its results are discarded.
+
+Pressing the cancel button will cancel any ongoing render process and start a new one.
+The current progress of the rendering progress is shown using the bar next to the cancel button.
 
 ![sidebar rendering section](docs/img/sidebar_rendering.png)
 
