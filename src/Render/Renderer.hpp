@@ -39,6 +39,7 @@ class Renderer {
   };
 
   Renderer(std::shared_ptr<DataManager> dataManager, VolumeStructure structure, VolumeShape shape);
+  virtual ~Renderer() = default;
 
   void setResolution(int resolution);
   void setSamplingRate(float samplingRate);
