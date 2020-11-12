@@ -36,6 +36,9 @@ OSPRayRenderer::OSPRayRenderer(std::shared_ptr<DataManager> dataManager,
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 OSPRayRenderer::~OSPRayRenderer() {
+  mCachedVolumes.clear();
+  mRenderFuture.reset();
+
   ospShutdown();
 }
 

@@ -55,13 +55,15 @@ void initOSPRay() {
     throw std::runtime_error("OSPRay Initialization failed.");
   }
 
-  ospDeviceSetErrorCallback(ospGetCurrentDevice(),
+	OSPDevice dev = ospGetCurrentDevice();
+  ospDeviceSetErrorCallback(dev,
       [](void* userData, OSPError e, const char* errorDetails) {
         osprayLogger().error(errorDetails);
       },
       nullptr);
-  ospDeviceSetStatusCallback(ospGetCurrentDevice(),
+  ospDeviceSetStatusCallback(dev,
       [](void* userData, const char* message) { osprayLogger().info(message); }, nullptr);
+  ospDeviceRelease(dev);
 
   ospLoadModule("volume_depth");
 }
