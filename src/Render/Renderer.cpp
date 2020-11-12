@@ -110,4 +110,12 @@ void Renderer::setSunStrength(float strength) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+std::future<Renderer::RenderedImage> Renderer::getFrame(glm::mat4 cameraTransform) {
+  std::scoped_lock lock(mParameterMutex);
+  return std::async(std::launch::async, &Renderer::getFrameImpl, this, cameraTransform, mParameters,
+      mDataManager->getState());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 } // namespace csp::volumerendering

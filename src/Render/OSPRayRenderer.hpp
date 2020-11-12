@@ -28,10 +28,9 @@ class OSPRayRenderer : public Renderer {
   OSPRayRenderer(const OSPRayRenderer& other) = delete;
   OSPRayRenderer& operator=(const OSPRayRenderer& other) = delete;
 
-  std::future<Renderer::RenderedImage> getFrame(glm::mat4 cameraTransform) override;
-  float                                getProgress() override;
-  void                                 preloadData(DataManager::State state) override;
-  void                                 cancelRendering() override;
+  float getProgress() override;
+  void  preloadData(DataManager::State state) override;
+  void  cancelRendering() override;
 
  private:
   struct Volume {
@@ -51,6 +50,9 @@ class OSPRayRenderer : public Renderer {
   std::optional<ospray::cpp::Future> mRenderFuture;
   bool                               mRenderingCancelled;
   std::mutex                         mCancelMutex;
+
+  RenderedImage getFrameImpl(
+      glm::mat4 cameraTransform, Parameters parameters, DataManager::State dataState) override;
 
   const Volume&                 getVolume(DataManager::State state);
   Volume                        loadVolume(DataManager::State state);

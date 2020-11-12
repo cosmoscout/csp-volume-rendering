@@ -56,7 +56,7 @@ class Renderer {
   void setSunDirection(glm::vec3 sunDirection);
   void setSunStrength(float strength);
 
-  virtual std::future<Renderer::RenderedImage> getFrame(glm::mat4 cameraTransform)   = 0;
+  std::future<Renderer::RenderedImage> getFrame(glm::mat4 cameraTransform);
   virtual float                                getProgress()                         = 0;
   virtual void                                 preloadData(DataManager::State state) = 0;
   virtual void                                 cancelRendering()                     = 0;
@@ -79,13 +79,16 @@ class Renderer {
     float     mSunStrength;
   };
 
-  std::mutex mParameterMutex;
-
   std::shared_ptr<DataManager> mDataManager;
 
   const VolumeStructure mStructure;
   const VolumeShape     mShape;
 
+  virtual RenderedImage getFrameImpl(
+      glm::mat4 cameraTransform, Parameters parameters, DataManager::State dataState) = 0;
+
+ private:
+  std::mutex mParameterMutex;
   Parameters mParameters;
 };
 

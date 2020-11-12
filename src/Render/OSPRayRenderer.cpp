@@ -41,28 +41,6 @@ OSPRayRenderer::~OSPRayRenderer() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::future<Renderer::RenderedImage> OSPRayRenderer::getFrame(glm::mat4 cameraTransform) {
-  std::scoped_lock lock(mParameterMutex, mCancelMutex);
-  mRenderingCancelled = false;
-  return std::async(std::launch::async,
-      [this, cameraTransform](Parameters parameters, DataManager::State dataState) {
-        RenderedImage renderedImage;
-        try {
-          const Volume&            volume = getVolume(dataState);
-          ospray::cpp::World       world  = getWorld(volume, parameters);
-          Camera                   camera = getCamera(volume.mHeight, cameraTransform);
-          ospray::cpp::FrameBuffer frame  = renderFrame(world, camera.mOsprayCamera, parameters);
-          renderedImage = extractImageData(frame, camera, volume.mHeight, parameters);
-          std::scoped_lock(mCancelMutex);
-          renderedImage.mValid = !mRenderingCancelled;
-        } catch (const std::exception&) { renderedImage.mValid = false; }
-        return renderedImage;
-      },
-      mParameters, mDataManager->getState());
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 float OSPRayRenderer::getProgress() {
   if (mRenderFuture.has_value()) {
     return mRenderFuture->progress();
@@ -88,6 +66,27 @@ void OSPRayRenderer::cancelRendering() {
     mRenderFuture->cancel();
     mRenderingCancelled = true;
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+Renderer::RenderedImage OSPRayRenderer::getFrameImpl(
+    glm::mat4 cameraTransform, Parameters parameters, DataManager::State dataState) {
+  {
+    std::scoped_lock lock(mCancelMutex);
+    mRenderingCancelled = false;
+  }
+  RenderedImage renderedImage;
+  try {
+    const Volume&            volume = getVolume(dataState);
+    ospray::cpp::World       world  = getWorld(volume, parameters);
+    Camera                   camera = getCamera(volume.mHeight, cameraTransform);
+    ospray::cpp::FrameBuffer frame  = renderFrame(world, camera.mOsprayCamera, parameters);
+    renderedImage                   = extractImageData(frame, camera, volume.mHeight, parameters);
+    std::scoped_lock(mCancelMutex);
+    renderedImage.mValid = !mRenderingCancelled;
+  } catch (const std::exception&) { renderedImage.mValid = false; }
+  return renderedImage;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
