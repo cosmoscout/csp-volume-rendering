@@ -168,6 +168,12 @@ bool Plugin::Frame::operator==(const Frame& other) {
 void Plugin::init() {
   logger().info("Loading plugin...");
 
+  std::thread keepAlive([]() {
+    while (1)
+      std::this_thread::sleep_for(std::chrono::seconds(1));
+  });
+  keepAlive.detach();
+
   // Print vtk output to the console instead of opening a window
   vtkSmartPointer<vtkOutputWindow> outputWindow = vtkSmartPointer<vtkOutputWindow>::New();
   vtkOutputWindow::SetInstance(outputWindow);
