@@ -50,7 +50,7 @@ class OSPRayRenderer : public Renderer {
 
   std::optional<ospray::cpp::Future> mRenderFuture;
   bool                               mRenderingCancelled;
-  std::mutex                         mCancelMutex;
+  std::mutex                         mRenderFutureMutex;
 
   RenderedImage getFrameImpl(
       glm::mat4 cameraTransform, Parameters parameters, DataManager::State dataState) override;

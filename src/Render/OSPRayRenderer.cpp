@@ -45,6 +45,7 @@ OSPRayRenderer::~OSPRayRenderer() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 float OSPRayRenderer::getProgress() {
+  std::scoped_lock(mRenderFutureMutex);
   if (mRenderFuture.has_value()) {
     return mRenderFuture->progress();
   } else {
@@ -64,8 +65,8 @@ void OSPRayRenderer::preloadData(DataManager::State state) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void OSPRayRenderer::cancelRendering() {
+  std::scoped_lock(mRenderFutureMutex);
   if (mRenderFuture.has_value()) {
-    std::scoped_lock(mCancelMutex);
     mRenderFuture->cancel();
     mRenderingCancelled = true;
   }
@@ -75,10 +76,7 @@ void OSPRayRenderer::cancelRendering() {
 
 Renderer::RenderedImage OSPRayRenderer::getFrameImpl(
     glm::mat4 cameraTransform, Parameters parameters, DataManager::State dataState) {
-  {
-    std::scoped_lock lock(mCancelMutex);
-    mRenderingCancelled = false;
-  }
+  mRenderingCancelled = false;
   RenderedImage renderedImage;
   try {
     const Volume&            volume = getVolume(dataState);
@@ -86,8 +84,7 @@ Renderer::RenderedImage OSPRayRenderer::getFrameImpl(
     Camera                   camera = getCamera(volume.mHeight, cameraTransform);
     ospray::cpp::FrameBuffer frame  = renderFrame(world, camera.mOsprayCamera, parameters);
     renderedImage                   = extractImageData(frame, camera, volume.mHeight, parameters);
-    std::scoped_lock(mCancelMutex);
-    renderedImage.mValid = !mRenderingCancelled;
+    renderedImage.mValid            = !mRenderingCancelled;
   } catch (const std::exception&) { renderedImage.mValid = false; }
   return renderedImage;
 }
@@ -353,9 +350,15 @@ ospray::cpp::FrameBuffer OSPRayRenderer::renderFrame(
   framebuffer.clear();
   framebuffer.commit();
 
-  mRenderFuture = framebuffer.renderFrame(renderer, camera, world);
+  {
+    std::scoped_lock(mRenderFutureMutex);
+    mRenderFuture = framebuffer.renderFrame(renderer, camera, world);
+  }
   mRenderFuture->wait();
-  mRenderFuture.reset();
+  {
+    std::scoped_lock(mRenderFutureMutex);
+    mRenderFuture.reset();
+  }
   return framebuffer;
 }
 
