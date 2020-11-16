@@ -12,9 +12,6 @@
 #include "../../../../src/cs-utils/FrameTimings.hpp"
 #include "../../../../src/cs-utils/utils.hpp"
 
-#include <VistaKernel/GraphicsManager/VistaSceneGraph.h>
-#include <VistaKernel/GraphicsManager/VistaTransformNode.h>
-#include <VistaKernel/VistaSystem.h>
 #include <VistaKernelOpenSGExt/VistaOpenSGMaterialTools.h>
 #include <VistaMath/VistaBoundingBox.h>
 #include <VistaOGLExt/VistaOGLUtils.h>
@@ -29,63 +26,12 @@ const uint32_t GRID_RESOLUTION = 256;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Billboard::Billboard(std::string const& sCenterName, std::string const& sFrameName,
-    double tStartExistence, double tEndExistence, glm::dvec3 radii)
-    : cs::scene::CelestialObject(sCenterName, sFrameName, tStartExistence, tEndExistence)
-    , mRadii(radii)
-    , mTexture(GL_TEXTURE_2D)
-    , mDepthValues(GRID_RESOLUTION * GRID_RESOLUTION)
-    , mDepthResolution(GRID_RESOLUTION) {
-  pVisibleRadius = mRadii[0];
-
-  createBuffers();
-
-  mShaderDirty = true;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Billboard::setEnabled(bool enabled) {
-  mEnabled = enabled;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Billboard::setTexture(std::vector<uint8_t>& texture, int width, int height) {
-  mTexture.UploadTexture(width, height, texture.data(), false, GL_RGBA);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Billboard::setDepthTexture(std::vector<float>& texture, int width, int height) {
-  mDepthValues     = texture;
-  mDepthResolution = width;
-
-  createBuffers();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Billboard::setTransform(glm::mat4 transform) {
-  mTransform = transform;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Billboard::setMVPMatrix(glm::mat4 mvp) {
-  mRendererMVP = mvp;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Billboard::setUseDepth(bool useDepth) {
-  mUseDepth = useDepth;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Billboard::setDrawDepth(bool drawDepth) {
-  mDrawDepth = drawDepth;
+Billboard::Billboard(VistaSceneGraph* sceneGraph, std::string const& centerName,
+    std::string const& frameName, double startExistence, double endExistence, glm::dvec3 radii)
+    : DisplayNode(
+          sceneGraph, centerName, frameName, startExistence, endExistence, radii, GRID_RESOLUTION) {
+  pDepthValues.connectAndTouch(
+      [this](std::vector<float> depthValues) { createBuffers(depthValues); });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -155,13 +101,7 @@ bool Billboard::Do() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool Billboard::GetBoundingBox(VistaBoundingBox& bb) {
-  return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Billboard::createBuffers() {
+void Billboard::createBuffers(std::vector<float> depthValues) {
   std::vector<float>    vertices(GRID_RESOLUTION * GRID_RESOLUTION * 3);
   std::vector<unsigned> indices((GRID_RESOLUTION - 1) * (2 + 2 * GRID_RESOLUTION));
 
@@ -170,8 +110,8 @@ void Billboard::createBuffers() {
       vertices[(x * GRID_RESOLUTION + y) * 3 + 0] = 2.f / (GRID_RESOLUTION - 1) * x - 1.f;
       vertices[(x * GRID_RESOLUTION + y) * 3 + 1] = 2.f / (GRID_RESOLUTION - 1) * y - 1.f;
       vertices[(x * GRID_RESOLUTION + y) * 3 + 2] =
-          mDepthValues[y * mDepthResolution / GRID_RESOLUTION * mDepthResolution +
-                       x * mDepthResolution / GRID_RESOLUTION];
+          depthValues[y * mDepthResolution / GRID_RESOLUTION * mDepthResolution +
+                      x * mDepthResolution / GRID_RESOLUTION];
     }
   }
 

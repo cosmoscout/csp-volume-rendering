@@ -25,63 +25,11 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-PointsForwardWarped::PointsForwardWarped(std::string const& sCenterName,
-    std::string const& sFrameName, double tStartExistence, double tEndExistence, glm::dvec3 radii)
-    : cs::scene::CelestialObject(sCenterName, sFrameName, tStartExistence, tEndExistence)
-    , mRadii(radii)
-    , mTexture(GL_TEXTURE_2D)
-    , mDepthValues(256 * 256)
-    , mDepthResolution(256) {
-  pVisibleRadius = mRadii[0];
-
-  createBuffers();
-
-  mShaderDirty = true;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void PointsForwardWarped::setEnabled(bool enabled) {
-  mEnabled = enabled;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void PointsForwardWarped::setTexture(std::vector<uint8_t>& texture, int width, int height) {
-  mTexture.UploadTexture(width, height, texture.data(), false, GL_RGBA);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void PointsForwardWarped::setDepthTexture(std::vector<float>& texture, int width, int height) {
-  mDepthValues     = texture;
-  mDepthResolution = width;
-
-  createBuffers();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void PointsForwardWarped::setTransform(glm::mat4 transform) {
-  mTransform = transform;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void PointsForwardWarped::setMVPMatrix(glm::mat4 mvp) {
-  mRendererMVP = mvp;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void PointsForwardWarped::setUseDepth(bool useDepth) {
-  mUseDepth = useDepth;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void PointsForwardWarped::setDrawDepth(bool drawDepth) {
-  mDrawDepth = drawDepth;
+PointsForwardWarped::PointsForwardWarped(VistaSceneGraph* sceneGraph, std::string const& centerName,
+    std::string const& frameName, double startExistence, double endExistence, glm::dvec3 radii)
+    : DisplayNode(sceneGraph, centerName, frameName, startExistence, endExistence, radii, 256) {
+  pDepthValues.connectAndTouch(
+      [this](std::vector<float> depthValues) { createBuffers(depthValues); });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -189,13 +137,7 @@ bool PointsForwardWarped::Do() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool PointsForwardWarped::GetBoundingBox(VistaBoundingBox& bb) {
-  return false;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void PointsForwardWarped::createBuffers() {
+void PointsForwardWarped::createBuffers(std::vector<float> depthValues) {
   std::vector<float>    vertices(mDepthResolution * mDepthResolution * 3);
   std::vector<unsigned> indices((mDepthResolution - 1) * (2 + 2 * mDepthResolution));
 
@@ -204,8 +146,8 @@ void PointsForwardWarped::createBuffers() {
       vertices[(x * mDepthResolution + y) * 3 + 0] = 2.f / (mDepthResolution - 1) * x - 1.f;
       vertices[(x * mDepthResolution + y) * 3 + 1] = 2.f / (mDepthResolution - 1) * y - 1.f;
       vertices[(x * mDepthResolution + y) * 3 + 2] =
-          mDepthValues[y * mDepthResolution / mDepthResolution * mDepthResolution +
-                       x * mDepthResolution / mDepthResolution];
+          depthValues[y * mDepthResolution / mDepthResolution * mDepthResolution +
+                      x * mDepthResolution / mDepthResolution];
     }
   }
 

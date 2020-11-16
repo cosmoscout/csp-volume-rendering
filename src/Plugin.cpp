@@ -199,10 +199,9 @@ void Plugin::init() {
 void Plugin::deInit() {
   logger().info("Unloading plugin...");
 
-  mSolarSystem->unregisterAnchor(mBillboard);
-  mSolarSystem->unregisterAnchor(mPoints);
-  mSceneGraph->GetRoot()->DisconnectChild(mBillboardNode.get());
-  mSceneGraph->GetRoot()->DisconnectChild(mPointsNode.get());
+  for (auto const& node : mDisplayNodes) {
+    mSolarSystem->unregisterAnchor(node.second);
+  }
 
   mAllSettings->onLoad().disconnect(mOnLoadConnection);
   mAllSettings->onSave().disconnect(mOnSaveConnection);
@@ -284,14 +283,11 @@ void Plugin::onLoad() {
       mDataManager, mPluginSettings.mVolumeStructure.get(), mPluginSettings.mVolumeShape.get());
 
   // If the volume representations already exist, remove them from the solar system
-  if (mBillboard) {
-    mSolarSystem->unregisterAnchor(mBillboard);
-    mSceneGraph->GetRoot()->DisconnectChild(mBillboardNode.get());
+  for (auto const& node : mDisplayNodes) {
+    mSolarSystem->unregisterAnchor(node.second);
   }
-  if (mPoints) {
-    mSolarSystem->unregisterAnchor(mPoints);
-    mSceneGraph->GetRoot()->DisconnectChild(mPointsNode.get());
-  }
+  mDisplayNodes.clear();
+  mActiveDisplay.reset();
 
   // Init volume representation
   auto anchor = mAllSettings->mAnchors.find(mPluginSettings.mAnchor.get());
@@ -301,31 +297,25 @@ void Plugin::onLoad() {
   }
 
   auto [tStartExistence, tEndExistence] = anchor->second.getExistence();
-  mBillboard = std::make_shared<Billboard>(anchor->second.mCenter, anchor->second.mFrame,
-      tStartExistence, tEndExistence, cs::core::SolarSystem::getRadii(anchor->second.mCenter));
-  mPoints    = std::make_shared<PointsForwardWarped>(anchor->second.mCenter, anchor->second.mFrame,
-      tStartExistence, tEndExistence, cs::core::SolarSystem::getRadii(anchor->second.mCenter));
-  mBillboard->setAnchorPosition(mPluginSettings.mPosition.get());
-  mBillboard->setAnchorScale(mPluginSettings.mScale.get());
-  mBillboard->setAnchorRotation(mPluginSettings.mRotation.get());
-  mPoints->setAnchorPosition(mPluginSettings.mPosition.get());
-  mPoints->setAnchorScale(mPluginSettings.mScale.get());
-  mPoints->setAnchorRotation(mPluginSettings.mRotation.get());
+  mDisplayNodes[Plugin::Settings::DisplayMode::eMesh] =
+      std::make_shared<Billboard>(mSceneGraph, anchor->second.mCenter, anchor->second.mFrame,
+          tStartExistence, tEndExistence, cs::core::SolarSystem::getRadii(anchor->second.mCenter));
+  mDisplayNodes[Plugin::Settings::DisplayMode::ePoints] = std::make_shared<PointsForwardWarped>(
+      mSceneGraph, anchor->second.mCenter, anchor->second.mFrame, tStartExistence, tEndExistence,
+      cs::core::SolarSystem::getRadii(anchor->second.mCenter));
 
-  // Add volume representation to solar system and scene graph
-  mSolarSystem->registerAnchor(mBillboard);
-  mBillboardNode.reset(mSceneGraph->NewOpenGLNode(mSceneGraph->GetRoot(), mBillboard.get()));
-  VistaOpenSGMaterialTools::SetSortKeyOnSubtree(
-      mBillboardNode.get(), static_cast<int>(cs::utils::DrawOrder::eTransparentItems));
-  mSolarSystem->registerAnchor(mPoints);
-  mPointsNode.reset(mSceneGraph->NewOpenGLNode(mSceneGraph->GetRoot(), mPoints.get()));
-  VistaOpenSGMaterialTools::SetSortKeyOnSubtree(
-      mPointsNode.get(), static_cast<int>(cs::utils::DrawOrder::eTransparentItems));
+  for (auto const& node : mDisplayNodes) {
+    node.second->setAnchorPosition(mPluginSettings.mPosition.get());
+    node.second->setAnchorScale(mPluginSettings.mScale.get());
+    node.second->setAnchorRotation(mPluginSettings.mRotation.get());
+
+    mSolarSystem->registerAnchor(node.second);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void csp::volumerendering::Plugin::registerUICallbacks() {
+void Plugin::registerUICallbacks() {
   // Rendering settings
   mGuiManager->getGui()->registerCallback("volumeRendering.setEnableRequestImages",
       "If disabled no new images will be rendered.",
@@ -556,23 +546,30 @@ void Plugin::connectSettings() {
     mGuiManager->setCheckboxValue("volumeRendering.setEnableReuseImages", enable);
   });
   mPluginSettings.mDepthData.connectAndTouch([this](bool enable) {
-    mBillboard->setUseDepth(enable);
-    mPoints->setUseDepth(enable);
+    for (auto const& node : mDisplayNodes) {
+      node.second->setUseDepth(enable);
+    }
     mGuiManager->setCheckboxValue("volumeRendering.setEnableDepthData", enable);
   });
   mPluginSettings.mDrawDepth.connectAndTouch([this](bool enable) {
-    mBillboard->setDrawDepth(enable);
-    mPoints->setDrawDepth(enable);
+    for (auto const& node : mDisplayNodes) {
+      node.second->setDrawDepth(enable);
+    }
     mGuiManager->setCheckboxValue("volumeRendering.setEnableDrawDepth", enable);
   });
   mPluginSettings.mDisplayMode.connectAndTouch([this](Settings::DisplayMode displayMode) {
+    for (auto const& node : mDisplayNodes) {
+      if (node.first == displayMode) {
+        node.second->setEnabled(true);
+      } else {
+        node.second->setEnabled(false);
+      }
+    }
+    mActiveDisplay = mDisplayNodes.find(displayMode)->second;
+
     if (displayMode == Settings::DisplayMode::eMesh) {
-      mBillboard->setEnabled(true);
-      mPoints->setEnabled(false);
       mGuiManager->setRadioChecked("volumeRendering.setDisplayMode0");
     } else if (displayMode == Settings::DisplayMode::ePoints) {
-      mBillboard->setEnabled(false);
-      mPoints->setEnabled(true);
       mGuiManager->setRadioChecked("volumeRendering.setDisplayMode1");
     }
     if (mDisplayedFrame.has_value()) {
@@ -595,14 +592,14 @@ void Plugin::initUI() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool csp::volumerendering::Plugin::tryRequestFrame() {
+bool Plugin::tryRequestFrame() {
   if ((!(mNextFrame == mRenderingFrame) || mParametersDirty || mFrameInvalid) &&
-      mBillboard->pVisible.get()) {
+      mActiveDisplay->pVisible.get()) {
     cs::utils::FrameTimings::ScopedTimer timer("Request frame");
 
     mRenderingFrame = mNextFrame;
-    glm::vec4 dir   = glm::vec4(mSolarSystem->getSunDirection(mBillboard->getWorldPosition()), 1);
-    dir             = dir * glm::inverse(mRenderingFrame.mCameraTransform);
+    glm::vec4 dir = glm::vec4(mSolarSystem->getSunDirection(mActiveDisplay->getWorldPosition()), 1);
+    dir           = dir * glm::inverse(mRenderingFrame.mCameraTransform);
     mRenderer->setSunDirection(dir);
     mFutureFrameData   = mRenderer->getFrame(mRenderingFrame.mCameraTransform);
     mLastFrameInterval = 0;
@@ -615,11 +612,11 @@ bool csp::volumerendering::Plugin::tryRequestFrame() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-glm::mat4 csp::volumerendering::Plugin::getCurrentCameraTransform() {
-  glm::mat4 currentCameraTransform = mBillboard->getRelativeTransform(
+glm::mat4 Plugin::getCurrentCameraTransform() {
+  glm::mat4 currentCameraTransform = mActiveDisplay->getRelativeTransform(
       mTimeControl->pSimulationTime.get(), mSolarSystem->getObserver());
-  float     scale = (float)mBillboard->getRelativeScale(mSolarSystem->getObserver());
-  glm::vec3 r     = cs::core::SolarSystem::getRadii(mBillboard->getCenterName());
+  float     scale = (float)mActiveDisplay->getRelativeScale(mSolarSystem->getObserver());
+  glm::vec3 r     = cs::core::SolarSystem::getRadii(mActiveDisplay->getCenterName());
   currentCameraTransform =
       glm::scale(currentCameraTransform, glm::vec3(1.f / scale, 1.f / scale, 1.f / scale));
   currentCameraTransform[3] *= glm::vec4(1 / r[0], 1 / r[1], 1 / r[2], 1);
@@ -639,7 +636,7 @@ glm::mat4 csp::volumerendering::Plugin::getCurrentCameraTransform() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-glm::mat4 csp::volumerendering::Plugin::predictCameraTransform(glm::mat4 currentTransform) {
+glm::mat4 Plugin::predictCameraTransform(glm::mat4 currentTransform) {
   glm::mat4 predictedCameraTransform = currentTransform;
   int       meanFrameInterval =
       std::accumulate(mFrameIntervals.begin(), mFrameIntervals.end(), 0) / mFrameIntervalsLength;
@@ -661,7 +658,7 @@ glm::mat4 csp::volumerendering::Plugin::predictCameraTransform(glm::mat4 current
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void csp::volumerendering::Plugin::showRenderProgress() {
+void Plugin::showRenderProgress() {
   std::stringstream code;
   code << "CosmoScout.volumeRendering.setRenderProgress(" << mRenderer->getProgress() << ", false)";
   mGuiManager->addScriptToGui(code.str());
@@ -669,7 +666,7 @@ void csp::volumerendering::Plugin::showRenderProgress() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void csp::volumerendering::Plugin::receiveFrame() {
+void Plugin::receiveFrame() {
   mFrameIntervals[mFrameIntervalsIndex] = mLastFrameInterval;
   if (++mFrameIntervalsIndex >= mFrameIntervalsLength) {
     mFrameIntervalsIndex = 0;
@@ -724,23 +721,14 @@ void Plugin::displayFrame(Frame& frame) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void csp::volumerendering::Plugin::displayFrame(Frame& frame, Settings::DisplayMode displayMode) {
+void Plugin::displayFrame(Frame& frame, Settings::DisplayMode displayMode) {
   cs::utils::FrameTimings::ScopedTimer timer("Display volume frame");
 
-  switch (displayMode) {
-  case Settings::DisplayMode::eMesh:
-    mBillboard->setTexture(frame.mColorImage, frame.mResolution, frame.mResolution);
-    mBillboard->setDepthTexture(frame.mDepthImage, frame.mResolution, frame.mResolution);
-    mBillboard->setTransform(glm::toMat4(glm::toQuat(frame.mCameraTransform)));
-    mBillboard->setMVPMatrix(frame.mModelViewProjection);
-    break;
-  case Settings::DisplayMode::ePoints:
-    mPoints->setTexture(frame.mColorImage, frame.mResolution, frame.mResolution);
-    mPoints->setDepthTexture(frame.mDepthImage, frame.mResolution, frame.mResolution);
-    mPoints->setTransform(glm::toMat4(glm::toQuat(frame.mCameraTransform)));
-    mPoints->setMVPMatrix(frame.mModelViewProjection);
-    break;
-  }
+  std::shared_ptr<DisplayNode> displayNode = mDisplayNodes.find(displayMode)->second;
+  displayNode->setTexture(frame.mColorImage, frame.mResolution, frame.mResolution);
+  displayNode->setDepthTexture(frame.mDepthImage, frame.mResolution, frame.mResolution);
+  displayNode->setTransform(glm::toMat4(glm::toQuat(frame.mCameraTransform)));
+  displayNode->setMVPMatrix(frame.mModelViewProjection);
 
   mDisplayedFrame = frame;
 }

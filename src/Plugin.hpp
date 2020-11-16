@@ -8,6 +8,7 @@
 #define CSP_VOLUME_RENDERING_PLUGIN_HPP
 
 #include "Data/DataManager.hpp"
+#include "Display/DisplayNode.hpp"
 #include "Render/Renderer.hpp"
 
 #include "../../../src/cs-core/PluginBase.hpp"
@@ -23,9 +24,6 @@
 #include <string>
 
 namespace csp::volumerendering {
-
-class Billboard;
-class PointsForwardWarped;
 
 class Plugin : public cs::core::PluginBase {
  public:
@@ -120,12 +118,10 @@ class Plugin : public cs::core::PluginBase {
   int                    mCameraTransformsLength = 15;
   int                    mCameraTransformsIndex  = 0;
 
-  std::unique_ptr<Renderer>            mRenderer;
-  std::shared_ptr<DataManager>         mDataManager;
-  std::shared_ptr<PointsForwardWarped> mPoints;
-  std::shared_ptr<Billboard>           mBillboard;
-  std::shared_ptr<VistaOpenGLNode>     mPointsNode;
-  std::shared_ptr<VistaOpenGLNode>     mBillboardNode;
+  std::unique_ptr<Renderer>                                     mRenderer;
+  std::shared_ptr<DataManager>                                  mDataManager;
+  std::map<Settings::DisplayMode, std::shared_ptr<DisplayNode>> mDisplayNodes;
+  std::shared_ptr<DisplayNode>                                  mActiveDisplay;
 
   std::future<Renderer::RenderedImage> mFutureFrameData;
 
