@@ -16,6 +16,8 @@
 
 namespace csp::volumerendering {
 
+/// DisplayNode implementation, that displays pixels of a rendered volume image as discrete points.
+/// The number of used points is equal to the number of pixels in the used depth image.
 class PointsForwardWarped : public DisplayNode {
  public:
   PointsForwardWarped(VistaSceneGraph* sceneGraph, std::string const& centerName,

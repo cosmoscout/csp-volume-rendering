@@ -21,8 +21,14 @@
 
 namespace csp::volumerendering {
 
+/// The abstract DisplayNode provides an interface for CelestialObjects that should display images
+/// rendered with a Renderer.
 class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
  public:
+  /// Create a DisplayNode in a coordinated system defined by centerName and frameName.
+  /// It will automatically be added to the Vista scene graph on construction and removed on
+  /// destruction. startExistence, endExistence and radii are passed to the CelestialObject base
+  /// class. The depthResolution is used as an initial mesh resolution of the created objects.
   DisplayNode(VistaSceneGraph* sceneGraph, std::string const& centerName,
       std::string const& frameName, double startExistence, double endExistence, glm::dvec3 radii,
       int depthResolution);
@@ -34,13 +40,24 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   DisplayNode& operator=(DisplayNode const& other) = delete;
   DisplayNode& operator=(DisplayNode&& other) = default;
 
+  /// Enable rendering of the display node.
   void setEnabled(bool enabled);
 
+  /// Set the color image that should be displayed.
+  /// The color data should be given as an array of rgba values (8 bit per channel).
   void setTexture(std::vector<uint8_t>& texture, int width, int height);
+  /// Set the depth information for displaying the image.
+  /// The depth data should be given as an array of z-positions in clip space per pixel.
   void setDepthTexture(std::vector<float>& texture, int width, int height);
+  /// Sets the base transform of the display node.
+  /// This should correspond to the perspective, from which the image was rendered.
   void setTransform(glm::mat4 transform);
+  /// Sets the model view projection matrix used in rendering the color image.
   void setMVPMatrix(glm::mat4 mvp);
+
+  /// Enables using the depth information for image based rendering.
   void setUseDepth(bool useDepth);
+  /// Enables drawing the depth data as grayscale instead of the color image.
   void setDrawDepth(bool drawDepth);
 
   /// Interface implementation of IVistaOpenGLDraw.

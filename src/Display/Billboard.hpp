@@ -16,6 +16,8 @@
 
 namespace csp::volumerendering {
 
+/// DisplayNode implementation, that displays rendered volume images on a continuous plane mesh.
+/// The mesh has a constant amount of vertices equal to GRID_RESOLUTION^2 (defined in Billboard.cpp).
 class Billboard : public DisplayNode {
  public:
   Billboard(VistaSceneGraph* sceneGraph, std::string const& centerName,
