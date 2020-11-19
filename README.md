@@ -155,9 +155,25 @@ The current progress of the rendering progress is shown using the bar next to th
 
 #### Transfer Function
 
-The transfer function section contains an editor for setting the transfer function that should be used for rendering.
+The transfer function section contains an editor for setting the transfer function that is used for rendering.
+The leftmost value of the function will be used for the lowest scalar value present in the dataset, the rightmost will be used for the highest value present.
 
-**TODO** more instructions
+The transfer function is defined by multiple control points which can dragged with the mouse.
+The y position of each point defines the opacity of the function for the corresponding scalar value.
+Between two points the opacity is interpolated.
+
+In addition to the opacity values each point may also define a color value for the corresponding scalar value.
+Points that define a color value are shown slightly larger on the graph.
+The color function is calculated by interpolating between all control points that do have a color value.
+
+Whether a control point defines a color value can be set using the lock button below the transfer function graph.
+If the lock button shows a closed lock, the color of the currently selected control point (orange outline) can be selected using the button next to the lock button.
+It he lock button shows an unlocked lock the control point does not carry any color information.
+The state of the lock button can be switched by clicking it.
+
+The current transfer function can be saved to a json file by entering a filename and then clicking the export button.
+Previously exported functions can be imported by selecting them from the dropdown at the bottom of the section and then clicking the import button.
+Transfer functions are exported to and imported from `<cosmoscout-installation-directory>/share/resources/transferfunctions/`.
 
 ![sidebar transfer function section](docs/img/sidebar_transfer_function.png)
 
@@ -171,24 +187,41 @@ This prevents holes in the volume when viewed from the side but may result in "s
 In `points` mode the pixels of the displayed image are rendered as points of varying size.
 This may result in visible grid patterns and holes in the volume when viewed from the side.
 
-**TODO** images mesh, points
+Mesh mode | Points mode
+:--: | :--:
+![display using mesh](docs/img/display_mesh.png "Display using mesh mode") | ![display using points](docs/img/display_points.png "Display using points mode")
 
 ![sidebar display section](docs/img/sidebar_display.png)
 
 #### Depth
 
-**TODO**
+The depth section allows configurating the image based rendering.
+
+If the first checkbox "Use depth data" is enabled, depth information that was collected during rendering is used for warping the image for viewing it from novel perspectives.
+If it is disabled, the image will be displayed as a flat image.
+
+The second checkbox allows rendering the collected depth information as a grayscale image instead of the color image.
+Areas that are shown in darker colors are closer to the camera, while brighter areas are further from the camera.
+
+The radio buttons at the bottom of the section allow selecting the heuristic, that should be used for gathering depth information on the volume. The recommended setting for most cases is "Multiple opacity thresholds".
 
 ![sidebar depth section](docs/img/sidebar_depth.png)
 
 #### Denoising
 
-**TODO**
+The plugin optionally uses Intel Open Image Denoise (OIDN) for denoising both the rendered color images, as well as the depth information.
+This can be enabled/disabled in this section for both images seperately.
 
 ![sidebar denoising section](docs/img/sidebar_denoising.png)
 
 #### Latency compensation
 
-**TODO**
+The latency compensation section contains toggles for features to reduce the effects of the rendering latency.
+
+Predictive rendering aims to render images not for the current camera perspective, but for the perspective, that the camera may have when the image has finished rendering.
+This is most effective when the camera is constantly moved at a steady pace.
+
+Reuse images enables displaying previously rendered images, if those are a better fit for the current perspective than the latest rendered image.
+Only images rendered with the same parameters will be considered for reuse.
 
 ![sidebar latency compensation section](docs/img/sidebar_latency_compensation.png)
