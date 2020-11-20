@@ -20,8 +20,7 @@ namespace csp::volumerendering {
 /// The number of used points is equal to the number of pixels in the used depth image.
 class PointsForwardWarped : public DisplayNode {
  public:
-  PointsForwardWarped(VistaSceneGraph* sceneGraph, std::string const& centerName,
-      std::string const& frameName, double startExistence, double endExistence, glm::dvec3 radii);
+  PointsForwardWarped(std::shared_ptr<cs::core::Settings> settings, std::string anchor);
 
   PointsForwardWarped(PointsForwardWarped const& other) = delete;
   PointsForwardWarped(PointsForwardWarped&& other)      = default;

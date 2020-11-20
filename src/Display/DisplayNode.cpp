@@ -25,19 +25,16 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-DisplayNode::DisplayNode(VistaSceneGraph* sceneGraph, std::string const& centerName,
-    std::string const& frameName, double startExistence, double endExistence, glm::dvec3 radii,
-    int depthResolution)
-    : cs::scene::CelestialObject(centerName, frameName, startExistence, endExistence)
-    , mVistaSceneGraph(sceneGraph)
-    , mRadii(radii)
-    , mTexture(GL_TEXTURE_2D)
+DisplayNode::DisplayNode(
+    std::shared_ptr<cs::core::Settings> settings, std::string anchor, int depthResolution)
+    : mTexture(GL_TEXTURE_2D)
     , pDepthValues(std::vector<float>(depthResolution * depthResolution))
     , mDepthResolution(depthResolution)
     , mShaderDirty(true) {
-  pVisibleRadius = mRadii[0];
+  settings->initAnchor(*this, anchor);
 
-  mVistaNode.reset(mVistaSceneGraph->NewOpenGLNode(mVistaSceneGraph->GetRoot(), this));
+  VistaSceneGraph* pSG = GetVistaSystem()->GetGraphicsManager()->GetSceneGraph();
+  mVistaNode.reset(pSG->NewOpenGLNode(pSG->GetRoot(), this));
   VistaOpenSGMaterialTools::SetSortKeyOnSubtree(
       mVistaNode.get(), static_cast<int>(cs::utils::DrawOrder::eTransparentItems));
 }
@@ -45,7 +42,8 @@ DisplayNode::DisplayNode(VistaSceneGraph* sceneGraph, std::string const& centerN
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 DisplayNode::~DisplayNode() {
-  mVistaSceneGraph->GetRoot()->DisconnectChild(mVistaNode.get());
+  VistaSceneGraph* pSG = GetVistaSystem()->GetGraphicsManager()->GetSceneGraph();
+  pSG->GetRoot()->DisconnectChild(mVistaNode.get());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

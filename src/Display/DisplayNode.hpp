@@ -16,6 +16,7 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
+#include "../../../../src/cs-core/Settings.hpp"
 #include "../../../../src/cs-scene/CelestialObject.hpp"
 #include "../../../../src/cs-utils/DefaultProperty.hpp"
 
@@ -25,13 +26,11 @@ namespace csp::volumerendering {
 /// rendered with a Renderer.
 class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
  public:
-  /// Create a DisplayNode in a coordinated system defined by centerName and frameName.
+  /// Create a DisplayNode positioned at the given anchor using properties found in settings.
   /// It will automatically be added to the Vista scene graph on construction and removed on
-  /// destruction. startExistence, endExistence and radii are passed to the CelestialObject base
-  /// class. The depthResolution is used as an initial mesh resolution of the created objects.
-  DisplayNode(VistaSceneGraph* sceneGraph, std::string const& centerName,
-      std::string const& frameName, double startExistence, double endExistence, glm::dvec3 radii,
-      int depthResolution);
+  /// destruction. The depthResolution is used as an initial mesh resolution of the created objects.
+  DisplayNode(
+      std::shared_ptr<cs::core::Settings> settings, std::string anchor, int depthResolution);
   virtual ~DisplayNode();
 
   DisplayNode(DisplayNode const& other) = delete;
@@ -65,7 +64,6 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   bool         GetBoundingBox(VistaBoundingBox& bb) override;
 
  protected:
-  VistaSceneGraph*                 mVistaSceneGraph;
   std::shared_ptr<VistaOpenGLNode> mVistaNode;
 
   bool mEnabled = false;
@@ -79,8 +77,6 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   int                                     mDepthResolution;
   bool                                    mUseDepth  = true;
   bool                                    mDrawDepth = false;
-
-  glm::dvec3 mRadii;
 
   bool mShaderDirty;
 };

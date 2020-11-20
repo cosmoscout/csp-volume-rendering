@@ -25,9 +25,9 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-PointsForwardWarped::PointsForwardWarped(VistaSceneGraph* sceneGraph, std::string const& centerName,
-    std::string const& frameName, double startExistence, double endExistence, glm::dvec3 radii)
-    : DisplayNode(sceneGraph, centerName, frameName, startExistence, endExistence, radii, 256) {
+PointsForwardWarped::PointsForwardWarped(
+    std::shared_ptr<cs::core::Settings> settings, std::string anchor)
+    : DisplayNode(settings, anchor, 256) {
   pDepthValues.connectAndTouch(
       [this](std::vector<float> depthValues) { createBuffers(depthValues); });
 }
