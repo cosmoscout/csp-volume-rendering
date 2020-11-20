@@ -117,11 +117,11 @@
             this.formatCount = d3.format(",.0f");
 
             // Axis scales
-            this.xScale = d3.scale.linear();
-            this.yScale = d3.scale.linear();
+            this.xScale = d3.scaleLinear();
+            this.yScale = d3.scaleLinear();
 
             // Area for the opacity map representation
-            this.area = d3.svg.area();
+            this.area = d3.area();
 
             // Keep track of control points interaction
             this.dragged = null;
@@ -263,12 +263,12 @@
             g.append("g")
                 .attr("class", "axis axis--x")
                 .attr("transform", "translate(0," + me._height + ")")
-                .call(d3.svg.axis().scale(me.xScale).orient("bottom").tickValues(xTicks));
+                .call(d3.axisBottom(me.xScale).tickValues(xTicks));
 
             g.append("g")
                 .attr("class", "axis axis--y")
                 .attr("transform", "translate(0, 0)")
-                .call(d3.svg.axis().scale(me.yScale).orient("left").ticks(me.numberTicks));
+                .call(d3.axisLeft(me.yScale).ticks(me.numberTicks));
         }
 
         // update scales with new data input
