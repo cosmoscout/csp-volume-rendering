@@ -11,9 +11,9 @@
 
 #include "../../../src/cs-utils/Property.hpp"
 
-#include <vtk-8.2/vtkCellArray.h>
-#include <vtk-8.2/vtkDataSet.h>
-#include <vtk-8.2/vtkSmartPointer.h>
+#include <vtk-8.1/vtkCellArray.h>
+#include <vtk-8.1/vtkDataSet.h>
+#include <vtk-8.1/vtkSmartPointer.h>
 
 #include <future>
 #include <map>

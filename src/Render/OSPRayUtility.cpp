@@ -18,10 +18,10 @@
 
 #include <rkcommon/math/vec.h>
 
-#include <vtk-8.2/vtkCellArray.h>
-#include <vtk-8.2/vtkCellData.h>
-#include <vtk-8.2/vtkPointData.h>
-#include <vtk-8.2/vtkUnsignedCharArray.h>
+#include <vtk-8.1/vtkCellArray.h>
+#include <vtk-8.1/vtkCellData.h>
+#include <vtk-8.1/vtkPointData.h>
+#include <vtk-8.1/vtkUnsignedCharArray.h>
 
 #include <cmath>
 #include <future>

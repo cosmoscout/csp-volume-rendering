@@ -9,9 +9,9 @@
 
 #include <ospray/ospray_cpp.h>
 
-#include <vtk-8.2/vtkSmartPointer.h>
-#include <vtk-8.2/vtkStructuredPoints.h>
-#include <vtk-8.2/vtkUnstructuredGrid.h>
+#include <vtk-8.1/vtkSmartPointer.h>
+#include <vtk-8.1/vtkStructuredPoints.h>
+#include <vtk-8.1/vtkUnstructuredGrid.h>
 
 #include <glm/gtc/type_ptr.hpp>
 

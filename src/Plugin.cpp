@@ -25,8 +25,8 @@
 #include <VistaKernel/GraphicsManager/VistaSceneGraph.h>
 #include <VistaKernelOpenSGExt/VistaOpenSGMaterialTools.h>
 
-#include <vtk-8.2/vtkOutputWindow.h>
-#include <vtk-8.2/vtkSmartPointer.h>
+#include <vtk-8.1/vtkOutputWindow.h>
+#include <vtk-8.1/vtkSmartPointer.h>
 
 #include "glm/gtc/epsilon.hpp"
 #include "glm/gtx/quaternion.hpp"

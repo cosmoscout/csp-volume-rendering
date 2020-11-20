@@ -10,7 +10,7 @@
 
 #include "../../../src/cs-utils/filesystem.hpp"
 
-#include <vtk-8.2/vtkPointData.h>
+#include <vtk-8.1/vtkPointData.h>
 
 #include <ViracochaBackend/DataManager/VrcGenericDataLoader.h>
 
