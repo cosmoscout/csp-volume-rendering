@@ -420,7 +420,7 @@ void Plugin::registerUICallbacks() {
       "Sets the transfer function for rendering the volume.",
       std::function([this](std::string json) {
         mRenderedFrames.clear();
-        cs::graphics::ColorMap colorMap(json, false);
+        cs::graphics::ColorMap colorMap(json);
         mRenderer->setTransferFunction(colorMap.getRawData());
         mParametersDirty = true;
       }));
