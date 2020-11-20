@@ -12,8 +12,6 @@
 
 #include <vtk-8.1/vtkPointData.h>
 
-#include <ViracochaBackend/DataManager/VrcGenericDataLoader.h>
-
 #include <algorithm>
 #include <future>
 #include <regex>

@@ -6,7 +6,6 @@
 
 #include "Plugin.hpp"
 
-#include "Data/GaiaDataManager.hpp"
 #include "Data/VtkDataManager.hpp"
 #include "Display/Billboard.hpp"
 #include "Display/PointsForwardWarped.hpp"
@@ -55,7 +54,6 @@ namespace csp::volumerendering {
 NLOHMANN_JSON_SERIALIZE_ENUM(
     Plugin::Settings::VolumeFileType, {
                                           {Plugin::Settings::VolumeFileType::eInvalid, nullptr},
-                                          {Plugin::Settings::VolumeFileType::eGaia, "gaia"},
                                           {Plugin::Settings::VolumeFileType::eVtk, "vtk"},
                                       })
 
@@ -265,16 +263,12 @@ void Plugin::onLoad() {
   mRenderState = RenderState::eWaitForData;
 
   switch (mPluginSettings.mVolumeDataType.get()) {
-  case Settings::VolumeFileType::eGaia:
-    mDataManager = std::make_shared<GaiaDataManager>(
-        mPluginSettings.mVolumeDataPath.get(), mPluginSettings.mVolumeDataPattern.get());
-    break;
   case Settings::VolumeFileType::eVtk:
     mDataManager = std::make_shared<VtkDataManager>(
         mPluginSettings.mVolumeDataPath.get(), mPluginSettings.mVolumeDataPattern.get());
     break;
   default:
-    logger().error("Invalid volume data type given in settings! Should be one of 'vtk', 'gaia'.");
+    logger().error("Invalid volume data type given in settings! Should be 'vtk'.");
     throw std::exception("Failed to initialize DataManager.");
     break;
   }

@@ -28,7 +28,7 @@ namespace csp::volumerendering {
 class Plugin : public cs::core::PluginBase {
  public:
   struct Settings {
-    enum class VolumeFileType { eInvalid = -1, eGaia, eVtk };
+    enum class VolumeFileType { eInvalid = -1, eVtk };
     enum class DisplayMode { eMesh, ePoints };
 
     // Data settings

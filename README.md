@@ -14,7 +14,7 @@ This plugin can be enabled with a configuration using the following pattern in y
         "csp-volume-rendering": {
             "volumeDataPath": <path to directory containing simulation data>,
             "volumeDataPattern": <regex pattern that matches simulation filenames>,
-            "volumeDataType": <"vtk"/"gaia">,
+            "volumeDataType": "vtk",
             "volumeStructure": <"structured"/"unstructured">,
             "volumeShape": <"cubic"/"spherical">,
             "anchor": <Anchor name, e.g. "Earth">
@@ -64,7 +64,7 @@ Mandatory settings are shown **bold**, while optional settings are shown in *ita
 | --- | --- | --- | --- |
 | **volumeDataPath** | string | - | Path to the directory that contains the volumetric data files. |
 | **volumeDataPattern** | string | - | Regex pattern that matches the filename of all relevant data files. The index of the simulation step that produced the file has to be marked using a capturing group. If files are named "Sim_01.vtk", "Sim_02.vtk" etc., `"Sim_([0-9]+).vtk"` would be a suitable regex. |
-| **volumeDataType** | `"vtk"` / `"gaia"` | - | Data format of the specified files. Currently supports VTK data and data produced by the GAIA simulation code. |
+| **volumeDataType** | `"vtk"` | - | Data format of the specified files. Currently only supports VTK data. |
 | **volumeStructure** | `"structured"` / `"unstructured"` | - | Structure of the volumetric data. Currently supports structured regular grids and unstructured grids. |
 | **volumeShape** | `"cubic"` / `"spherical"` | - | Shape of the volume. By default, spherical volumes are rendered with the same size as the planet they are bound to. Cubic volumes are rendered, so that their corners touch the planets surface. |
 

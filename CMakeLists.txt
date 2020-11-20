@@ -12,12 +12,6 @@ endif()
 
 # dependencies -------------------------------------------------------------------------------------
 
-if (DEFINED ENV{VIRACOCHA_ROOT_DIR})
-  SET(VIRACOCHA_ROOT_DIR "$ENV{VIRACOCHA_ROOT_DIR}")
-else()
-  SET(VIRACOCHA_ROOT_DIR ${COSMOSCOUT_EXTERNALS_DIR})
-endif()
-
 if (DEFINED ENV{VTK_CMAKE_CONFIG_DIR})
   SET(VTK_DIR "$ENV{VTK_CMAKE_CONFIG_DIR}")
 else()
@@ -69,7 +63,6 @@ endif()
 find_package(ospray REQUIRED)
 find_package(OpenImageDenoise REQUIRED)
 find_package(VTK REQUIRED)
-find_package(VIRACOCHA REQUIRED)
 
 # build plugin -------------------------------------------------------------------------------------
 
@@ -89,7 +82,6 @@ target_link_libraries(csp-volume-rendering
     cs-core
     ospray::ospray
     OpenImageDenoise
-    viracocha::viracochabackend
     ${VTK_LIBRARIES}
 )
 
