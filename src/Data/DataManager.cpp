@@ -179,8 +179,12 @@ DataManager::State DataManager::getState() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void DataManager::initState() {
-  std::scoped_lock(mStateMutex);
-  setTimestep(pTimesteps.get()[0]);
+  int timestep;
+  {
+    std::scoped_lock lock(mStateMutex);
+    timestep = pTimesteps.get()[0];
+  }
+  setTimestep(timestep);
   mInitScalarsThread = std::thread(&DataManager::initScalars, this);
 }
 

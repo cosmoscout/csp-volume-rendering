@@ -45,7 +45,7 @@ OSPRayRenderer::~OSPRayRenderer() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 float OSPRayRenderer::getProgress() {
-  std::scoped_lock(mRenderFutureMutex);
+  std::scoped_lock lock(mRenderFutureMutex);
   if (mRenderFuture.has_value()) {
     return mRenderFuture->progress();
   } else {
@@ -65,7 +65,7 @@ void OSPRayRenderer::preloadData(DataManager::State state) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void OSPRayRenderer::cancelRendering() {
-  std::scoped_lock(mRenderFutureMutex);
+  std::scoped_lock lock(mRenderFutureMutex);
   if (mRenderFuture.has_value()) {
     mRenderFuture->cancel();
     mRenderingCancelled = true;
@@ -351,12 +351,12 @@ ospray::cpp::FrameBuffer OSPRayRenderer::renderFrame(
   framebuffer.commit();
 
   {
-    std::scoped_lock(mRenderFutureMutex);
+    std::scoped_lock lock(mRenderFutureMutex);
     mRenderFuture = framebuffer.renderFrame(renderer, camera, world);
   }
   mRenderFuture->wait();
   {
-    std::scoped_lock(mRenderFutureMutex);
+    std::scoped_lock lock(mRenderFutureMutex);
     mRenderFuture.reset();
   }
   return framebuffer;
