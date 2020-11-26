@@ -8,6 +8,7 @@
 #define CSP_VOLUME_RENDERING_RENDERER_HPP
 
 #include "../Data/DataManager.hpp"
+#include "../Enums.hpp"
 
 #include "../../../../src/cs-utils/DefaultProperty.hpp"
 
@@ -23,7 +24,6 @@ namespace csp::volumerendering {
 class Renderer {
  public:
   enum class VolumeStructure { eInvalid = -1, eStructured, eUnstructured };
-  enum class VolumeShape { eInvalid = -1, eCubic, eSpherical };
   enum class DepthMode {
     eNone           = 0,
     eIsosurface     = 1,

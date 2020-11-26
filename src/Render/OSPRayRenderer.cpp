@@ -28,7 +28,7 @@ namespace csp::volumerendering {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 OSPRayRenderer::OSPRayRenderer(std::shared_ptr<DataManager> dataManager,
-    Renderer::VolumeStructure structure, Renderer::VolumeShape shape)
+    Renderer::VolumeStructure structure, VolumeShape shape)
     : Renderer(dataManager, structure, shape) {
   OSPRayUtility::initOSPRay();
 }
@@ -134,12 +134,12 @@ float OSPRayRenderer::getHeight(vtkSmartPointer<vtkDataSet> data) {
   float height;
 
   switch (mShape) {
-  case Renderer::VolumeShape::eCubic: {
+  case VolumeShape::eCubic: {
     float diagonal = sqrtf(x * x + y * y + z * z);
     height         = diagonal;
     break;
   }
-  case Renderer::VolumeShape::eSpherical: {
+  case VolumeShape::eSpherical: {
     height = fmax(fmax(x, y), z);
     break;
   }

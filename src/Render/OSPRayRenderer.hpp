@@ -23,7 +23,7 @@ namespace csp::volumerendering {
 class OSPRayRenderer : public Renderer {
  public:
   OSPRayRenderer(std::shared_ptr<DataManager> dataManager, Renderer::VolumeStructure structure,
-      Renderer::VolumeShape shape);
+      VolumeShape shape);
   ~OSPRayRenderer();
 
   OSPRayRenderer(const OSPRayRenderer& other) = delete;

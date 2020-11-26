@@ -7,6 +7,8 @@
 #ifndef CSP_VOLUME_RENDERING_DISPLAYNODE_HPP
 #define CSP_VOLUME_RENDERING_DISPLAYNODE_HPP
 
+#include "../Enums.hpp"
+
 #include <VistaKernel/GraphicsManager/VistaOpenGLDraw.h>
 #include <VistaKernel/GraphicsManager/VistaOpenGLNode.h>
 #include <VistaOGLExt/VistaBufferObject.h>
@@ -16,20 +18,20 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
-#include "../../../../src/cs-scene/CelestialObject.hpp"
+#include "../../../../src/cs-scene/CelestialBody.hpp"
 #include "../../../../src/cs-utils/DefaultProperty.hpp"
 
 namespace csp::volumerendering {
 
 /// The abstract DisplayNode provides an interface for CelestialObjects that should display images
 /// rendered with a Renderer.
-class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
+class DisplayNode : public cs::scene::CelestialBody, public IVistaOpenGLDraw {
  public:
   /// Create a DisplayNode in a coordinated system defined by centerName and frameName.
   /// It will automatically be added to the Vista scene graph on construction and removed on
   /// destruction. startExistence, endExistence and radii are passed to the CelestialObject base
   /// class. The depthResolution is used as an initial mesh resolution of the created objects.
-  DisplayNode(VistaSceneGraph* sceneGraph, std::string const& centerName,
+  DisplayNode(VolumeShape shape, VistaSceneGraph* sceneGraph, std::string const& centerName,
       std::string const& frameName, double startExistence, double endExistence, glm::dvec3 radii,
       int depthResolution);
   virtual ~DisplayNode();
@@ -60,6 +62,11 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   /// Enables drawing the depth data as grayscale instead of the color image.
   void setDrawDepth(bool drawDepth);
 
+  virtual glm::dvec3 getRadii() const;
+  virtual double     getHeight(glm::dvec2 lngLat) const;
+  virtual bool       getIntersection(
+            glm::dvec3 const& rayPos, glm::dvec3 const& rayDir, glm::dvec3& pos) const;
+
   /// Interface implementation of IVistaOpenGLDraw.
   virtual bool Do() override = 0;
   bool         GetBoundingBox(VistaBoundingBox& bb) override;
@@ -67,6 +74,8 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
  protected:
   VistaSceneGraph*                 mVistaSceneGraph;
   std::shared_ptr<VistaOpenGLNode> mVistaNode;
+
+  VolumeShape mShape;
 
   bool mEnabled = false;
 

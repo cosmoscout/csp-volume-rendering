@@ -14,6 +14,7 @@
 #include "logger.hpp"
 
 #include "../../../src/cs-core/GuiManager.hpp"
+#include "../../../src/cs-core/InputManager.hpp"
 #include "../../../src/cs-core/Settings.hpp"
 #include "../../../src/cs-core/SolarSystem.hpp"
 #include "../../../src/cs-core/TimeControl.hpp"
@@ -66,12 +67,11 @@ NLOHMANN_JSON_SERIALIZE_ENUM(
                                    {Renderer::VolumeStructure::eUnstructured, "unstructured"},
                                })
 
-NLOHMANN_JSON_SERIALIZE_ENUM(
-    Renderer::VolumeShape, {
-                               {Renderer::VolumeShape::eInvalid, nullptr},
-                               {Renderer::VolumeShape::eCubic, "cubic"},
-                               {Renderer::VolumeShape::eSpherical, "spherical"},
-                           })
+NLOHMANN_JSON_SERIALIZE_ENUM(VolumeShape, {
+                                              {VolumeShape::eInvalid, nullptr},
+                                              {VolumeShape::eCubic, "cubic"},
+                                              {VolumeShape::eSpherical, "spherical"},
+                                          })
 
 NLOHMANN_JSON_SERIALIZE_ENUM(
     Plugin::Settings::DisplayMode, {
@@ -200,7 +200,8 @@ void Plugin::deInit() {
   logger().info("Unloading plugin...");
 
   for (auto const& node : mDisplayNodes) {
-    mSolarSystem->unregisterAnchor(node.second);
+    mSolarSystem->unregisterBody(node.second);
+    mInputManager->unregisterSelectable(node.second);
   }
 
   mAllSettings->onLoad().disconnect(mOnLoadConnection);
@@ -284,7 +285,8 @@ void Plugin::onLoad() {
 
   // If the volume representations already exist, remove them from the solar system
   for (auto const& node : mDisplayNodes) {
-    mSolarSystem->unregisterAnchor(node.second);
+    mSolarSystem->unregisterBody(node.second);
+    mInputManager->unregisterSelectable(node.second);
   }
   mDisplayNodes.clear();
   mActiveDisplay.reset();
@@ -298,18 +300,21 @@ void Plugin::onLoad() {
 
   auto [tStartExistence, tEndExistence] = anchor->second.getExistence();
   mDisplayNodes[Plugin::Settings::DisplayMode::eMesh] =
-      std::make_shared<Billboard>(mSceneGraph, anchor->second.mCenter, anchor->second.mFrame,
-          tStartExistence, tEndExistence, cs::core::SolarSystem::getRadii(anchor->second.mCenter));
-  mDisplayNodes[Plugin::Settings::DisplayMode::ePoints] = std::make_shared<PointsForwardWarped>(
-      mSceneGraph, anchor->second.mCenter, anchor->second.mFrame, tStartExistence, tEndExistence,
-      cs::core::SolarSystem::getRadii(anchor->second.mCenter));
+      std::make_shared<Billboard>(mPluginSettings.mVolumeShape.get(), mSceneGraph,
+          anchor->second.mCenter, anchor->second.mFrame, tStartExistence, tEndExistence,
+          cs::core::SolarSystem::getRadii(anchor->second.mCenter));
+  mDisplayNodes[Plugin::Settings::DisplayMode::ePoints] =
+      std::make_shared<PointsForwardWarped>(mPluginSettings.mVolumeShape.get(), mSceneGraph,
+          anchor->second.mCenter, anchor->second.mFrame, tStartExistence, tEndExistence,
+          cs::core::SolarSystem::getRadii(anchor->second.mCenter));
 
   for (auto const& node : mDisplayNodes) {
     node.second->setAnchorPosition(mPluginSettings.mPosition.get());
     node.second->setAnchorScale(mPluginSettings.mScale.get());
     node.second->setAnchorRotation(mPluginSettings.mRotation.get());
 
-    mSolarSystem->registerAnchor(node.second);
+    mSolarSystem->registerBody(node.second);
+    mInputManager->registerSelectable(node.second);
   }
 }
 

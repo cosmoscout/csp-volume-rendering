@@ -26,10 +26,10 @@ const uint32_t GRID_RESOLUTION = 256;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Billboard::Billboard(VistaSceneGraph* sceneGraph, std::string const& centerName,
+Billboard::Billboard(VolumeShape shape, VistaSceneGraph* sceneGraph, std::string const& centerName,
     std::string const& frameName, double startExistence, double endExistence, glm::dvec3 radii)
-    : DisplayNode(
-          sceneGraph, centerName, frameName, startExistence, endExistence, radii, GRID_RESOLUTION) {
+    : DisplayNode(shape, sceneGraph, centerName, frameName, startExistence, endExistence, radii,
+          GRID_RESOLUTION) {
   pDepthValues.connectAndTouch(
       [this](std::vector<float> depthValues) { createBuffers(depthValues); });
 }
