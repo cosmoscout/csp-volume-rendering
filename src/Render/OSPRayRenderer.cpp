@@ -27,8 +27,8 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-OSPRayRenderer::OSPRayRenderer(std::shared_ptr<DataManager> dataManager,
-    Renderer::VolumeStructure structure, VolumeShape shape)
+OSPRayRenderer::OSPRayRenderer(
+    std::shared_ptr<DataManager> dataManager, VolumeStructure structure, VolumeShape shape)
     : Renderer(dataManager, structure, shape) {
   OSPRayUtility::initOSPRay();
 }
@@ -181,7 +181,7 @@ ospray::cpp::World OSPRayRenderer::getWorld(const Volume& volume, const Paramete
 
   ospray::cpp::Group group;
   group.setParam("volume", ospray::cpp::Data(volumetricModel));
-  if (parameters.mDepthMode == Renderer::DepthMode::eIsosurface) {
+  if (parameters.mDepthMode == DepthMode::eIsosurface) {
     ospray::cpp::Geometry isosurface("isosurface");
     isosurface.setParam("isovalue", 0.8f);
     isosurface.setParam("volume", volumetricModel.handle());
@@ -341,7 +341,7 @@ ospray::cpp::FrameBuffer OSPRayRenderer::renderFrame(
   renderer.commit();
 
   int channels = OSP_FB_COLOR;
-  if (parameters.mDepthMode != Renderer::DepthMode::eNone) {
+  if (parameters.mDepthMode != DepthMode::eNone) {
     channels |= OSP_FB_DEPTH;
   }
 
@@ -372,7 +372,7 @@ Renderer::RenderedImage OSPRayRenderer::extractImageData(ospray::cpp::FrameBuffe
   frame.unmap(colorFrame);
   std::vector<float> depthData(parameters.mResolution * parameters.mResolution, INFINITY);
 
-  if (parameters.mDepthMode != Renderer::DepthMode::eNone) {
+  if (parameters.mDepthMode != DepthMode::eNone) {
     float* depthFrame = (float*)frame.map(OSP_FB_DEPTH);
     depthData         = std::vector(depthFrame, depthFrame + depthData.size());
     frame.unmap(depthFrame);
@@ -388,7 +388,7 @@ Renderer::RenderedImage OSPRayRenderer::extractImageData(ospray::cpp::FrameBuffe
       return data;
     });
   }
-  if (parameters.mDepthMode != Renderer::DepthMode::eNone && parameters.mDenoiseDepth) {
+  if (parameters.mDepthMode != DepthMode::eNone && parameters.mDenoiseDepth) {
     futureDepth = std::async(std::launch::deferred, [parameters, &depthData]() {
       std::vector<float> depthGrayscale = OSPRayUtility::depthToGrayscale(depthData);
       std::vector<float> denoised =
@@ -401,7 +401,7 @@ Renderer::RenderedImage OSPRayRenderer::extractImageData(ospray::cpp::FrameBuffe
   if (parameters.mDenoiseColor) {
     colorData = futureColor.get();
   }
-  if (parameters.mDepthMode != Renderer::DepthMode::eNone && parameters.mDenoiseDepth) {
+  if (parameters.mDepthMode != DepthMode::eNone && parameters.mDenoiseDepth) {
     depthData = futureDepth.get();
   }
 

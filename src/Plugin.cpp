@@ -53,19 +53,17 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-NLOHMANN_JSON_SERIALIZE_ENUM(
-    Plugin::Settings::VolumeFileType, {
-                                          {Plugin::Settings::VolumeFileType::eInvalid, nullptr},
-                                          {Plugin::Settings::VolumeFileType::eGaia, "gaia"},
-                                          {Plugin::Settings::VolumeFileType::eVtk, "vtk"},
-                                      })
+NLOHMANN_JSON_SERIALIZE_ENUM(VolumeFileType, {
+                                                 {VolumeFileType::eInvalid, nullptr},
+                                                 {VolumeFileType::eGaia, "gaia"},
+                                                 {VolumeFileType::eVtk, "vtk"},
+                                             })
 
-NLOHMANN_JSON_SERIALIZE_ENUM(
-    Renderer::VolumeStructure, {
-                                   {Renderer::VolumeStructure::eInvalid, nullptr},
-                                   {Renderer::VolumeStructure::eStructured, "structured"},
-                                   {Renderer::VolumeStructure::eUnstructured, "unstructured"},
-                               })
+NLOHMANN_JSON_SERIALIZE_ENUM(VolumeStructure, {
+                                                  {VolumeStructure::eInvalid, nullptr},
+                                                  {VolumeStructure::eStructured, "structured"},
+                                                  {VolumeStructure::eUnstructured, "unstructured"},
+                                              })
 
 NLOHMANN_JSON_SERIALIZE_ENUM(VolumeShape, {
                                               {VolumeShape::eInvalid, nullptr},
@@ -73,21 +71,19 @@ NLOHMANN_JSON_SERIALIZE_ENUM(VolumeShape, {
                                               {VolumeShape::eSpherical, "spherical"},
                                           })
 
-NLOHMANN_JSON_SERIALIZE_ENUM(
-    Plugin::Settings::DisplayMode, {
-                                       {Plugin::Settings::DisplayMode::ePoints, "points"},
-                                       {Plugin::Settings::DisplayMode::eMesh, "mesh"},
-                                   })
+NLOHMANN_JSON_SERIALIZE_ENUM(DisplayMode, {
+                                              {DisplayMode::ePoints, "points"},
+                                              {DisplayMode::eMesh, "mesh"},
+                                          })
 
-NLOHMANN_JSON_SERIALIZE_ENUM(
-    Renderer::DepthMode, {
-                             {Renderer::DepthMode::eNone, "none"},
-                             {Renderer::DepthMode::eIsosurface, "isosurface"},
-                             {Renderer::DepthMode::eFirstHit, "firstHit"},
-                             {Renderer::DepthMode::eLastHit, "lastHit"},
-                             {Renderer::DepthMode::eThreshold, "threshold"},
-                             {Renderer::DepthMode::eMultiThreshold, "multiThreshold"},
-                         })
+NLOHMANN_JSON_SERIALIZE_ENUM(DepthMode, {
+                                            {DepthMode::eNone, "none"},
+                                            {DepthMode::eIsosurface, "isosurface"},
+                                            {DepthMode::eFirstHit, "firstHit"},
+                                            {DepthMode::eLastHit, "lastHit"},
+                                            {DepthMode::eThreshold, "threshold"},
+                                            {DepthMode::eMultiThreshold, "multiThreshold"},
+                                        })
 
 void from_json(nlohmann::json const& j, Plugin::Settings& o) {
   // Data settings
@@ -266,11 +262,11 @@ void Plugin::onLoad() {
   mRenderState = RenderState::eWaitForData;
 
   switch (mPluginSettings.mVolumeDataType.get()) {
-  case Settings::VolumeFileType::eGaia:
+  case VolumeFileType::eGaia:
     mDataManager = std::make_shared<GaiaDataManager>(
         mPluginSettings.mVolumeDataPath.get(), mPluginSettings.mVolumeDataPattern.get());
     break;
-  case Settings::VolumeFileType::eVtk:
+  case VolumeFileType::eVtk:
     mDataManager = std::make_shared<VtkDataManager>(
         mPluginSettings.mVolumeDataPath.get(), mPluginSettings.mVolumeDataPattern.get());
     break;
@@ -299,11 +295,11 @@ void Plugin::onLoad() {
   }
 
   auto [tStartExistence, tEndExistence] = anchor->second.getExistence();
-  mDisplayNodes[Plugin::Settings::DisplayMode::eMesh] =
+  mDisplayNodes[DisplayMode::eMesh] =
       std::make_shared<Billboard>(mPluginSettings.mVolumeShape.get(), mSceneGraph,
           anchor->second.mCenter, anchor->second.mFrame, tStartExistence, tEndExistence,
           cs::core::SolarSystem::getRadii(anchor->second.mCenter));
-  mDisplayNodes[Plugin::Settings::DisplayMode::ePoints] =
+  mDisplayNodes[DisplayMode::ePoints] =
       std::make_shared<PointsForwardWarped>(mPluginSettings.mVolumeShape.get(), mSceneGraph,
           anchor->second.mCenter, anchor->second.mFrame, tStartExistence, tEndExistence,
           cs::core::SolarSystem::getRadii(anchor->second.mCenter));
@@ -357,23 +353,22 @@ void Plugin::registerUICallbacks() {
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode0",
       "Don't calculate a depth value.",
-      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eNone; }));
+      std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eNone; }));
   mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode1",
       "Calculate depth of isosurface.",
-      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eIsosurface; }));
+      std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eIsosurface; }));
   mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode2",
       "Uses first hit as depth value.",
-      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eFirstHit; }));
+      std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eFirstHit; }));
   mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode3",
       "Uses last hit as depth value.",
-      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eLastHit; }));
+      std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eLastHit; }));
   mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode4",
       "Uses depth, at which an opacity threshold was reached.",
-      std::function([this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eThreshold; }));
+      std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eThreshold; }));
   mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode5",
       "Uses depth, at which the last of multiple opacity thresholds was reached.",
-      std::function(
-          [this]() { mPluginSettings.mDepthMode = Renderer::DepthMode::eMultiThreshold; }));
+      std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eMultiThreshold; }));
 
   // Display settings
   mGuiManager->getGui()->registerCallback("volumeRendering.setEnablePredictiveRendering",
@@ -393,13 +388,11 @@ void Plugin::registerUICallbacks() {
       std::function([this](bool enable) { mPluginSettings.mDrawDepth = enable; }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setDisplayMode0",
-      "Displays the rendered images on a continuous mesh.", std::function([this]() {
-        mPluginSettings.mDisplayMode = Plugin::Settings::DisplayMode::eMesh;
-      }));
+      "Displays the rendered images on a continuous mesh.",
+      std::function([this]() { mPluginSettings.DisplayMode::eMesh; }));
   mGuiManager->getGui()->registerCallback("volumeRendering.setDisplayMode1",
-      "Displays the rendered images on a continuous mesh.", std::function([this]() {
-        mPluginSettings.mDisplayMode = Plugin::Settings::DisplayMode::ePoints;
-      }));
+      "Displays the rendered images on a continuous mesh.",
+      std::function([this]() { mPluginSettings.mDisplayMode = DisplayMode::ePoints; }));
 
   // Data settings
   mGuiManager->getGui()->registerCallback("volumeRendering.setScalar",
@@ -524,21 +517,21 @@ void Plugin::connectSettings() {
     mParametersDirty = true;
     mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseDepth", enable);
   });
-  mPluginSettings.mDepthMode.connectAndTouch([this](Renderer::DepthMode drawMode) {
+  mPluginSettings.mDepthMode.connectAndTouch([this](DepthMode drawMode) {
     mRenderedFrames.clear();
     mRenderer->setDepthMode(drawMode);
     mParametersDirty = true;
-    if (drawMode == Renderer::DepthMode::eNone) {
+    if (drawMode == DepthMode::eNone) {
       mGuiManager->setRadioChecked("volumeRendering.setDepthMode0");
-    } else if (drawMode == Renderer::DepthMode::eIsosurface) {
+    } else if (drawMode == DepthMode::eIsosurface) {
       mGuiManager->setRadioChecked("volumeRendering.setDepthMode1");
-    } else if (drawMode == Renderer::DepthMode::eFirstHit) {
+    } else if (drawMode == DepthMode::eFirstHit) {
       mGuiManager->setRadioChecked("volumeRendering.setDepthMode2");
-    } else if (drawMode == Renderer::DepthMode::eLastHit) {
+    } else if (drawMode == DepthMode::eLastHit) {
       mGuiManager->setRadioChecked("volumeRendering.setDepthMode3");
-    } else if (drawMode == Renderer::DepthMode::eThreshold) {
+    } else if (drawMode == DepthMode::eThreshold) {
       mGuiManager->setRadioChecked("volumeRendering.setDepthMode4");
-    } else if (drawMode == Renderer::DepthMode::eMultiThreshold) {
+    } else if (drawMode == DepthMode::eMultiThreshold) {
       mGuiManager->setRadioChecked("volumeRendering.setDepthMode5");
     }
   });
@@ -562,7 +555,7 @@ void Plugin::connectSettings() {
     }
     mGuiManager->setCheckboxValue("volumeRendering.setEnableDrawDepth", enable);
   });
-  mPluginSettings.mDisplayMode.connectAndTouch([this](Settings::DisplayMode displayMode) {
+  mPluginSettings.mDisplayMode.connectAndTouch([this](DisplayMode displayMode) {
     for (auto const& node : mDisplayNodes) {
       if (node.first == displayMode) {
         node.second->setEnabled(true);
@@ -572,9 +565,9 @@ void Plugin::connectSettings() {
     }
     mActiveDisplay = mDisplayNodes.find(displayMode)->second;
 
-    if (displayMode == Settings::DisplayMode::eMesh) {
+    if (displayMode == DisplayMode::eMesh) {
       mGuiManager->setRadioChecked("volumeRendering.setDisplayMode0");
-    } else if (displayMode == Settings::DisplayMode::ePoints) {
+    } else if (displayMode == DisplayMode::ePoints) {
       mGuiManager->setRadioChecked("volumeRendering.setDisplayMode1");
     }
     if (mDisplayedFrame.has_value()) {
@@ -726,7 +719,7 @@ void Plugin::displayFrame(Frame& frame) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Plugin::displayFrame(Frame& frame, Settings::DisplayMode displayMode) {
+void Plugin::displayFrame(Frame& frame, DisplayMode displayMode) {
   cs::utils::FrameTimings::ScopedTimer timer("Display volume frame");
 
   std::shared_ptr<DisplayNode> displayNode = mDisplayNodes.find(displayMode)->second;

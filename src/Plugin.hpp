@@ -7,9 +7,9 @@
 #ifndef CSP_VOLUME_RENDERING_PLUGIN_HPP
 #define CSP_VOLUME_RENDERING_PLUGIN_HPP
 
-#include "Enums.hpp"
 #include "Data/DataManager.hpp"
 #include "Display/DisplayNode.hpp"
+#include "Enums.hpp"
 #include "Render/Renderer.hpp"
 
 #include "../../../src/cs-core/PluginBase.hpp"
@@ -29,25 +29,22 @@ namespace csp::volumerendering {
 class Plugin : public cs::core::PluginBase {
  public:
   struct Settings {
-    enum class VolumeFileType { eInvalid = -1, eGaia, eVtk };
-    enum class DisplayMode { eMesh, ePoints };
-
     // Data settings
-    cs::utils::Property<std::string>                   mVolumeDataPath;
-    cs::utils::Property<std::string>                   mVolumeDataPattern;
-    cs::utils::Property<VolumeFileType>                mVolumeDataType;
-    cs::utils::Property<Renderer::VolumeStructure>     mVolumeStructure;
-    cs::utils::Property<VolumeShape> mVolumeShape;
+    cs::utils::Property<std::string>     mVolumeDataPath;
+    cs::utils::Property<std::string>     mVolumeDataPattern;
+    cs::utils::Property<VolumeFileType>  mVolumeDataType;
+    cs::utils::Property<VolumeStructure> mVolumeStructure;
+    cs::utils::Property<VolumeShape>     mVolumeShape;
 
     // Rendering settings
-    cs::utils::DefaultProperty<bool>                mRequestImages{true};
-    cs::utils::DefaultProperty<int>                 mResolution{256};
-    cs::utils::DefaultProperty<float>               mSamplingRate{0.05f};
-    cs::utils::DefaultProperty<float>               mSunStrength{1.f};
-    cs::utils::DefaultProperty<float>               mDensityScale{1.f};
-    cs::utils::DefaultProperty<bool>                mDenoiseColor{true};
-    cs::utils::DefaultProperty<bool>                mDenoiseDepth{true};
-    cs::utils::DefaultProperty<Renderer::DepthMode> mDepthMode{Renderer::DepthMode::eNone};
+    cs::utils::DefaultProperty<bool>      mRequestImages{true};
+    cs::utils::DefaultProperty<int>       mResolution{256};
+    cs::utils::DefaultProperty<float>     mSamplingRate{0.05f};
+    cs::utils::DefaultProperty<float>     mSunStrength{1.f};
+    cs::utils::DefaultProperty<float>     mDensityScale{1.f};
+    cs::utils::DefaultProperty<bool>      mDenoiseColor{true};
+    cs::utils::DefaultProperty<bool>      mDenoiseDepth{true};
+    cs::utils::DefaultProperty<DepthMode> mDepthMode{DepthMode::eNone};
 
     // Display settings
     cs::utils::DefaultProperty<bool>        mPredictiveRendering{false};
@@ -94,7 +91,7 @@ class Plugin : public cs::core::PluginBase {
 
   void receiveFrame();
   void displayFrame(Frame& frame);
-  void displayFrame(Frame& frame, Settings::DisplayMode displayMode);
+  void displayFrame(Frame& frame, DisplayMode displayMode);
   void tryReuseFrame(glm::mat4 cameraTransform);
 
   void exportTransferFunction(std::string const& path, std::string const& jsonTransferFunction);
@@ -119,10 +116,10 @@ class Plugin : public cs::core::PluginBase {
   int                    mCameraTransformsLength = 15;
   int                    mCameraTransformsIndex  = 0;
 
-  std::unique_ptr<Renderer>                                     mRenderer;
-  std::shared_ptr<DataManager>                                  mDataManager;
-  std::map<Settings::DisplayMode, std::shared_ptr<DisplayNode>> mDisplayNodes;
-  std::shared_ptr<DisplayNode>                                  mActiveDisplay;
+  std::unique_ptr<Renderer>                           mRenderer;
+  std::shared_ptr<DataManager>                        mDataManager;
+  std::map<DisplayMode, std::shared_ptr<DisplayNode>> mDisplayNodes;
+  std::shared_ptr<DisplayNode>                        mActiveDisplay;
 
   std::future<Renderer::RenderedImage> mFutureFrameData;
 

@@ -14,8 +14,8 @@ constexpr char* RENDERER_ERROR_MESSAGE = "Failed to initialize Renderer.";
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Renderer::Renderer(std::shared_ptr<DataManager> dataManager, VolumeStructure structure,
-    VolumeShape shape)
+Renderer::Renderer(
+    std::shared_ptr<DataManager> dataManager, VolumeStructure structure, VolumeShape shape)
     : mDataManager(dataManager)
     , mStructure(structure)
     , mShape(shape) {
@@ -47,7 +47,7 @@ void Renderer::setSamplingRate(float samplingRate) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Renderer::setDepthMode(Renderer::DepthMode depthMode) {
+void Renderer::setDepthMode(DepthMode depthMode) {
   std::scoped_lock lock(mParameterMutex);
   mParameters.mDepthMode = depthMode;
 }
