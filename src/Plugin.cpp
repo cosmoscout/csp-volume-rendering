@@ -172,9 +172,10 @@ void Plugin::init() {
   });
   keepAlive.detach();
 
-  // Print vtk output to the console instead of opening a window
-  vtkSmartPointer<vtkOutputWindow> outputWindow = vtkSmartPointer<vtkOutputWindow>::New();
-  vtkOutputWindow::SetInstance(outputWindow);
+  // Makes sure that the vtk output window is created on the main thread. If it is created on
+  // another thread and that thread stops, all calls to DisplayText etc. from any other thread will
+  // block indefinitely.
+  vtkOutputWindow::GetInstance()->DisplayDebugText("");
 
   mOnLoadConnection = mAllSettings->onLoad().connect([this]() { onLoad(); });
   mOnSaveConnection = mAllSettings->onSave().connect(
