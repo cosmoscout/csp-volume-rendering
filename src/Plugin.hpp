@@ -37,14 +37,15 @@ class Plugin : public cs::core::PluginBase {
     cs::utils::Property<VolumeShape>     mVolumeShape;
 
     // Rendering settings
-    cs::utils::DefaultProperty<bool>      mRequestImages{true};
-    cs::utils::DefaultProperty<int>       mResolution{256};
-    cs::utils::DefaultProperty<float>     mSamplingRate{0.05f};
-    cs::utils::DefaultProperty<float>     mSunStrength{1.f};
-    cs::utils::DefaultProperty<float>     mDensityScale{1.f};
-    cs::utils::DefaultProperty<bool>      mDenoiseColor{true};
-    cs::utils::DefaultProperty<bool>      mDenoiseDepth{true};
-    cs::utils::DefaultProperty<DepthMode> mDepthMode{DepthMode::eNone};
+    cs::utils::DefaultProperty<bool>        mRequestImages{true};
+    cs::utils::DefaultProperty<int>         mResolution{256};
+    cs::utils::DefaultProperty<float>       mSamplingRate{0.05f};
+    cs::utils::DefaultProperty<float>       mSunStrength{1.f};
+    cs::utils::DefaultProperty<float>       mDensityScale{1.f};
+    cs::utils::DefaultProperty<bool>        mDenoiseColor{true};
+    cs::utils::DefaultProperty<bool>        mDenoiseDepth{true};
+    cs::utils::DefaultProperty<DepthMode>   mDepthMode{DepthMode::eNone};
+    cs::utils::DefaultProperty<std::string> mTransferFunction{"BlackBody.json"};
 
     // Display settings
     cs::utils::DefaultProperty<bool>        mPredictiveRendering{false};

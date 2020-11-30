@@ -102,6 +102,7 @@ void from_json(nlohmann::json const& j, Plugin::Settings& o) {
   cs::core::Settings::deserialize(j, "denoiseColor", o.mDenoiseColor);
   cs::core::Settings::deserialize(j, "denoiseDepth", o.mDenoiseDepth);
   cs::core::Settings::deserialize(j, "depthMode", o.mDepthMode);
+  cs::core::Settings::deserialize(j, "transferFunction", o.mTransferFunction);
 
   // Display settings
   cs::core::Settings::deserialize(j, "predictiveRendering", o.mPredictiveRendering);
@@ -134,6 +135,7 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
   cs::core::Settings::serialize(j, "denoiseColor", o.mDenoiseColor);
   cs::core::Settings::serialize(j, "denoiseDepth", o.mDenoiseDepth);
   cs::core::Settings::serialize(j, "depthMode", o.mDepthMode);
+  cs::core::Settings::serialize(j, "transferFunction", o.mTransferFunction);
 
   // Display settings
   cs::core::Settings::serialize(j, "predictiveRendering", o.mPredictiveRendering);
@@ -389,7 +391,7 @@ void Plugin::registerUICallbacks() {
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setDisplayMode0",
       "Displays the rendered images on a continuous mesh.",
-      std::function([this]() { mPluginSettings.DisplayMode::eMesh; }));
+      std::function([this]() { mPluginSettings.mDisplayMode = DisplayMode::eMesh; }));
   mGuiManager->getGui()->registerCallback("volumeRendering.setDisplayMode1",
       "Displays the rendered images on a continuous mesh.",
       std::function([this]() { mPluginSettings.mDisplayMode = DisplayMode::ePoints; }));
@@ -535,6 +537,8 @@ void Plugin::connectSettings() {
       mGuiManager->setRadioChecked("volumeRendering.setDepthMode5");
     }
   });
+  mPluginSettings.mTransferFunction.connectAndTouch(
+      [this](std::string name) { importTransferFunction(name); });
 
   // Display settings
   mPluginSettings.mPredictiveRendering.connectAndTouch([this](bool enable) {
