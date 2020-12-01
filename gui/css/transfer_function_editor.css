@@ -1,0 +1,9 @@
+svg[id^="transferFunctionEditor.graph"] circle {
+    cursor: grab;
+    stroke: black;
+    stroke-width: 1.5px;
+}
+
+svg[id^="transferFunctionEditor.graph"] circle.selected {
+    stroke: #ff7f0e;
+}

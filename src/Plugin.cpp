@@ -433,10 +433,10 @@ void Plugin::registerUICallbacks() {
         mParametersDirty = true;
       }));
 
-  mGuiManager->getGui()->registerCallback("volumeRendering.importTransferFunction",
+  mGuiManager->getGui()->registerCallback("transferFunctionEditor.importTransferFunction",
       "Import a saved transfer function.",
       std::function([this](std::string name) { importTransferFunction(name); }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.exportTransferFunction",
+  mGuiManager->getGui()->registerCallback("transferFunctionEditor.exportTransferFunction",
       "Export the current transfer function to a file.",
       std::function([this](std::string name, std::string jsonTransferFunction) {
         exportTransferFunction(name, jsonTransferFunction);
@@ -585,8 +585,10 @@ void Plugin::connectSettings() {
 void Plugin::initUI() {
   // Add the volume rendering user interface components to the CosmoScout user interface.
   mGuiManager->addCssToGui("css/csp-volume-rendering.css");
+  mGuiManager->addCssToGui("css/transfer_function_editor.css");
   mGuiManager->addPluginTabToSideBarFromHTML(
       "Volume Rendering", "blur_circular", "../share/resources/gui/volume_rendering_tab.html");
+  mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/transfer_function_editor.js");
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
 
   updateAvailableTransferFunctions();
@@ -768,7 +770,7 @@ void Plugin::updateAvailableTransferFunctions() {
   }
 
   std::string code =
-      "CosmoScout.volumeRendering.setAvailableTransferFunctions(`" + j.dump() + "`);";
+      "CosmoScout.transferFunctionEditor.setAvailableTransferFunctions(`" + j.dump() + "`);";
   mGuiManager->addScriptToGui(code);
 }
 

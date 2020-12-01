@@ -135,37 +135,7 @@
     </div>
     <div class="section-body collapse container-fluid" id="collapseVolume-transferFunction"
          aria-labelledby="headingVolume-transferFunction" data-parent="#volumeRenderingTab-accordion">
-      <div class="row">
-        <svg id="volumeRendering.tfGraph" width="420" height="150"></svg>
-      </div>
-      <div class="row">
-        <div class="col-2">
-          <a id="volumeRendering.tfColorLock" class="btn glass block" title="Lock Color">
-            <i class="material-icons">lock</i>
-          </a>
-        </div>
-        <div class="col-3">
-          <input type="text" class="form-control color-input" id="volumeRendering.tfColorPicker" style="color: black;" value="#FF0000">
-        </div>
-      </div>
-      <div class="row">
-        <div class="col-5">
-          <button id="volumeRendering.tfExport" class="waves-effect waves-light block btn glass text">Export</button>
-        </div>
-        <div class="col-7">
-          <input type="text" id="volumeRendering.tfExportLocation" placeholder="Filename" class="text-input text">
-        </div>
-      </div>
-      <div class="row">
-        <div class="col-5">
-          <button id="volumeRendering.tfImport" class="waves-effect waves-light block btn glass text">Import</button>
-        </div>
-        <div class="col-7">
-          <select id="volumeRendering.tfImportSelect">
-            <option value="-1">none</option>
-          </select>
-        </div>
-      </div>
+      <div id="volumeRendering.tfEditor"></div>
     </div>
   </div>
 
