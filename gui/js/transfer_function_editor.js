@@ -10,10 +10,11 @@
 
 (() => {
   class TransferFunctionEditor {
-    constructor(id, callback, {fitToData = false, numberTicks = 5} = {}) {
+    constructor(
+        id, callback, {width = 400, height = 150, fitToData = false, numberTicks = 5} = {}) {
       this.id       = id;
       this.callback = callback;
-      this.options  = {fitToData: fitToData, numberTicks: numberTicks};
+      this.options = {width: width, height: height, fitToData: fitToData, numberTicks: numberTicks};
 
       this._createElements();
       this._initializeElements();
@@ -42,12 +43,14 @@
       this._controlPoints = [];
 
       // Custom margins
-      this._margin = {top: 10, right: 20, bottom: 20, left: 25};
+      this._margin = {top: 10, right: 20, bottom: 25, left: 40};
 
       // Access the svg dom element
-      this._svg    = d3.select("#transferFunctionEditor\\.graph-" + this.id);
+      this._svg = d3.select("#transferFunctionEditor\\.graph-" + this.id)
+                      .attr("width", this.options.width)
+                      .attr("height", this.options.height);
       this._width  = +this._svg.attr("width") - this._margin.left - this._margin.right;
-      this._height = +this._svg.attr("height") - this._margin.top - this._margin.bottom - 15;
+      this._height = +this._svg.attr("height") - this._margin.top - this._margin.bottom;
     }
 
     _initializeElements() {
