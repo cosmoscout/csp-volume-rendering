@@ -434,8 +434,9 @@ void Plugin::registerUICallbacks() {
       }));
 
   mGuiManager->getGui()->registerCallback("transferFunctionEditor.importTransferFunction",
-      "Import a saved transfer function.",
-      std::function([this](std::string name) { importTransferFunction(name); }));
+      "Import a saved transfer function.", std::function([this](std::string name, double editorId) {
+        importTransferFunction(name, (int)std::lround(editorId));
+      }));
   mGuiManager->getGui()->registerCallback("transferFunctionEditor.exportTransferFunction",
       "Export the current transfer function to a file.",
       std::function([this](std::string name, std::string jsonTransferFunction) {
@@ -537,8 +538,10 @@ void Plugin::connectSettings() {
       mGuiManager->setRadioChecked("volumeRendering.setDepthMode5");
     }
   });
-  mPluginSettings.mTransferFunction.connectAndTouch(
-      [this](std::string name) { importTransferFunction(name); });
+  mPluginSettings.mTransferFunction.connectAndTouch([this](std::string name) {
+    std::string code = "CosmoScout.volumeRendering.loadTransferFunction('" + name + "');";
+    mGuiManager->addScriptToGui(code);
+  });
 
   // Display settings
   mPluginSettings.mPredictiveRendering.connectAndTouch([this](bool enable) {
@@ -749,12 +752,12 @@ void Plugin::exportTransferFunction(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Plugin::importTransferFunction(std::string const& path) {
+void Plugin::importTransferFunction(std::string const& path, int editorId) {
   std::stringstream jsonTransferFunction;
   std::ifstream     i("../share/resources/transferfunctions/" + path);
   jsonTransferFunction << i.rdbuf();
-  std::string code =
-      "CosmoScout.volumeRendering.loadTransferFunction(`" + jsonTransferFunction.str() + "`);";
+  std::string code = "CosmoScout.transferFunctionEditor.loadTransferFunction(`" +
+                     jsonTransferFunction.str() + "`, " + std::to_string(editorId) + ");";
   mGuiManager->addScriptToGui(code);
 }
 

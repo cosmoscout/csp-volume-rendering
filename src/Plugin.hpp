@@ -96,7 +96,7 @@ class Plugin : public cs::core::PluginBase {
   void tryReuseFrame(glm::mat4 cameraTransform);
 
   void exportTransferFunction(std::string const& path, std::string const& jsonTransferFunction);
-  void importTransferFunction(std::string const& path);
+  void importTransferFunction(std::string const& path, int editorId);
   void updateAvailableTransferFunctions();
 
   Settings mPluginSettings;

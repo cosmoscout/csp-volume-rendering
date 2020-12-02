@@ -87,7 +87,7 @@
       // Import button listener
       $("#transferFunctionEditor\\.import-" + this.id).on("click", () => {
         CosmoScout.callbacks.transferFunctionEditor.importTransferFunction(
-            $("#transferFunctionEditor\\.importSelect-" + this.id).val());
+            $("#transferFunctionEditor\\.importSelect-" + this.id).val(), this.id);
       });
 
       // Lock button listener
@@ -578,6 +578,10 @@
       this._availableFiles = JSON.parse(availableFilesJson);
       this._editors.forEach(
           (editor) => { editor.setAvailableTransferFunctions(this._availableFiles); });
+    }
+
+    loadTransferFunction(jsonTransferFunction, editorId) {
+      this._editors.find(e => e.id == editorId).loadTransferFunction(jsonTransferFunction);
     }
   }
 

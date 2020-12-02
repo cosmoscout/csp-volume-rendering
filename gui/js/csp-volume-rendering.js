@@ -99,8 +99,9 @@
       CosmoScout.gui.initSliderRange("volumeRendering.setTimestep", range, 0, [this.timesteps[0]]);
     }
 
-    loadTransferFunction(jsonTransferFunction) {
-      this.transferFunctionEditor.loadTransferFunction(jsonTransferFunction);
+    loadTransferFunction(path) {
+      CosmoScout.callbacks.transferFunctionEditor.importTransferFunction(
+          path, this.transferFunctionEditor.id);
     }
   }
 
