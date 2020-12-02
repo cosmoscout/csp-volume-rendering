@@ -1,9 +1,28 @@
 svg[id^="transferFunctionEditor.graph"] circle {
     cursor: grab;
-    stroke: black;
+    stroke: var(--cs-color-text);
     stroke-width: 1.5px;
 }
 
 svg[id^="transferFunctionEditor.graph"] circle.selected {
-    stroke: #ff7f0e;
+    stroke: var(--cs-color-text-highlight);
+    stroke-width: 2.5px;
+}
+
+svg[id^="transferFunctionEditor.graph"] .line {
+    stroke: var(--cs-color-primary);
+}
+
+svg[id^="transferFunctionEditor.graph"] .domain {
+    stroke: var(--cs-color-primary);
+    fill: rgba(0, 0, 0, 0);
+}
+
+svg[id^="transferFunctionEditor.graph"] .tick line {
+    stroke: var(--cs-color-primary);
+    stroke-width: 1px;
+}
+
+svg[id^="transferFunctionEditor.graph"] .tick text {
+    fill: var(--cs-color-text);
 }

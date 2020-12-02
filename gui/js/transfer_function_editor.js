@@ -131,14 +131,9 @@
       g.append("path")
           .datum(this._controlPoints)
           .attr("class", "line")
-          .attr("fill", "url(#transferFunctionEditor.gradient-" + this.id + ")")
-          .attr("stroke", "black");
+          .attr("fill", "url(#transferFunctionEditor.gradient-" + this.id + ")");
 
-      g.append("path")
-          .datum(this._controlPoints)
-          .attr("class", "line")
-          .attr("fill", "none")
-          .attr("stroke", "black");
+      g.append("path").datum(this._controlPoints).attr("class", "line").attr("fill", "none");
 
       // Mouse interaction handler
       g.append("rect")
