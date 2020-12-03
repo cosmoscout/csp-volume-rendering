@@ -47,7 +47,7 @@ void Renderer::setSamplingRate(float samplingRate) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Renderer::setDepthMode(Renderer::DepthMode depthMode) {
+void Renderer::setDepthMode(DepthMode depthMode) {
   std::scoped_lock lock(mParameterMutex);
   mParameters.mDepthMode = depthMode;
 }

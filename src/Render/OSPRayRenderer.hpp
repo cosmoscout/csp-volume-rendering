@@ -22,8 +22,8 @@ namespace csp::volumerendering {
 /// Renderer imeplementation that uses Intel OSPRay for rendering volumes.
 class OSPRayRenderer : public Renderer {
  public:
-  OSPRayRenderer(std::shared_ptr<DataManager> dataManager, Renderer::VolumeStructure structure,
-      Renderer::VolumeShape shape);
+  OSPRayRenderer(std::shared_ptr<DataManager> dataManager, VolumeStructure structure,
+      VolumeShape shape);
   ~OSPRayRenderer();
 
   OSPRayRenderer(const OSPRayRenderer& other) = delete;

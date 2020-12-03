@@ -26,8 +26,8 @@ const uint32_t GRID_RESOLUTION = 256;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Billboard::Billboard(std::shared_ptr<cs::core::Settings> settings, std::string anchor)
-    : DisplayNode(settings, anchor, GRID_RESOLUTION) {
+Billboard::Billboard(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor)
+    : DisplayNode(shape, settings, anchor, GRID_RESOLUTION) {
   pDepthValues.connectAndTouch(
       [this](std::vector<float> depthValues) { createBuffers(depthValues); });
 }

@@ -8,6 +8,7 @@
 #define CSP_VOLUME_RENDERING_RENDERER_HPP
 
 #include "../Data/DataManager.hpp"
+#include "../Enums.hpp"
 
 #include "../../../../src/cs-utils/DefaultProperty.hpp"
 
@@ -22,17 +23,6 @@ namespace csp::volumerendering {
 /// providing it with parameters.
 class Renderer {
  public:
-  enum class VolumeStructure { eInvalid = -1, eStructured, eUnstructured };
-  enum class VolumeShape { eInvalid = -1, eCubic, eSpherical };
-  enum class DepthMode {
-    eNone           = 0,
-    eIsosurface     = 1,
-    eFirstHit       = 2,
-    eLastHit        = 4,
-    eThreshold      = 8,
-    eMultiThreshold = 16
-  };
-
   /// A RenderedImage object contains all relevant information on a rendered image.
   struct RenderedImage {
     /// Contains the color values of the image as RGBA values.
@@ -57,7 +47,7 @@ class Renderer {
   /// less noise.
   void setSamplingRate(float samplingRate);
   /// Sets the heuristic with which the depth image should be rendered.
-  void setDepthMode(Renderer::DepthMode depthMode);
+  void setDepthMode(DepthMode depthMode);
 
   /// Enables or disables denoising of the color image.
   void setDenoiseColor(bool denoiseColor);
@@ -96,9 +86,9 @@ class Renderer {
 
  protected:
   struct Parameters {
-    int                 mResolution;
-    float               mSamplingRate;
-    Renderer::DepthMode mDepthMode;
+    int       mResolution;
+    float     mSamplingRate;
+    DepthMode mDepthMode;
 
     bool mDenoiseColor;
     bool mDenoiseDepth;
