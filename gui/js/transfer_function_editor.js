@@ -11,7 +11,8 @@
 (() => {
   class TransferFunctionEditor {
     constructor(id, element, callback,
-        {width = 400, height = 150, fitToData = false, numberTicks = 5} = {}) {
+        {width = 400, height = 150, fitToData = false, numberTicks = 5, defaultFunction = ""} =
+            {}) {
       this.id       = id;
       this.element  = element;
       this.callback = callback;
@@ -20,6 +21,11 @@
       this._createElements();
       this._initializeElements();
       this._drawChart();
+
+      if (defaultFunction != "") {
+        CosmoScout.callbacks.transferFunctionEditor.importTransferFunction(
+            defaultFunction, this.id);
+      }
     }
 
     setData(data) {
