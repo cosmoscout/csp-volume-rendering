@@ -281,9 +281,8 @@
 
       gradient.exit().remove();
 
-      const callback = CosmoScout.callbacks.find(this.callback);
-      if (callback !== undefined) {
-        callback(this.getJsonString());
+      if (this.callback !== undefined) {
+        this.callback(this.getJsonString());
       }
 
       if (d3.event) {
