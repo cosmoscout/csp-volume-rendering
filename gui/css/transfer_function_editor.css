@@ -26,3 +26,10 @@ svg[id^="transferFunctionEditor.graph"] .tick line {
 svg[id^="transferFunctionEditor.graph"] .tick text {
     fill: var(--cs-color-text);
 }
+
+div.row input[id^="transferFunctionEditor."],
+div.row button[data-id^="transferFunctionEditor."],
+div.row div[id^="transferFunctionEditor.importSelectParent"] > .bootstrap-select {
+    width: 100% !important;
+    height: 100% !important;
+}
