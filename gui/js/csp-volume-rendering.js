@@ -29,7 +29,7 @@
       this.progressBar = document.getElementById("volumeRendering.progressBar");
 
       this.transferFunctionEditor = CosmoScout.transferFunctionEditor.create(
-          "volumeRendering.tfEditor", this.setTransferFunction);
+        document.getElementById("volumeRendering.tfEditor"), this.setTransferFunction);
     }
 
     setTransferFunction(transferFunction) {

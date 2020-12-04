@@ -10,9 +10,10 @@
 
 (() => {
   class TransferFunctionEditor {
-    constructor(
-        id, callback, {width = 400, height = 150, fitToData = false, numberTicks = 5} = {}) {
+    constructor(id, element, callback,
+        {width = 400, height = 150, fitToData = false, numberTicks = 5} = {}) {
       this.id       = id;
+      this.element  = element;
       this.callback = callback;
       this.options = {width: width, height: height, fitToData: fitToData, numberTicks: numberTicks};
 
@@ -46,7 +47,8 @@
       this._margin = {top: 10, right: 20, bottom: 25, left: 40};
 
       // Access the svg dom element
-      this._svg = d3.select("#transferFunctionEditor\\.graph-" + this.id)
+      this._svg = d3.select(this.element)
+                      .select("#transferFunctionEditor\\.graph-" + this.id)
                       .attr("width", this.options.width)
                       .attr("height", this.options.height);
       this._width  = +this._svg.attr("width") - this._margin.left - this._margin.right;
@@ -54,7 +56,21 @@
     }
 
     _initializeElements() {
-      CosmoScout.gui.initInputs();
+      const pickerDiv =
+          this.element.querySelector("#transferFunctionEditor\\.colorPicker-" + this.id);
+      pickerDiv.picker = new CP(pickerDiv);
+      pickerDiv.picker.self.classList.add('no-alpha');
+      pickerDiv.picker.on('change', (r, g, b, a) => {
+        const color                = CP.HEX([r, g, b, 1]);
+        pickerDiv.style.background = color;
+        pickerDiv.value            = color;
+      });
+
+      pickerDiv.oninput = (e) => {
+        const color = CP.HEX(e.target.value);
+        pickerDiv.picker.set(color[0], color[1], color[2], 1);
+        pickerDiv.style.background = CP.HEX([color[0], color[1], color[2], 1]);
+      };
 
       let extent = [0, 255];
       if (this.options.fitToData && this._data && this._data.length > 0) {
@@ -74,24 +90,27 @@
           .y1(this._height);
 
       // Access the color selector
-      this._colorPicker = $("#transferFunctionEditor\\.colorPicker-" + this.id).get(0);
+      this._colorPicker =
+          $(this.element).find("#transferFunctionEditor\\.colorPicker-" + this.id).get(0);
       this._colorPicker.picker.on("change", () => {
         this._selected.color = this._colorPicker.value;
         this._redraw();
       });
       // Export button listener
-      $("#transferFunctionEditor\\.export-" + this.id).on("click", () => {
+      $(this.element).find("#transferFunctionEditor\\.export-" + this.id).on("click", () => {
         CosmoScout.callbacks.transferFunctionEditor.exportTransferFunction(
-            $("#transferFunctionEditor\\.exportLocation-" + this.id).val(), this.getJsonString());
+            $(this.element).find("#transferFunctionEditor\\.exportLocation-" + this.id).val(),
+            this.getJsonString());
       });
       // Import button listener
-      $("#transferFunctionEditor\\.import-" + this.id).on("click", () => {
+      $(this.element).find("#transferFunctionEditor\\.import-" + this.id).on("click", () => {
         CosmoScout.callbacks.transferFunctionEditor.importTransferFunction(
-            $("#transferFunctionEditor\\.importSelect-" + this.id).val(), this.id);
+            $(this.element).find("#transferFunctionEditor\\.importSelect-" + this.id).val(),
+            this.id);
       });
 
       // Lock button listener
-      $("#transferFunctionEditor\\.colorLock-" + this.id).on("click", () => {
+      $(this.element).find("#transferFunctionEditor\\.colorLock-" + this.id).on("click", () => {
         if (this._controlPoints.some(point => point.locked && point !== this._selected)) {
           this._selected.locked = !this._selected.locked;
           this._redraw();
@@ -101,7 +120,8 @@
     }
 
     _updateLockButtonState() {
-      const colorLockButton = $("#transferFunctionEditor\\.colorLock-" + this.id + " i");
+      const colorLockButton =
+          $(this.element).find("#transferFunctionEditor\\.colorLock-" + this.id + " i");
       if (this._selected.locked) {
         $(colorLockButton).html("lock");
       } else {
@@ -221,7 +241,8 @@
         }
       });
 
-      const svg = d3.select("#transferFunctionEditor\\.graph-" + this.id).select("g");
+      const svg =
+          d3.select(this.element).select("#transferFunctionEditor\\.graph-" + this.id).select("g");
       svg.selectAll("path.line").datum(this._controlPoints).attr("d", this._area);
 
       // Add circle to connect and interact with the control points
@@ -480,7 +501,8 @@
     setAvailableTransferFunctions(availableFiles) {
       let options = "";
       availableFiles.forEach((file) => { options += `<option>${file}</option>`; });
-      const importSelect = $("#transferFunctionEditor\\.importSelect-" + this.id);
+      const importSelect =
+          $(this.element).find("#transferFunctionEditor\\.importSelect-" + this.id);
       importSelect.html(options);
       importSelect.selectpicker();
       importSelect.selectpicker("refresh");
@@ -552,17 +574,17 @@
       document.body.appendChild(templateElement);
     }
 
-    create(containerId, callback, options) {
+    create(container, callback, options) {
       const editor = CosmoScout.gui.loadTemplateContent("transferFunctionEditor");
       if (editor === false) {
         console.warn('"#transferFunctionEditor-template" could not be loaded!');
         return;
       }
 
-      document.getElementById(containerId).innerHTML =
-          editor.innerHTML.replace(/%ID%/g, this._nextId);
+      container.innerHTML = editor.innerHTML.replace(/%ID%/g, this._nextId);
 
-      const transferFunctionEditor = new TransferFunctionEditor(this._nextId, callback, options);
+      const transferFunctionEditor =
+          new TransferFunctionEditor(this._nextId, container, callback, options);
       transferFunctionEditor.setAvailableTransferFunctions(this._availableFiles);
       this._editors.push(transferFunctionEditor);
       this._nextId++;
