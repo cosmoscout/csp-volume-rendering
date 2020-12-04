@@ -232,7 +232,7 @@
           .attr("cx", (d) => { return this._xScale(d.x); })
           .attr("cy", (d) => { return this._yScale(d.opacity); })
           .style("fill", (d) => { return d.color; })
-          .attr("r", 1e-6)
+          .attr("r", (d) => { return d.locked ? 6.0 : 4.0; })
           .on("mousedown",
               (d) => {
                 this._selected = this._dragged = d;
@@ -241,18 +241,14 @@
                 this._updateLockButtonState();
               })
           .on("mouseup", () => { this._mouseup(); })
-          .on("contextmenu",
-              (d, i) => {
-                // react on right-clicking
-                d3.event.preventDefault();
-                d.color  = this.colorPicker.value;
-                d.locked = true;
-                this._redraw();
-                this._updateLockButtonState();
-              })
-          .transition()
-          .duration(750)
-          .attr("r", (d) => { return d.locked ? 6.0 : 4.0; });
+          .on("contextmenu", (d, i) => {
+            // react on right-clicking
+            d3.event.preventDefault();
+            d.color  = this.colorPicker.value;
+            d.locked = true;
+            this._redraw();
+            this._updateLockButtonState();
+          });
 
       circle.classed("selected", (d) => { return d === this._selected; })
           .style("fill", (d) => { return d.color; })
@@ -543,7 +539,7 @@
             <div class="col-5">
               <button id="transferFunctionEditor.import-%ID%" class="waves-effect waves-light block btn glass text">Import</button>
             </div>
-            <div class="col-7">
+            <div class="col-7" id="transferFunctionEditor.importSelectParent-%ID%">
               <select id="transferFunctionEditor.importSelect-%ID%">
                 <option value="-1">none</option>
               </select>
