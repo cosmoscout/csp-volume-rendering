@@ -154,5 +154,3 @@ source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/ospray_modules/volume_depth FILES
 )
 
 install(TARGETS ospray_module_volume_depth DESTINATION "lib")
-
-install(DIRECTORY "transferfunctions" DESTINATION "share/resources")
