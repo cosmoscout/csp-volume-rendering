@@ -29,9 +29,14 @@
       this.progressBar = document.getElementById("volumeRendering.progressBar");
 
       this.transferFunctionEditor = CosmoScout.transferFunctionEditor.create(
-        document.getElementById("volumeRendering.tfEditor"), this.setTransferFunction);
+          document.getElementById("volumeRendering.tfEditor"), this.setTransferFunction);
     }
 
+    /**
+     * Sets the transfer function for this plugin's transfer function editor.
+     *
+     * @param transferFunction {string} A json string describing the transfer function
+     */
     setTransferFunction(transferFunction) {
       const callback = CosmoScout.callbacks.find("volumeRendering.setTransferFunction");
       if (callback !== undefined) {
@@ -39,6 +44,11 @@
       }
     }
 
+    /**
+     * Toggles automatic progression of the timestep slider.
+     * If the automatic progression is enabled, the slider will move a certain amount of units per
+     * second, set using the animation speed slider.
+     */
     play() {
       const playButtonIcon = $("#volumeRendering\\.play i");
       if (this.playing) {
@@ -74,6 +84,14 @@
       }
     }
 
+    /**
+     * Updates the progress bar in the rendering section of the settings menu.
+     *
+     * @param progress {number} Current progress of the rendering process.
+     *     Should be value between 0 and 1.
+     * @param animate {bool} Sets whether the progress bar should show the new value instantly or if
+     *     there should be a smooth transition.
+     */
     setRenderProgress(progress, animate) {
       if (animate) {
         this.progressBar.classList.add('animated');
@@ -84,6 +102,11 @@
       this.progressBar.style.width = Math.round(progress * 100) + "%";
     }
 
+    /**
+     * Sets the available timesteps. The timestep slider will snap to these values.
+     *
+     * @param timestepsJson {string} json string of a list of all available timesteps
+     */
     setTimesteps(timestepsJson) {
       this.timesteps = JSON.parse(timestepsJson);
       this.timesteps.sort((a, b) => a - b);
