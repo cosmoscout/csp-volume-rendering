@@ -8,10 +8,10 @@
 
 #include "../logger.hpp"
 
-#include <vtk-8.1/vtkCellDataToPointData.h>
-#include <vtk-8.1/vtkDataSetReader.h>
-#include <vtk-8.1/vtkXMLFileReadTester.h>
-#include <vtk-8.1/vtkXMLGenericDataObjectReader.h>
+#include <vtkCellDataToPointData.h>
+#include <vtkDataSetReader.h>
+#include <vtkXMLFileReadTester.h>
+#include <vtkXMLGenericDataObjectReader.h>
 
 namespace csp::volumerendering {
 

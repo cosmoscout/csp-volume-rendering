@@ -10,7 +10,7 @@
 
 #include "../../../src/cs-utils/filesystem.hpp"
 
-#include <vtk-8.1/vtkPointData.h>
+#include <vtkPointData.h>
 
 #include <algorithm>
 #include <future>

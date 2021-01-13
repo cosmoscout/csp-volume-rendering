@@ -11,8 +11,8 @@
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <vtk-8.1/vtkPointData.h>
-#include <vtk-8.1/vtkStructuredPoints.h>
+#include <vtkPointData.h>
+#include <vtkStructuredPoints.h>
 
 #include <rkcommon/math/vec.h>
 

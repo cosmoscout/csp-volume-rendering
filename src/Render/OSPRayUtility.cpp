@@ -18,10 +18,10 @@
 
 #include <rkcommon/math/vec.h>
 
-#include <vtk-8.1/vtkCellArray.h>
-#include <vtk-8.1/vtkCellData.h>
-#include <vtk-8.1/vtkPointData.h>
-#include <vtk-8.1/vtkUnsignedCharArray.h>
+#include <vtkCellArray.h>
+#include <vtkCellData.h>
+#include <vtkPointData.h>
+#include <vtkUnsignedCharArray.h>
 
 #include <cmath>
 #include <future>
@@ -55,14 +55,15 @@ void initOSPRay() {
     throw std::runtime_error("OSPRay Initialization failed.");
   }
 
-	OSPDevice dev = ospGetCurrentDevice();
-  ospDeviceSetErrorCallback(dev,
+  OSPDevice dev = ospGetCurrentDevice();
+  ospDeviceSetErrorCallback(
+      dev,
       [](void* userData, OSPError e, const char* errorDetails) {
         osprayLogger().error(errorDetails);
       },
       nullptr);
-  ospDeviceSetStatusCallback(dev,
-      [](void* userData, const char* message) { osprayLogger().info(message); }, nullptr);
+  ospDeviceSetStatusCallback(
+      dev, [](void* userData, const char* message) { osprayLogger().info(message); }, nullptr);
   ospDeviceRelease(dev);
 
   ospLoadModule("volume_depth");
@@ -83,9 +84,8 @@ ospray::cpp::Volume createOSPRayVolumeUnstructured(vtkSmartPointer<vtkUnstructur
   std::transform(vertexDataD.begin(), vertexDataD.end(), std::back_inserter(vertexData),
       [](double d) { return (float)d; });
 
-  std::vector<uint64_t> vertexIndices(vtkVolume->GetCells()->GetPointer(),
-      vtkVolume->GetCells()->GetPointer() +
-          vtkVolume->GetCells()->GetNumberOfConnectivityEntries());
+  std::vector<uint64_t> vertexIndices(vtkVolume->GetCells()->GetNumberOfConnectivityEntries());
+  vtkVolume->GetCells()->GetConnectivityArray64()->ExportToVoidPointer(vertexIndices.data());
 
   std::vector<uint64_t> cellIndices(vtkVolume->GetNumberOfCells());
   int                   index = -4;
