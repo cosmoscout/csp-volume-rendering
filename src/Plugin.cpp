@@ -291,11 +291,11 @@ void Plugin::onLoad() {
     throw std::exception("Failed to initialize CelestialObjects.");
   }
 
-  auto existence = anchor->second.mExistence;
-  mDisplayNodes[DisplayMode::eMesh] =
-      std::make_shared<Billboard>(mPluginSettings.mVolumeShape.get(), mAllSettings, mPluginSettings.mAnchor.get());
-  mDisplayNodes[DisplayMode::ePoints] =
-      std::make_shared<PointsForwardWarped>(mPluginSettings.mVolumeShape.get(), mAllSettings, mPluginSettings.mAnchor.get());
+  auto existence                    = anchor->second.mExistence;
+  mDisplayNodes[DisplayMode::eMesh] = std::make_shared<Billboard>(
+      mPluginSettings.mVolumeShape.get(), mAllSettings, mPluginSettings.mAnchor.get());
+  mDisplayNodes[DisplayMode::ePoints] = std::make_shared<PointsForwardWarped>(
+      mPluginSettings.mVolumeShape.get(), mAllSettings, mPluginSettings.mAnchor.get());
 
   for (auto const& node : mDisplayNodes) {
     node.second->setAnchorPosition(mPluginSettings.mPosition.get());

@@ -55,7 +55,7 @@ void* VolumeDepth::beginFrame(FrameBuffer*, World* world) {
           lightArray.push_back(light->getIE());
           if (light->getSecondIE().has_value()) {
             lightArray.push_back(light->getSecondIE().value());
-					}
+          }
         }
       }
     }
@@ -63,7 +63,8 @@ void* VolumeDepth::beginFrame(FrameBuffer*, World* world) {
 
   void** lightPtr = lightArray.empty() ? nullptr : &lightArray[0];
 
-  ispc::World_setSciVisData(world->getIE(), (ispc::vec3f&)aoColor, lightPtr, (uint32_t)lightArray.size());
+  ispc::World_setSciVisData(
+      world->getIE(), (ispc::vec3f&)aoColor, lightPtr, (uint32_t)lightArray.size());
 
   world->scivisDataValid = true;
 

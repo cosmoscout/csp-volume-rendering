@@ -25,8 +25,8 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-PointsForwardWarped::PointsForwardWarped(VolumeShape shape,
-    std::shared_ptr<cs::core::Settings> settings, std::string anchor)
+PointsForwardWarped::PointsForwardWarped(
+    VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor)
     : DisplayNode(shape, settings, anchor, 256) {
   pDepthValues.connectAndTouch(
       [this](std::vector<float> depthValues) { createBuffers(depthValues); });
