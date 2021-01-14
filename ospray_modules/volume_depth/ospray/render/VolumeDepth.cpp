@@ -2,11 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "VolumeDepth.hpp"
+
+#define _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING
+
 #include "lights/AmbientLight.h"
 #include "lights/HDRILight.h"
 // ispc exports
 #include "common/World_ispc.h"
 #include "render/VolumeDepth_ispc.h"
+
+#undef _SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING
 
 #include <iostream>
 
