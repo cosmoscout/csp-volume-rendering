@@ -111,5 +111,6 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES
 
 install(TARGETS csp-volume-rendering DESTINATION "share/plugins")
 install(DIRECTORY "gui" DESTINATION "share/resources")
+install(DIRECTORY "data" DESTINATION "share")
 
 add_subdirectory(ospray_modules)
