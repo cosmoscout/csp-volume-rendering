@@ -67,8 +67,7 @@ void* VolumeDepth::beginFrame(FrameBuffer*, World* world) {
   void** lightPtr = lightArray.empty() ? nullptr : &lightArray[0];
 
   ispc::vec3f aoColorIspc{aoColor[0], aoColor[1], aoColor[2]};
-  ispc::World_setSciVisData(
-      world->getIE(), aoColorIspc, lightPtr, (uint32_t)lightArray.size());
+  ispc::World_setSciVisData(world->getIE(), aoColorIspc, lightPtr, (uint32_t)lightArray.size());
 
   world->scivisDataValid = true;
 
