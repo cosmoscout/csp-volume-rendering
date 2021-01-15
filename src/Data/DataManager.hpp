@@ -24,7 +24,7 @@ namespace csp::volumerendering {
 
 class DataManagerException : public std::exception {
  public:
-  const char* what() const;
+  const char* what() const noexcept override;
 };
 
 /// The DataManager class provides an interface for accessing multiple volumetric data files in one

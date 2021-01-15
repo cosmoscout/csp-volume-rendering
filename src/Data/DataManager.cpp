@@ -20,7 +20,7 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const char* DataManagerException::what() const {
+const char* DataManagerException::what() const noexcept {
   return "Failed to initialize DataManager.";
 }
 
@@ -160,7 +160,7 @@ vtkSmartPointer<vtkDataSet> DataManager::getData(State state) {
   vtkSmartPointer<vtkDataSet> dataset = futureData.get();
   if (!dataset) {
     logger().error("Loaded data is null! Is the data type correctly set in the settings?");
-    throw std::exception("Loaded data is null.");
+    throw std::runtime_error("Loaded data is null.");
   }
   if (state.mScalar != "") {
     dataset->GetPointData()->SetActiveScalars(state.mScalar.c_str());

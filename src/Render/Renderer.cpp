@@ -10,7 +10,7 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const char* RendererException::what() const {
+const char* RendererException::what() const noexcept {
   return "Failed to initialize Renderer.";
 }
 

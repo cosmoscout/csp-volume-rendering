@@ -21,7 +21,7 @@ namespace csp::volumerendering {
 
 class RendererException : public std::exception {
  public:
-  const char* what() const;
+  const char* what() const noexcept override;
 };
 
 /// The abstract Renderer class provides an interface for controlling a volume renderer and
