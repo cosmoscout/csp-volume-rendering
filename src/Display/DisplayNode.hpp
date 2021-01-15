@@ -26,7 +26,7 @@ namespace csp::volumerendering {
 
 /// The abstract DisplayNode provides an interface for CelestialObjects that should display images
 /// rendered with a Renderer.
-class DisplayNode : public cs::scene::CelestialBody, public IVistaOpenGLDraw {
+class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
  public:
   /// Create a DisplayNode positioned at the given anchor using properties found in settings.
   /// It will automatically be added to the Vista scene graph on construction and removed on
@@ -62,9 +62,6 @@ class DisplayNode : public cs::scene::CelestialBody, public IVistaOpenGLDraw {
   void setDrawDepth(bool drawDepth);
 
   virtual glm::dvec3 getRadii() const;
-  virtual double     getHeight(glm::dvec2 lngLat) const;
-  virtual bool       getIntersection(
-            glm::dvec3 const& rayPos, glm::dvec3 const& rayDir, glm::dvec3& pos) const;
 
   /// Interface implementation of IVistaOpenGLDraw.
   virtual bool Do() override = 0;

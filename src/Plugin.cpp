@@ -197,8 +197,7 @@ void Plugin::deInit() {
   logger().info("Unloading plugin...");
 
   for (auto const& node : mDisplayNodes) {
-    mSolarSystem->unregisterBody(node.second);
-    mInputManager->unregisterSelectable(node.second);
+    mSolarSystem->unregisterAnchor(node.second);
   }
 
   mAllSettings->onLoad().disconnect(mOnLoadConnection);
@@ -278,8 +277,7 @@ void Plugin::onLoad() {
 
   // If the volume representations already exist, remove them from the solar system
   for (auto const& node : mDisplayNodes) {
-    mSolarSystem->unregisterBody(node.second);
-    mInputManager->unregisterSelectable(node.second);
+    mSolarSystem->unregisterAnchor(node.second);
   }
   mDisplayNodes.clear();
   mActiveDisplay.reset();
@@ -302,8 +300,7 @@ void Plugin::onLoad() {
     node.second->setAnchorScale(mPluginSettings.mScale.get());
     node.second->setAnchorRotation(mPluginSettings.mRotation.get());
 
-    mSolarSystem->registerBody(node.second);
-    mInputManager->registerSelectable(node.second);
+    mSolarSystem->registerAnchor(node.second);
   }
 }
 
