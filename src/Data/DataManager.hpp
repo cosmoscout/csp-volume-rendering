@@ -22,6 +22,11 @@
 
 namespace csp::volumerendering {
 
+class DataManagerException : public std::exception {
+ public:
+  const char* what() const;
+};
+
 /// The DataManager class provides an interface for accessing multiple volumetric data files in one
 /// directory. Implementations for reading different kinds of data formats are supplied in
 /// subclasses. The DataManager class can't be instantiated, use one of the subclasses instead.

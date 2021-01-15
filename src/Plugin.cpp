@@ -269,7 +269,7 @@ void Plugin::onLoad() {
     break;
   default:
     logger().error("Invalid volume data type given in settings! Should be 'vtk'.");
-    throw std::exception("Failed to initialize DataManager.");
+    throw std::runtime_error("Failed to initialize DataManager.");
     break;
   }
 
@@ -288,7 +288,7 @@ void Plugin::onLoad() {
   auto anchor = mAllSettings->mAnchors.find(mPluginSettings.mAnchor.get());
   if (anchor == mAllSettings->mAnchors.end()) {
     logger().error("No anchor with name '{}' found!", mPluginSettings.mAnchor.get());
-    throw std::exception("Failed to initialize CelestialObjects.");
+    throw std::runtime_error("Failed to initialize CelestialObjects.");
   }
 
   auto existence                    = anchor->second.mExistence;

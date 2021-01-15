@@ -20,7 +20,9 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-constexpr char* DATAMANAGER_ERROR_MESSAGE = "Failed to initialize DataManager.";
+const char* DataManagerException::what() const {
+  return "Failed to initialize DataManager.";
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -31,14 +33,14 @@ DataManager::DataManager(std::string path, std::string filenamePattern) {
   } catch (const std::regex_error& e) {
     logger().error(
         "Filename pattern '{}' is not a valid regular expression: {}", filenamePattern, e.what());
-    throw std::exception(DATAMANAGER_ERROR_MESSAGE);
+    throw DataManagerException();
   }
   if (patternRegex.mark_count() != 1) {
     logger().error(
         "Filename pattern '{}' has the wrong amount of capture groups: {}! The pattern should "
         "contain only one capture group capturing the timestep component of the filename.",
         filenamePattern, patternRegex.mark_count());
-    throw std::exception(DATAMANAGER_ERROR_MESSAGE);
+    throw DataManagerException();
   }
 
   std::set<std::string> files;
@@ -46,7 +48,7 @@ DataManager::DataManager(std::string path, std::string filenamePattern) {
     files = cs::utils::filesystem::listFiles(path, patternRegex);
   } catch (const boost::filesystem::filesystem_error& e) {
     logger().error("Loading volume data from '{}' failed: {}", path, e.what());
-    throw std::exception(DATAMANAGER_ERROR_MESSAGE);
+    throw DataManagerException();
   }
 
   std::vector<int> timesteps;
@@ -62,7 +64,7 @@ DataManager::DataManager(std::string path, std::string filenamePattern) {
       logger().error("Capture group in filename pattern '{}' does not match an integer for file "
                      "'{}': Match of group is '{}'! A suitable capture group could be '([0-9])+'.",
           filenamePattern, file, match[1].str());
-      throw std::exception(DATAMANAGER_ERROR_MESSAGE);
+      throw DataManagerException();
     }
 
     timesteps.push_back(timestep);
@@ -70,7 +72,7 @@ DataManager::DataManager(std::string path, std::string filenamePattern) {
   }
   if (timesteps.size() == 0) {
     logger().error("No files matching '{}' found in '{}'!", filenamePattern, path);
-    throw std::exception(DATAMANAGER_ERROR_MESSAGE);
+    throw DataManagerException();
   }
   pTimesteps.set(timesteps);
 }
