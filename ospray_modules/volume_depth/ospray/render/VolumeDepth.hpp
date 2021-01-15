@@ -5,10 +5,14 @@
 
 #include "ospray_module_volume_depth_export.h"
 
+#if defined(_MSC_VER)
 #pragma warning(push)
 #pragma warning(disable : 4275)
+#endif
 #include "render/Renderer.h"
+#if defined(_MSC_VER)
 #pragma warning(pop)
+#endif
 
 namespace ospray {
 
