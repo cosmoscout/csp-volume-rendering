@@ -11,7 +11,7 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-constexpr char* BILLBOARD_VERT = R"(
+const std::string BILLBOARD_VERT = R"(
 #version 330
 
 uniform vec3 uRadii;
@@ -58,7 +58,7 @@ void main()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-constexpr char* BILLBOARD_FRAG = R"(
+const std::string BILLBOARD_FRAG = R"(
 #version 330
 
 uniform sampler2D uTexture;
@@ -90,7 +90,7 @@ void main()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-constexpr char* POINTS_FORWARD_VERT = R"(
+const std::string POINTS_FORWARD_VERT = R"(
 #version 330
 
 uniform vec3 uRadii;
@@ -140,7 +140,7 @@ void main()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-constexpr char* POINTS_FORWARD_FRAG = R"(
+const std::string POINTS_FORWARD_FRAG = R"(
 #version 330
 
 uniform sampler2D uTexture;
