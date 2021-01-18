@@ -241,13 +241,13 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
   cameraTransform = observerTransform * cameraTransform;
 
   // Get base vectors of rotated coordinate system
-  glm::vec3 camRight(cameraTransform[0].xyz);
+  glm::vec3 camRight(cameraTransform[0]);
   camRight = glm::normalize(camRight);
-  glm::vec3 camUp(cameraTransform[1].xyz);
+  glm::vec3 camUp(cameraTransform[1]);
   camUp = glm::normalize(camUp);
-  glm::vec3 camDir(cameraTransform[2].xyz);
+  glm::vec3 camDir(cameraTransform[2]);
   camDir = glm::normalize(camDir);
-  glm::vec3 camPos(cameraTransform[3].xyz);
+  glm::vec3 camPos(cameraTransform[3]);
 
   // Get position of camera in rotated coordinate system
   float camXLen = glm::dot(camPos, camRight);
@@ -436,11 +436,11 @@ std::vector<float> OSPRayRenderer::normalizeDepthData(std::vector<float> data, c
       float     ndcY       = ((float)y / parameters.mResolution - 0.5f) * 2;
       glm::vec4 posPixClip = glm::vec4(ndcX, ndcY, 0, 1);
       glm::vec4 posPix     = glm::inverse(camera.mTransformationMatrix) * posPixClip;
-      glm::vec3 posPixNorm = posPix.xyz * (1 / posPix.w);
+      glm::vec3 posPixNorm = glm::vec3(posPix) * (1 / posPix.w);
       glm::vec3 pos =
           val * glm::normalize(posPixNorm - camera.mPositionRotated) + camera.mPositionRotated;
       glm::vec4 posClip     = camera.mTransformationMatrix * glm::vec4(pos, 1);
-      glm::vec3 posClipNorm = posClip.xyz * (1 / posClip.w);
+      glm::vec3 posClipNorm = glm::vec3(posClip) * (1 / posClip.w);
       depthData[i]          = posClipNorm.z;
     }
   }

@@ -625,7 +625,7 @@ glm::mat4 Plugin::predictCameraTransform(glm::mat4 currentTransform) {
   glm::quat predictedRotation(1, 0, 0, 0);
 
   for (int i = 0; i < mCameraTransformsLength; i++) {
-    predictedTranslation += glm::vec3(mCameraTransforms[i][3].xyz) / (float)mCameraTransformsLength;
+    predictedTranslation += glm::vec3(mCameraTransforms[i][3]) / (float)mCameraTransformsLength;
     predictedRotation =
         glm::slerp(predictedRotation, glm::quat_cast(mCameraTransforms[i]), 1.f / (i + 1));
   }
