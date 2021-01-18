@@ -439,7 +439,7 @@ std::vector<float> OSPRayRenderer::normalizeDepthData(std::vector<float> data, c
       val /= volumeHeight;
       int       x          = i % parameters.mResolution;
       float     ndcX       = ((float)x / parameters.mResolution - 0.5f) * 2;
-      int       y          = i / parameters.mResolution;
+      int       y          = (int)(i / parameters.mResolution);
       float     ndcY       = ((float)y / parameters.mResolution - 0.5f) * 2;
       glm::vec4 posPixClip = glm::vec4(ndcX, ndcY, 0, 1);
       glm::vec4 posPix     = glm::inverse(camera.mTransformationMatrix) * posPixClip;
