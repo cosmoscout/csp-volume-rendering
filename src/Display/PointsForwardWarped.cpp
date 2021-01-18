@@ -79,23 +79,23 @@ bool PointsForwardWarped::Do() {
   glGetIntegerv(GL_VIEWPORT, glViewport.data());
   glm::vec4 volumeTop    = glm::vec4(0, 1, -mRendererMVP[3][2] / mRendererMVP[2][2], 1);
   volumeTop              = matrix * volumeTop;
-  volumeTop              = glm::vec4(volumeTop.xyz * (1.f / volumeTop.w), 1);
+  volumeTop              = glm::vec4(glm::vec3(volumeTop) * (1.f / volumeTop.w), 1);
   glm::vec4 volumeBottom = glm::vec4(0, -1, -mRendererMVP[3][2] / mRendererMVP[2][2], 1);
   volumeBottom           = matrix * volumeBottom;
-  volumeBottom           = glm::vec4(volumeBottom.xyz * (1.f / volumeBottom.w), 1);
+  volumeBottom           = glm::vec4(glm::vec3(volumeBottom) * (1.f / volumeBottom.w), 1);
   glm::vec4 volumeRight  = glm::vec4(1, 0, -mRendererMVP[3][2] / mRendererMVP[2][2], 1);
   volumeRight            = matrix * volumeRight;
-  volumeRight            = glm::vec4(volumeRight.xyz * (1.f / volumeRight.w), 1);
+  volumeRight            = glm::vec4(glm::vec3(volumeRight) * (1.f / volumeRight.w), 1);
   glm::vec4 volumeLeft   = glm::vec4(-1, 0, -mRendererMVP[3][2] / mRendererMVP[2][2], 1);
   volumeLeft             = matrix * volumeLeft;
-  volumeLeft             = glm::vec4(volumeLeft.xyz * (1.f / volumeLeft.w), 1);
+  volumeLeft             = glm::vec4(glm::vec3(volumeLeft) * (1.f / volumeLeft.w), 1);
 
   glm::vec4 volumeCenter = glm::vec4(0, 0, -mRendererMVP[3][2] / mRendererMVP[2][2], 1);
   volumeCenter           = inverse(mRendererMVP) * volumeCenter;
-  volumeCenter           = glm::vec4(volumeCenter.xyz * (1.f / volumeCenter.w), 1);
+  volumeCenter           = glm::vec4(glm::vec3(volumeCenter) * (1.f / volumeCenter.w), 1);
   volumeCenter           = glm::vec4(mRadii, 1) * volumeCenter;
-  volumeCenter           = glm::vec4((mTransform * glm::vec4(volumeCenter.xyz, 1)).xyz, 1);
-  volumeCenter           = glm::vec4((matMV * glm::vec4(volumeCenter.xyz, 1)).xyz, 1);
+  volumeCenter           = glm::vec4((mTransform * glm::vec4(glm::vec3(volumeCenter), 1)).xyz(), 1);
+  volumeCenter           = glm::vec4((matMV * glm::vec4(glm::vec3(volumeCenter), 1)).xyz(), 1);
   mShader.SetUniform(mShader.GetUniformLocation("uBaseDepth"), volumeCenter[2] / volumeCenter[3]);
 
   int pointHeight = (int)ceil((volumeTop[1] / volumeTop[3] - volumeBottom[1] / volumeBottom[3]) /
