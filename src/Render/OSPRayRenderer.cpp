@@ -114,6 +114,8 @@ OSPRayRenderer::Volume OSPRayRenderer::loadVolume(DataManager::State state) {
     volume.mOsprayData =
         OSPRayUtility::createOSPRayVolumeStructured(vtkStructuredPoints::SafeDownCast(volumeData));
     break;
+  case VolumeStructure::eInvalid:
+    throw std::runtime_error("Trying to load volume with unknown/invalid structure!");
   }
   volume.mHeight       = getHeight(volumeData);
   volume.mScalarBounds = getScalarBounds(volumeData);
@@ -141,6 +143,11 @@ float OSPRayRenderer::getHeight(vtkSmartPointer<vtkDataSet> data) {
   }
   case VolumeShape::eSpherical: {
     height = fmax(fmax(x, y), z);
+    break;
+  }
+  case VolumeShape::eInvalid:
+  default: {
+    height = 0;
     break;
   }
   }
