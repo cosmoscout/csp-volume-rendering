@@ -407,7 +407,7 @@ void Plugin::registerUICallbacks() {
       }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setAnimationSpeed",
-      "Time units per second when animating.", std::function([this](double value) {
+      "Time units per second when animating.", std::function([](double value) {
         // Callback is only registered to suppress warnings
       }));
 
