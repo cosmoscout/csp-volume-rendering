@@ -27,8 +27,8 @@ namespace csp::volumerendering {
 
 DisplayNode::DisplayNode(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings,
     std::string anchor, int depthResolution)
-    : mTexture(GL_TEXTURE_2D)
-    , mShape(shape)
+    : mShape(shape)
+    , mTexture(GL_TEXTURE_2D)
     , pDepthValues(std::vector<float>(depthResolution * depthResolution))
     , mDepthResolution(depthResolution)
     , mShaderDirty(true) {
