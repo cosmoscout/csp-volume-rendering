@@ -205,7 +205,7 @@ std::vector<float> grayscaleToDepth(const std::vector<float>& grayscale) {
   std::vector<float> depth;
   depth.reserve(grayscale.size() / 3);
 
-  for (int i = 0; i < grayscale.size() / 3; i++) {
+  for (size_t i = 0; i < grayscale.size() / 3; i++) {
     depth.push_back(grayscale[i * 3] * 2 - 1);
   }
 

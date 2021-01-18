@@ -381,7 +381,7 @@ Renderer::RenderedImage OSPRayRenderer::extractImageData(ospray::cpp::FrameBuffe
 
   if (parameters.mDepthMode != DepthMode::eNone) {
     float* depthFrame = (float*)frame.map(OSP_FB_DEPTH);
-    depthData         = std::vector(depthFrame, depthFrame + depthData.size());
+    depthData         = std::vector<float>(depthFrame, depthFrame + depthData.size());
     frame.unmap(depthFrame);
   }
 
@@ -413,7 +413,7 @@ Renderer::RenderedImage OSPRayRenderer::extractImageData(ospray::cpp::FrameBuffe
   }
 
   std::vector<uint8_t> colorDataInt(4 * parameters.mResolution * parameters.mResolution);
-  for (int i = 0; i < colorDataInt.size(); i++) {
+  for (size_t i = 0; i < colorDataInt.size(); i++) {
     colorDataInt[i] = (uint8_t)(colorData[i] * 255);
   }
 
@@ -431,7 +431,7 @@ std::vector<float> OSPRayRenderer::normalizeDepthData(std::vector<float> data, c
     float volumeHeight, const Parameters& parameters) {
   std::vector<float> depthData(parameters.mResolution * parameters.mResolution);
 
-  for (int i = 0; i < depthData.size(); i++) {
+  for (size_t i = 0; i < depthData.size(); i++) {
     float val = data[i];
     if (val == INFINITY) {
       depthData[i] = -camera.mTransformationMatrix[3][2] / camera.mTransformationMatrix[2][2];
