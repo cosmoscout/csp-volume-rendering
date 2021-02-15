@@ -53,12 +53,15 @@
       } catch (e) { console.log("Error: " + e); }
     }
 
-    capture() {
-      const canvas  = document.createElement("canvas");
-      canvas.width  = this.remoteVideo.videoWidth;
-      canvas.height = this.remoteVideo.videoHeight;
-      canvas.getContext("2d").drawImage(
-          this.remoteVideo, 0, 0, this.remoteVideo.videoWidth, this.remoteVideo.videoHeight);
+    capture(resolution) {
+      const canvas = document.createElement("canvas");
+      // canvas.width  = this.remoteVideo.videoWidth;
+      // canvas.height = this.remoteVideo.videoHeight;
+      canvas.width  = resolution;
+      canvas.height = resolution;
+      // canvas.getContext("2d").drawImage(
+      //    this.remoteVideo, 0, 0, this.remoteVideo.videoWidth, this.remoteVideo.videoHeight);
+      canvas.getContext("2d").drawImage(this.remoteVideo, 0, 0, resolution, resolution);
       const data = canvas.toDataURL("image/png");
       document.getElementById("captureImg").setAttribute("src", data);
       CosmoScout.callbacks.volumeRendering.captureColorImage(

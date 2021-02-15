@@ -10,6 +10,7 @@
 #include "Display/Billboard.hpp"
 #include "Display/PointsForwardWarped.hpp"
 #include "Render/OSPRayRenderer.hpp"
+#include "Render/WebRTCRenderer.hpp"
 #include "logger.hpp"
 
 #include "../../../src/cs-core/GuiManager.hpp"
@@ -30,12 +31,6 @@
 
 #include "glm/gtc/epsilon.hpp"
 #include "glm/gtx/quaternion.hpp"
-
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb_image.h>
-
-#include <boost/archive/iterators/binary_from_base64.hpp>
-#include <boost/archive/iterators/transform_width.hpp>
 
 #include <numeric>
 #include <thread>
@@ -278,8 +273,8 @@ void Plugin::onLoad() {
     break;
   }
 
-  mRenderer = std::make_unique<OSPRayRenderer>(
-      mDataManager, mPluginSettings.mVolumeStructure.get(), mPluginSettings.mVolumeShape.get());
+  mRenderer = std::make_unique<WebRTCRenderer>(mDataManager, mPluginSettings.mVolumeStructure.get(),
+      mPluginSettings.mVolumeShape.get(), mGuiManager);
 
   // If the volume representations already exist, remove them from the solar system
   for (auto const& node : mDisplayNodes) {
@@ -313,31 +308,6 @@ void Plugin::onLoad() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Plugin::registerUICallbacks() {
-  mGuiManager->getGui()->registerCallback("volumeRendering.captureColorImage",
-      "Capture a single frame from the WebRTC stream.",
-      std::function([this](std::string data) {
-        // Decode base64
-        using It = boost::archive::iterators::transform_width<
-            boost::archive::iterators::binary_from_base64<std::string::const_iterator>, 8, 6>;
-        auto binary = std::vector<unsigned char>(It(data.begin()), It(data.end()));
-
-        // Remove padding.
-        auto length = data.size();
-        if (binary.size() > 2 && data[length - 1] == '=' && data[length - 2] == '=') {
-          binary.erase(binary.end() - 2, binary.end());
-        } else if (binary.size() > 1 && data[length - 1] == '=') {
-          binary.erase(binary.end() - 1, binary.end());
-        }
-
-        // Load image
-        int            w, h, c;
-        int            channels = 4;
-        unsigned char* image =
-            stbi_load_from_memory(binary.data(), (int)binary.size(), &w, &h, &c, channels);
-
-        mDisplayNodes.find(mPluginSettings.mDisplayMode.get())->second->setTexture(image, w, h);
-      }));
-
   // Rendering settings
   mGuiManager->getGui()->registerCallback("volumeRendering.setEnableRequestImages",
       "If disabled no new images will be rendered.",
@@ -737,7 +707,7 @@ void Plugin::displayFrame(Frame& frame, DisplayMode displayMode) {
   cs::utils::FrameTimings::ScopedTimer timer("Display volume frame");
 
   std::shared_ptr<DisplayNode> displayNode = mDisplayNodes.find(displayMode)->second;
-  // displayNode->setTexture(frame.mColorImage, frame.mResolution, frame.mResolution);
+  displayNode->setTexture(frame.mColorImage, frame.mResolution, frame.mResolution);
   displayNode->setDepthTexture(frame.mDepthImage, frame.mResolution, frame.mResolution);
   displayNode->setTransform(glm::toMat4(glm::toQuat(frame.mCameraTransform)));
   displayNode->setMVPMatrix(frame.mModelViewProjection);
