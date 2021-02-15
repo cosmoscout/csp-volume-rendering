@@ -294,36 +294,10 @@
       </div>
     </div>
   </div>
-
-  <div class="settings-section">
-    <div class="section-header collapsed font-alegreya" id="headingVolume-webrtc"
-         data-toggle="collapse" data-target="#collapseVolume-webrtc" aria-expanded="false"
-         aria-controls="collapseVolume-webrtc" type="button">
-      <i class="material-icons">cloud</i>
-      <span>WebRTC</span>
-      <i class="material-icons caret-icon">keyboard_arrow_left</i>
-    </div>
-    <div class="section-body collapse container-fluid" id="collapseVolume-webrtc"
-         aria-labelledby="headingVolume-webrtc" data-parent="#volumeRenderingTab-accordion">
-      <div class="row mb-1">
-        <div class="embed-responsive embed-responsive-16by9">
-          <video id="remotevideo" class="embed-responsive-item" autoplay loop controls muted></video>
-        </div>
-      </div>
-
-      <div class="row mb-1">
-        <div class="col-12">
-          <button class="btn glass block" onclick="CosmoScout.volumeRendering.capture()">
-            Capture
-          </button>
-        </div>
-      </div>
-
-      <div class="row mb-1">
-        <div class="col-12">
-          <img id="captureImg">
-        </div>
-      </div>
-    </div>
-  </div>
 </div>
+
+<template id="volumeRendering-webRtc-template">
+  <div id='volumeRendering-webRtcContainer' class='embed-responsive embed-responsive-16by9'>
+    <video id='volumeRendering-webRtcVideo' class='embed-responsive-item' autoplay loop controls muted></video>
+  </div>
+</template>

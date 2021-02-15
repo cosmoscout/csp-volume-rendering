@@ -22,3 +22,10 @@
     max-height: 300px;
     overflow: auto;
 }
+
+#volumeRendering-webRtcContainer {
+    bottom: 0;
+    right: 0;
+    position: absolute;
+    visibility: hidden;
+}

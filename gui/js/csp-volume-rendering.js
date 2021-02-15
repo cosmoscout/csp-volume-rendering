@@ -11,8 +11,6 @@
     name = 'volumeRendering';
 
     call(desc) {
-      console.log('Starting call');
-      this.startTime      = window.performance.now();
       const configuration = {iceServers: [{urls: ["stun:turn2.l.google.com"]}]};
       this.pc2            = new RTCPeerConnection(configuration);
       this.pc2.addEventListener('icecandidate', e => this.onIceCandidate(e));
@@ -22,10 +20,6 @@
 
     onCreateOfferSuccess(desc) {
       this.pc2.setRemoteDescription(desc);
-      console.log('pc2 createAnswer start');
-      // Since the 'remote' side has no media stream we need
-      // to pass in the right constraints in order for it to
-      // accept the incoming offer of audio and video.
       try {
         this.pc2.createAnswer()
             .then(answer => this.onCreateAnswerSuccess(answer))
@@ -34,36 +28,33 @@
     }
 
     gotRemoteStream(e) {
-      if (this.remoteVideo.srcObject !== e.streams[0]) {
-        this.remoteVideo.srcObject = e.streams[0];
-        console.log('pc2 received remote stream');
+      if (this.video.srcObject !== e.streams[0]) {
+        this.video.srcObject = e.streams[0];
       }
     }
 
     onCreateAnswerSuccess(desc) {
       try {
         this.pc2.setLocalDescription(desc);
-        console.log("Answer: " + JSON.stringify(desc));
+        // TODO Transmit answer
       } catch (e) { console.log("Error: " + e); }
     }
 
     onIceCandidate(event) {
       try {
-        console.log("ICE: " + JSON.stringify(event.candidate));
+        // TODO Transmit candidate
+        if (event.candidate == null) {
+          console.log("All candidates found");
+        }
       } catch (e) { console.log("Error: " + e); }
     }
 
     capture(resolution) {
-      const canvas = document.createElement("canvas");
-      // canvas.width  = this.remoteVideo.videoWidth;
-      // canvas.height = this.remoteVideo.videoHeight;
+      const canvas  = document.createElement("canvas");
       canvas.width  = resolution;
       canvas.height = resolution;
-      // canvas.getContext("2d").drawImage(
-      //    this.remoteVideo, 0, 0, this.remoteVideo.videoWidth, this.remoteVideo.videoHeight);
-      canvas.getContext("2d").drawImage(this.remoteVideo, 0, 0, resolution, resolution);
+      canvas.getContext("2d").drawImage(this.video, 0, 0, resolution, resolution);
       const data = canvas.toDataURL("image/png");
-      document.getElementById("captureImg").setAttribute("src", data);
       CosmoScout.callbacks.volumeRendering.captureColorImage(
           data.replace("data:image/png;base64,", ""));
     }
@@ -72,19 +63,9 @@
      * @inheritDoc
      */
     init() {
-      this.remoteVideo = document.getElementById("remotevideo");
-
-      this.remoteVideo.addEventListener('resize', () => {
-        console.log(`Remote video size changed to ${this.remoteVideo.videoWidth}x${
-            this.remoteVideo.videoHeight}`);
-        // We'll use the first onsize callback as an indication that video has started
-        // playing out.
-        if (this.startTime) {
-          const elapsedTime = window.performance.now() - this.startTime;
-          console.log('Setup time: ' + elapsedTime.toFixed(3) + 'ms');
-          this.startTime = null;
-        }
-      });
+      this.videoContainer = CosmoScout.gui.loadTemplateContent("volumeRendering-webRtc");
+      document.body.appendChild(this.videoContainer);
+      this.video = document.getElementById("volumeRendering-webRtcVideo");
 
       CosmoScout.gui.initInputs();
       CosmoScout.gui.initSlider("volumeRendering.setAnimationSpeed", 10, 1000, 10, [100]);
