@@ -32,9 +32,12 @@ class WebRTCRenderer : public Renderer {
   RenderedImage getFrameImpl(
       glm::mat4 cameraTransform, Parameters parameters, DataManager::State dataState) override;
 
+  glm::mat4 getOSPRayMVP(float volumeHeight, glm::mat4 observerTransform);
+
   std::shared_ptr<cs::core::GuiManager> mGuiManager;
 
-	std::promise<RenderedImage> mResultPromise;
+  std::promise<RenderedImage> mResultPromise;
+  glm::mat4                   mCurrentTransform;
 };
 
 } // namespace csp::volumerendering
