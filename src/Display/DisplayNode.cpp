@@ -61,6 +61,12 @@ void DisplayNode::setTexture(std::vector<uint8_t>& texture, int width, int heigh
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void DisplayNode::setTexture(uint8_t* texture, int width, int height) {
+  mTexture.UploadTexture(width, height, texture, false, GL_RGBA);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void DisplayNode::setDepthTexture(std::vector<float>& texture, int width, int height) {
   mDepthResolution = width;
   pDepthValues.set(texture);
