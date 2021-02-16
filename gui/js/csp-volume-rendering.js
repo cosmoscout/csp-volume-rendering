@@ -50,13 +50,17 @@
     }
 
     capture(resolution) {
-      const canvas  = document.createElement("canvas");
-      canvas.width  = resolution;
-      canvas.height = resolution;
-      canvas.getContext("2d").drawImage(this.video, 0, 0, resolution, resolution);
-      const data = canvas.toDataURL("image/png");
-      CosmoScout.callbacks.volumeRendering.captureColorImage(
-          data.replace("data:image/png;base64,", ""));
+      if (this.canvas.width != resolution) {
+        this.canvas.width = resolution;
+      }
+      if (this.canvas.height != resolution) {
+        this.canvas.height = resolution;
+      }
+
+      this.canvas.getContext("2d").drawImage(this.video, 0, 0, resolution, resolution);
+      let data = this.canvas.toDataURL("image/png");
+      data = data.replace("data:image/png;base64,", "")
+      CosmoScout.callbacks.volumeRendering.captureColorImage(data);
     }
 
     /**
@@ -65,7 +69,8 @@
     init() {
       this.videoContainer = CosmoScout.gui.loadTemplateContent("volumeRendering-webRtc");
       document.body.appendChild(this.videoContainer);
-      this.video = document.getElementById("volumeRendering-webRtcVideo");
+      this.video  = document.getElementById("volumeRendering-webRtcVideo");
+      this.canvas = document.createElement("canvas");
 
       CosmoScout.gui.initInputs();
       CosmoScout.gui.initSlider("volumeRendering.setAnimationSpeed", 10, 1000, 10, [100]);
