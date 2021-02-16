@@ -36,6 +36,7 @@ class WebRTCRenderer : public Renderer {
 
   std::shared_ptr<cs::core::GuiManager> mGuiManager;
 
+  std::mutex                  mResultMutex;
   std::promise<RenderedImage> mResultPromise;
   glm::mat4                   mCurrentTransform;
 };

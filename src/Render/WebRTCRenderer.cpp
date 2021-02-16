@@ -88,6 +88,7 @@ void WebRTCRenderer::cancelRendering() {
 
 Renderer::RenderedImage WebRTCRenderer::getFrameImpl(
     glm::mat4 cameraTransform, Parameters parameters, DataManager::State dataState) {
+  std::scoped_lock(mResultMutex);
   mCurrentTransform = cameraTransform;
   mGuiManager->getGui()->callJavascript(
       "CosmoScout.volumeRendering.capture", parameters.mResolution);
