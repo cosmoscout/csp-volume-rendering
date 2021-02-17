@@ -74,7 +74,7 @@
      */
     init() {
       this.videoContainer = CosmoScout.gui.loadTemplateContent("volumeRendering-webRtc");
-      document.body.appendChild(this.videoContainer);
+      document.getElementById("cosmoscout").appendChild(this.videoContainer);
       this.video  = document.getElementById("volumeRendering-webRtcVideo");
       this.canvas = document.createElement("canvas");
 

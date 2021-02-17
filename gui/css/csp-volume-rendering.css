@@ -28,4 +28,5 @@
     right: 0;
     position: absolute;
     visibility: hidden;
+    pointer-events: none;
 }
