@@ -54,6 +54,8 @@ WebRTCRenderer::WebRTCRenderer(std::shared_ptr<DataManager> dataManager, VolumeS
         result.mMVP       = getOSPRayMVP(512., mCurrentTransform);
         result.mValid     = true;
         mResultPromise.set_value(result);
+
+        stbi_image_free(image);
       }));
 }
 
