@@ -15,6 +15,7 @@
       this.pc2            = new RTCPeerConnection(configuration);
       this.pc2.addEventListener('icecandidate', e => this.onIceCandidate(e));
       this.pc2.addEventListener('track', e => this.gotRemoteStream(e));
+      this.pc2.addEventListener('datachannel', e => this.gotDataChannel(e));
       this.onCreateOfferSuccess(desc);
     }
 
@@ -31,6 +32,11 @@
       if (this.video.srcObject !== e.streams[0]) {
         this.video.srcObject = e.streams[0];
       }
+    }
+
+    gotDataChannel(e) {
+      this.dc = e.channel;
+      this.dc.addEventListener('message', (e) => { console.log(e.data); });
     }
 
     onCreateAnswerSuccess(desc) {
@@ -59,7 +65,7 @@
 
       this.canvas.getContext("2d").drawImage(this.video, 0, 0, resolution, resolution);
       let data = this.canvas.toDataURL("image/png");
-      data = data.replace("data:image/png;base64,", "")
+      data     = data.replace("data:image/png;base64,", "")
       CosmoScout.callbacks.volumeRendering.captureColorImage(data);
     }
 
