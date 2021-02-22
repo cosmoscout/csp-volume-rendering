@@ -72,6 +72,16 @@ find_package(ospray REQUIRED)
 find_package(OpenImageDenoise REQUIRED)
 find_package(VTK REQUIRED)
 
+if (WIN32)
+  set(PKG_CONFIG_EXECUTABLE ${COSMOSCOUT_EXTERNALS_DIR}/bin/pkg-config.exe)
+endif()
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(SOUP       REQUIRED IMPORTED_TARGET libsoup-2.4)
+pkg_check_modules(JSON_GLIB  REQUIRED IMPORTED_TARGET json-glib-1.0)
+pkg_check_modules(GST        REQUIRED IMPORTED_TARGET gstreamer-1.0)
+pkg_check_modules(GST_WEBRTC REQUIRED IMPORTED_TARGET gstreamer-webrtc-1.0)
+pkg_check_modules(GST_SDP    REQUIRED IMPORTED_TARGET gstreamer-sdp-1.0)
+
 # build plugin -------------------------------------------------------------------------------------
 
 file(GLOB_RECURSE SOURCE_FILES src/*.cpp)
@@ -91,11 +101,16 @@ target_link_libraries(csp-volume-rendering
     ospray::ospray
     OpenImageDenoise
     ${VTK_LIBRARIES}
+    PkgConfig::GST
+    PkgConfig::GST_WEBRTC
+    PkgConfig::GST_SDP
+    PkgConfig::SOUP
+    PkgConfig::JSON_GLIB
 )
 
 target_include_directories(csp-volume-rendering
   PUBLIC
-	  ${VTK_INCLUDE_DIRS}
+    ${VTK_INCLUDE_DIRS}
 )
 
 # Add this Plugin to a "plugins" folder in your IDE.
