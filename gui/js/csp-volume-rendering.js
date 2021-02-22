@@ -10,74 +10,10 @@
      */
     name = 'volumeRendering';
 
-    call(desc) {
-      const configuration = {iceServers: [{urls: ["stun:turn2.l.google.com"]}]};
-      this.pc2            = new RTCPeerConnection(configuration);
-      this.pc2.addEventListener('icecandidate', e => this.onIceCandidate(e));
-      this.pc2.addEventListener('track', e => this.gotRemoteStream(e));
-      this.pc2.addEventListener('datachannel', e => this.gotDataChannel(e));
-      this.onCreateOfferSuccess(desc);
-    }
-
-    onCreateOfferSuccess(desc) {
-      this.pc2.setRemoteDescription(desc);
-      try {
-        this.pc2.createAnswer()
-            .then(answer => this.onCreateAnswerSuccess(answer))
-            .catch(e => console.log("Error: " + e));
-      } catch (e) { console.log("Error: " + e); }
-    }
-
-    gotRemoteStream(e) {
-      if (this.video.srcObject !== e.streams[0]) {
-        this.video.srcObject = e.streams[0];
-      }
-    }
-
-    gotDataChannel(e) {
-      this.dc = e.channel;
-      this.dc.addEventListener('message', (e) => { console.log(e.data); });
-    }
-
-    onCreateAnswerSuccess(desc) {
-      try {
-        this.pc2.setLocalDescription(desc);
-        // TODO Transmit answer
-      } catch (e) { console.log("Error: " + e); }
-    }
-
-    onIceCandidate(event) {
-      try {
-        // TODO Transmit candidate
-        if (event.candidate == null) {
-          console.log("All candidates found");
-        }
-      } catch (e) { console.log("Error: " + e); }
-    }
-
-    capture(resolution) {
-      if (this.canvas.width != resolution) {
-        this.canvas.width = resolution;
-      }
-      if (this.canvas.height != resolution) {
-        this.canvas.height = resolution;
-      }
-
-      this.canvas.getContext("2d").drawImage(this.video, 0, 0, resolution, resolution);
-      let data = this.canvas.toDataURL("image/png");
-      data     = data.replace("data:image/png;base64,", "")
-      CosmoScout.callbacks.volumeRendering.captureColorImage(data);
-    }
-
     /**
      * @inheritDoc
      */
     init() {
-      this.videoContainer = CosmoScout.gui.loadTemplateContent("volumeRendering-webRtc");
-      document.getElementById("cosmoscout").appendChild(this.videoContainer);
-      this.video  = document.getElementById("volumeRendering-webRtcVideo");
-      this.canvas = document.createElement("canvas");
-
       CosmoScout.gui.initInputs();
       CosmoScout.gui.initSlider("volumeRendering.setAnimationSpeed", 10, 1000, 10, [100]);
       CosmoScout.gui.initSlider("volumeRendering.setResolution", 32, 2048, 32, [256]);

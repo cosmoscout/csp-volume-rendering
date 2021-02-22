@@ -11,6 +11,8 @@
 
 #include "../../../../src/cs-core/GuiManager.hpp"
 
+#include <gst/gst.h>
+
 #include <glm/gtc/type_ptr.hpp>
 
 #include <optional>
@@ -34,11 +36,7 @@ class WebRTCRenderer : public Renderer {
 
   glm::mat4 getOSPRayMVP(float volumeHeight, glm::mat4 observerTransform);
 
-  std::shared_ptr<cs::core::GuiManager> mGuiManager;
-
-  std::mutex                  mResultMutex;
-  std::promise<RenderedImage> mResultPromise;
-  glm::mat4                   mCurrentTransform;
+  std::thread mMainLoop;
 };
 
 } // namespace csp::volumerendering
