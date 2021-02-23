@@ -10,6 +10,7 @@
 #include "Renderer.hpp"
 
 #include "../../../../src/cs-core/GuiManager.hpp"
+#include "../../../../src/cs-utils/Signal.hpp"
 
 #include <gst/gst.h>
 
@@ -28,16 +29,27 @@ class SignallingServer {
   ~SignallingServer();
 
   void send(std::string const& text);
-  gboolean    setupCall();
+
+  cs::utils::Signal<> const&                         onPeerConnected() const;
+  cs::utils::Signal<std::string, std::string> const& onSdpReceived() const;
+  cs::utils::Signal<std::string, gint64> const&      onIceReceived() const;
 
  private:
   static void onServerConnected(SoupSession* session, GAsyncResult* res, SignallingServer* pThis);
-  gboolean    registerWithServer();
+  static void onServerMessage(SoupWebsocketConnection* conn, SoupWebsocketDataType type,
+      GBytes* message, SignallingServer* pThis);
+
+  gboolean registerWithServer();
+  gboolean setupCall();
 
   std::unique_ptr<SoupWebsocketConnection> wsConnection;
 
   std::string mOurId;
   std::string mPeerId;
+
+  cs::utils::Signal<>                         mOnPeerConnected;
+  cs::utils::Signal<std::string, std::string> mOnSdpReceived;
+  cs::utils::Signal<std::string, gint64>      mOnIceReceived;
 };
 
 class WebRTCRenderer : public Renderer {
