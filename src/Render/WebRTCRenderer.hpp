@@ -13,12 +13,32 @@
 
 #include <gst/gst.h>
 
+#include <libsoup/soup.h>
+
 #include <glm/gtc/type_ptr.hpp>
 
 #include <optional>
 #include <string>
 
 namespace csp::volumerendering {
+
+class SignallingServer {
+ public:
+  SignallingServer(std::string const& url, std::string peerId);
+  ~SignallingServer();
+
+  void send(std::string const& text);
+  gboolean    setupCall();
+
+ private:
+  static void onServerConnected(SoupSession* session, GAsyncResult* res, SignallingServer* pThis);
+  gboolean    registerWithServer();
+
+  std::unique_ptr<SoupWebsocketConnection> wsConnection;
+
+  std::string mOurId;
+  std::string mPeerId;
+};
 
 class WebRTCRenderer : public Renderer {
  public:

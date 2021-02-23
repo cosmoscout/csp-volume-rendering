@@ -18,7 +18,6 @@
 
 /* For signalling */
 #include <json-glib/json-glib.h>
-#include <libsoup/soup.h>
 
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -54,23 +53,12 @@ static GMainLoop*  loop;
 static GstElement *pipe1, *webrtc1 = NULL;
 static GObject *   send_channel, *receive_channel;
 
-static SoupWebsocketConnection* ws_conn           = NULL;
-static enum AppState            app_state         = static_cast<AppState>(0);
-static gchar*                   peer_id           = "1234";
-static const gchar*             server_url        = "wss://webrtc.nirbheek.in:8443";
-static gboolean                 disable_ssl       = TRUE;
-static gboolean                 remote_is_offerer = FALSE;
+static enum AppState app_state         = static_cast<AppState>(0);
+static gboolean      disable_ssl       = TRUE;
+static gboolean      remote_is_offerer = FALSE;
 
 std::unique_ptr<GstElement, std::function<void(GstElement*)>> mAppSink;
-
-static GOptionEntry entries[] = {
-    {"peer-id", 0, 0, G_OPTION_ARG_STRING, &peer_id, "String ID of the peer to connect to", "ID"},
-    {"server", 0, 0, G_OPTION_ARG_STRING, &server_url, "Signalling server to connect to", "URL"},
-    {"disable-ssl", 0, 0, G_OPTION_ARG_NONE, &disable_ssl, "Disable ssl", NULL},
-    {"remote-offerer", 0, 0, G_OPTION_ARG_NONE, &remote_is_offerer,
-        "Request that the peer generate the offer and we'll answer", NULL},
-    {NULL},
-};
+csp::volumerendering::SignallingServer mSignallingServer("wss://webrtc.nirbheek.in:8443", "1234");
 
 #define STUN_SERVER " stun-server=stun://stun.l.google.com:19302 "
 #define RTP_CAPS_OPUS "application/x-rtp,media=audio,encoding-name=OPUS,payload="
@@ -81,14 +69,6 @@ static gboolean cleanup_and_quit_loop(const gchar* msg, enum AppState state) {
     gst_printerr("%s\n", msg);
   if (state > 0)
     app_state = state;
-
-  if (ws_conn) {
-    if (soup_websocket_connection_get_state(ws_conn) == SOUP_WEBSOCKET_STATE_OPEN)
-      /* This will call us again */
-      soup_websocket_connection_close(ws_conn, 1000, "");
-    else
-      g_clear_object(&ws_conn);
-  }
 
   if (loop) {
     g_main_loop_quit(loop);
@@ -201,7 +181,7 @@ static void send_ice_candidate_message(GstElement* webrtc G_GNUC_UNUSED, guint m
   text = get_string_from_json_object(msg);
   json_object_unref(msg);
 
-  soup_websocket_connection_send_text(ws_conn, text);
+  mSignallingServer.send(text);
   g_free(text);
 }
 
@@ -218,10 +198,10 @@ static void send_sdp_to_peer(GstWebRTCSessionDescription* desc) {
   sdp  = json_object_new();
 
   if (desc->type == GST_WEBRTC_SDP_TYPE_OFFER) {
-    gst_print("Sending offer:\n%s\n", text);
+    gst_println("Sending offer.");
     json_object_set_string_member(sdp, "type", "offer");
   } else if (desc->type == GST_WEBRTC_SDP_TYPE_ANSWER) {
-    gst_print("Sending answer:\n%s\n", text);
+    gst_println("Sending answer.");
     json_object_set_string_member(sdp, "type", "answer");
   } else {
     g_assert_not_reached();
@@ -235,7 +215,7 @@ static void send_sdp_to_peer(GstWebRTCSessionDescription* desc) {
   text = get_string_from_json_object(msg);
   json_object_unref(msg);
 
-  soup_websocket_connection_send_text(ws_conn, text);
+  mSignallingServer.send(text);
   g_free(text);
 }
 
@@ -266,7 +246,7 @@ static void on_negotiation_needed(GstElement* element, gpointer user_data) {
   app_state             = PEER_CALL_NEGOTIATING;
 
   if (remote_is_offerer) {
-    soup_websocket_connection_send_text(ws_conn, "OFFER_REQUEST");
+    mSignallingServer.send("OFFER_REQUEST");
   } else if (create_offer) {
     GstPromise* promise = gst_promise_new_with_change_func(on_offer_created, NULL, NULL);
     g_signal_emit_by_name(webrtc1, "create-offer", NULL, promise);
@@ -386,46 +366,6 @@ err:
   return FALSE;
 }
 
-static gboolean setup_call(void) {
-  gchar* msg;
-
-  if (soup_websocket_connection_get_state(ws_conn) != SOUP_WEBSOCKET_STATE_OPEN)
-    return FALSE;
-
-  if (!peer_id)
-    return FALSE;
-
-  gst_print("Setting up signalling server call with %s\n", peer_id);
-  app_state = PEER_CONNECTING;
-  msg       = g_strdup_printf("SESSION %s", peer_id);
-  soup_websocket_connection_send_text(ws_conn, msg);
-  g_free(msg);
-  return TRUE;
-}
-
-static gboolean register_with_server(void) {
-  gchar* hello;
-
-  if (soup_websocket_connection_get_state(ws_conn) != SOUP_WEBSOCKET_STATE_OPEN)
-    return FALSE;
-
-  gint32 id;
-
-  id = g_random_int_range(10, 10000);
-  gst_print("Registering id %i with server\n", id);
-
-  hello = g_strdup_printf("HELLO %i", id);
-
-  app_state = SERVER_REGISTERING;
-
-  /* Register with the server with a random integer id. Reply will be received
-   * by on_server_message() */
-  soup_websocket_connection_send_text(ws_conn, hello);
-  g_free(hello);
-
-  return TRUE;
-}
-
 static void on_server_closed(
     SoupWebsocketConnection* conn G_GNUC_UNUSED, gpointer user_data G_GNUC_UNUSED) {
   app_state = SERVER_CLOSED;
@@ -504,7 +444,7 @@ static void on_server_message(SoupWebsocketConnection* conn, SoupWebsocketDataTy
     app_state = SERVER_REGISTERED;
     gst_print("Registered with server\n");
     /* Ask signalling server to connect us with a specific peer */
-    if (!setup_call()) {
+    if (!mSignallingServer.setupCall()) {
       cleanup_and_quit_loop("ERROR: Failed to setup call", PEER_CALL_ERROR);
       goto out;
     }
@@ -599,7 +539,7 @@ static void on_server_message(SoupWebsocketConnection* conn, SoupWebsocketDataTy
       g_assert_cmphex(ret, ==, GST_SDP_OK);
 
       if (g_str_equal(sdptype, "answer")) {
-        gst_print("Received answer:\n%s\n", text);
+        gst_println("Received answer.");
         answer = gst_webrtc_session_description_new(GST_WEBRTC_SDP_TYPE_ANSWER, sdp);
         g_assert_nonnull(answer);
 
@@ -612,7 +552,7 @@ static void on_server_message(SoupWebsocketConnection* conn, SoupWebsocketDataTy
         }
         app_state = PEER_CALL_STARTED;
       } else {
-        gst_print("Received offer:\n%s\n", text);
+        gst_println("Received offer.");
         on_offer_received(sdp);
       }
 
@@ -636,57 +576,7 @@ out:
   g_free(text);
 }
 
-static void on_server_connected(SoupSession* session, GAsyncResult* res, SoupMessage* msg) {
-  GError* error = NULL;
-
-  ws_conn = soup_session_websocket_connect_finish(session, res, &error);
-  if (error) {
-    cleanup_and_quit_loop(error->message, SERVER_CONNECTION_ERROR);
-    g_error_free(error);
-    return;
-  }
-
-  g_assert_nonnull(ws_conn);
-
-  app_state = SERVER_CONNECTED;
-  gst_print("Connected to signalling server\n");
-
-  g_signal_connect(ws_conn, "closed", G_CALLBACK(on_server_closed), NULL);
-  g_signal_connect(ws_conn, "message", G_CALLBACK(on_server_message), NULL);
-
-  /* Register with the server so it knows about us and can accept commands */
-  register_with_server();
-}
-
-/*
- * Connect to the signalling server. This is the entrypoint for everything else.
- */
-static void connect_to_websocket_server_async(void) {
-  SoupLogger*  logger;
-  SoupMessage* message;
-  SoupSession* session;
-  const char*  https_aliases[] = {"wss", NULL};
-
-  session = soup_session_new_with_options(SOUP_SESSION_SSL_STRICT, !disable_ssl,
-      SOUP_SESSION_SSL_USE_SYSTEM_CA_FILE, TRUE,
-      // SOUP_SESSION_SSL_CA_FILE, "/etc/ssl/certs/ca-bundle.crt",
-      SOUP_SESSION_HTTPS_ALIASES, https_aliases, NULL);
-
-  logger = soup_logger_new(SOUP_LOGGER_LOG_BODY, -1);
-  soup_session_add_feature(session, SOUP_SESSION_FEATURE(logger));
-  g_object_unref(logger);
-
-  message = soup_message_new(SOUP_METHOD_GET, server_url);
-
-  gst_print("Connecting to server...\n");
-
-  /* Once connected, we will register */
-  soup_session_websocket_connect_async(
-      session, message, NULL, NULL, NULL, (GAsyncReadyCallback)on_server_connected, message);
-  app_state = SERVER_CONNECTING;
-}
-
-static gboolean check_plugins(void) {
+gboolean check_plugins() {
   guint        i;
   gboolean     ret;
   GstPlugin*   plugin;
@@ -699,7 +589,7 @@ static gboolean check_plugins(void) {
   for (i = 0; i < g_strv_length((gchar**)needed); i++) {
     plugin = gst_registry_find_plugin(registry, needed[i]);
     if (!plugin) {
-      gst_print("Required gstreamer plugin '%s' not found\n", needed[i]);
+      csp::volumerendering::logger().error("Required gstreamer plugin '{}' not found!", needed[i]);
       ret = FALSE;
       continue;
     }
@@ -714,31 +604,112 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+SignallingServer::SignallingServer(std::string const& url, std::string peerId)
+    : mOurId(std::to_string(g_random_int_range(10, 10000)))
+    , mPeerId(std::move(peerId)) {
+  SoupLogger*  soupLogger;
+  SoupMessage* message;
+  SoupSession* session;
+  const char*  https_aliases[] = {"wss", NULL};
+
+  session = soup_session_new_with_options(SOUP_SESSION_SSL_STRICT, false,
+      SOUP_SESSION_SSL_USE_SYSTEM_CA_FILE, TRUE, SOUP_SESSION_HTTPS_ALIASES, https_aliases, NULL);
+
+  soupLogger = soup_logger_new(SOUP_LOGGER_LOG_BODY, -1);
+  soup_session_add_feature(session, SOUP_SESSION_FEATURE(soupLogger));
+  g_object_unref(soupLogger);
+
+  message = soup_message_new(SOUP_METHOD_GET, url.c_str());
+
+  logger().trace("Connecting to signalling server...");
+
+  // Once connected, we will register
+  soup_session_websocket_connect_async(session, message, NULL, NULL, NULL,
+      reinterpret_cast<GAsyncReadyCallback>(&SignallingServer::onServerConnected), this);
+  app_state = SERVER_CONNECTING;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+SignallingServer::~SignallingServer() {
+  if (wsConnection) {
+    if (soup_websocket_connection_get_state(wsConnection.get()) == SOUP_WEBSOCKET_STATE_OPEN) {
+      soup_websocket_connection_close(wsConnection.get(), 1000, "");
+      // TODO wait until 'closed' fired
+    }
+    g_object_unref(wsConnection.get());
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void SignallingServer::send(std::string const& text) {
+  soup_websocket_connection_send_text(wsConnection.get(), text.c_str());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void SignallingServer::onServerConnected(
+    SoupSession* session, GAsyncResult* res, SignallingServer* pThis) {
+  GError* error = NULL;
+
+  pThis->wsConnection.reset(soup_session_websocket_connect_finish(session, res, &error));
+  if (error) {
+    cleanup_and_quit_loop(error->message, SERVER_CONNECTION_ERROR);
+    g_error_free(error);
+    return;
+  }
+
+  g_assert_nonnull(pThis->wsConnection.get());
+
+  app_state = SERVER_CONNECTED;
+  logger().trace("Connected to signalling server.");
+
+  g_signal_connect(pThis->wsConnection.get(), "closed", G_CALLBACK(on_server_closed), NULL);
+  g_signal_connect(pThis->wsConnection.get(), "message", G_CALLBACK(on_server_message), NULL);
+
+  // Register with the server so it knows about us and can accept commands
+  pThis->registerWithServer();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+gboolean SignallingServer::registerWithServer() {
+  if (soup_websocket_connection_get_state(wsConnection.get()) != SOUP_WEBSOCKET_STATE_OPEN)
+    return FALSE;
+
+  // Register with the server with a random integer id. Reply will be received
+  // by onServerMessage()
+  logger().trace("Registering id '{}' with server.", mOurId);
+  app_state = SERVER_REGISTERING;
+  send("HELLO " + mOurId);
+  return TRUE;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+gboolean SignallingServer::setupCall() {
+  if (soup_websocket_connection_get_state(wsConnection.get()) != SOUP_WEBSOCKET_STATE_OPEN)
+    return FALSE;
+
+  logger().trace("Setting up call with '{}'.", mPeerId);
+  app_state = PEER_CONNECTING;
+  send("SESSION " + mPeerId);
+  return TRUE;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 WebRTCRenderer::WebRTCRenderer(std::shared_ptr<DataManager> dataManager, VolumeStructure structure,
     VolumeShape shape, std::shared_ptr<cs::core::GuiManager> guiManager)
     : Renderer(dataManager, structure, shape) {
-  GError* error    = NULL;
-  int     ret_code = -1;
+  GError* error = NULL;
 
   if (!gst_init_check(nullptr, nullptr, &error) || !check_plugins()) {
     // TODO
   }
 
-  ret_code = 0;
-
-  // Disable ssl when running a localhost server, because
-  // it's probably a test server with a self-signed certificate
-  {
-    GstUri* uri = gst_uri_from_string(server_url);
-    if (g_strcmp0("localhost", gst_uri_get_host(uri)) == 0 ||
-        g_strcmp0("127.0.0.1", gst_uri_get_host(uri)) == 0)
-      disable_ssl = TRUE;
-    gst_uri_unref(uri);
-  }
-
   loop = g_main_loop_new(NULL, FALSE);
-
-  connect_to_websocket_server_async();
 
   mMainLoop = std::thread([]() {
     g_main_loop_run(loop);
