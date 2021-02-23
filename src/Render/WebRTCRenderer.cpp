@@ -717,30 +717,30 @@ namespace csp::volumerendering {
 WebRTCRenderer::WebRTCRenderer(std::shared_ptr<DataManager> dataManager, VolumeStructure structure,
     VolumeShape shape, std::shared_ptr<cs::core::GuiManager> guiManager)
     : Renderer(dataManager, structure, shape) {
+  GError* error    = NULL;
+  int     ret_code = -1;
+
+  if (!gst_init_check(nullptr, nullptr, &error) || !check_plugins()) {
+    // TODO
+  }
+
+  ret_code = 0;
+
+  // Disable ssl when running a localhost server, because
+  // it's probably a test server with a self-signed certificate
+  {
+    GstUri* uri = gst_uri_from_string(server_url);
+    if (g_strcmp0("localhost", gst_uri_get_host(uri)) == 0 ||
+        g_strcmp0("127.0.0.1", gst_uri_get_host(uri)) == 0)
+      disable_ssl = TRUE;
+    gst_uri_unref(uri);
+  }
+
+  loop = g_main_loop_new(NULL, FALSE);
+
+  connect_to_websocket_server_async();
+
   mMainLoop = std::thread([]() {
-    GError* error    = NULL;
-    int     ret_code = -1;
-
-    if (!gst_init_check(nullptr, nullptr, &error) || !check_plugins()) {
-      // TODO
-    }
-
-    ret_code = 0;
-
-    /* Disable ssl when running a localhost server, because
-     * it's probably a test server with a self-signed certificate */
-    {
-      GstUri* uri = gst_uri_from_string(server_url);
-      if (g_strcmp0("localhost", gst_uri_get_host(uri)) == 0 ||
-          g_strcmp0("127.0.0.1", gst_uri_get_host(uri)) == 0)
-        disable_ssl = TRUE;
-      gst_uri_unref(uri);
-    }
-
-    loop = g_main_loop_new(NULL, FALSE);
-
-    connect_to_websocket_server_async();
-
     g_main_loop_run(loop);
 
     if (loop)
@@ -756,7 +756,11 @@ WebRTCRenderer::WebRTCRenderer(std::shared_ptr<DataManager> dataManager, VolumeS
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-WebRTCRenderer::~WebRTCRenderer(){};
+WebRTCRenderer::~WebRTCRenderer() {
+  cleanup_and_quit_loop(nullptr, PEER_CALL_STOPPED);
+
+  mMainLoop.join();
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
