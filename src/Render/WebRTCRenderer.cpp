@@ -42,9 +42,7 @@ enum AppState {
   PEER_CALL_ERROR,
 };
 
-static GMainLoop*  loop;
-static GstElement *pipe1, *webrtc1 = NULL;
-static GObject *   send_channel, *receive_channel;
+static GObject *send_channel, *receive_channel;
 
 static enum AppState app_state = static_cast<AppState>(0);
 
@@ -56,11 +54,6 @@ static gboolean cleanup_and_quit_loop(const gchar* msg, enum AppState state) {
     gst_printerr("%s\n", msg);
   if (state > 0)
     app_state = state;
-
-  if (loop) {
-    g_main_loop_quit(loop);
-    g_clear_pointer(&loop, g_main_loop_unref);
-  }
 
   /* To allow usage as a GSourceFunc */
   return G_SOURCE_REMOVE;
@@ -172,13 +165,6 @@ SignallingServer::SignallingServer(std::string const& url, std::string peerId)
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 SignallingServer::~SignallingServer() {
-  if (wsConnection) {
-    if (soup_websocket_connection_get_state(wsConnection.get()) == SOUP_WEBSOCKET_STATE_OPEN) {
-      soup_websocket_connection_close(wsConnection.get(), 1000, "");
-      // TODO wait until 'closed' fired
-    }
-    g_object_unref(wsConnection.get());
-  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -211,7 +197,16 @@ void SignallingServer::onServerConnected(
     SoupSession* session, GAsyncResult* res, SignallingServer* pThis) {
   GError* error = NULL;
 
-  pThis->wsConnection.reset(soup_session_websocket_connect_finish(session, res, &error));
+  pThis->wsConnection =
+      std::unique_ptr<SoupWebsocketConnection, std::function<void(SoupWebsocketConnection*)>>(
+          soup_session_websocket_connect_finish(session, res, &error),
+          [](SoupWebsocketConnection* conn) {
+            if (soup_websocket_connection_get_state(conn) == SOUP_WEBSOCKET_STATE_OPEN) {
+              soup_websocket_connection_close(conn, 1000, "");
+              // TODO wait until 'closed' fired
+            }
+            g_object_unref(conn);
+          });
   if (error) {
     cleanup_and_quit_loop(error->message, SERVER_CONNECTION_ERROR);
     g_error_free(error);
@@ -409,31 +404,24 @@ WebRTCStream::WebRTCStream()
   });
   mSignallingServer.onIceReceived().connect([this](std::string text, guint64 spdmLineIndex) {
     // Add ice candidate sent by remote peer
-    g_signal_emit_by_name(webrtc1, "add-ice-candidate", spdmLineIndex, text.c_str());
+    g_signal_emit_by_name(mWebrtcBin.get(), "add-ice-candidate", spdmLineIndex, text.c_str());
   });
 
-  loop = g_main_loop_new(NULL, FALSE);
+  mMainLoop = std::unique_ptr<GMainLoop, std::function<void(GMainLoop*)>>(
+      g_main_loop_new(NULL, FALSE), [](GMainLoop* loop) {
+        g_main_loop_quit(loop);
+        g_main_loop_unref(loop);
+      });
 
-  mMainLoop = std::thread([]() {
-    g_main_loop_run(loop);
-
-    if (loop)
-      g_main_loop_unref(loop);
-
-    if (pipe1) {
-      gst_element_set_state(GST_ELEMENT(pipe1), GST_STATE_NULL);
-      logger().trace("Pipeline stopped.");
-      gst_object_unref(pipe1);
-    }
-  });
+  mMainLoopThread = std::thread([this]() { g_main_loop_run(mMainLoop.get()); });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 WebRTCStream::~WebRTCStream() {
-  cleanup_and_quit_loop(nullptr, PEER_CALL_STOPPED);
-
-  mMainLoop.join();
+  mMainLoop.reset();
+  mPipeline.reset();
+  mMainLoopThread.join();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -461,7 +449,7 @@ void WebRTCStream::onOfferSet(GstPromise* promise, WebRTCStream* pThis) {
   gst_promise_unref(promise);
   promise = gst_promise_new_with_change_func(
       reinterpret_cast<GstPromiseChangeFunc>(&WebRTCStream::onAnswerCreated), pThis, NULL);
-  g_signal_emit_by_name(webrtc1, "create-answer", NULL, promise);
+  g_signal_emit_by_name(pThis->mWebrtcBin.get(), "create-answer", NULL, promise);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -478,7 +466,7 @@ void WebRTCStream::onAnswerCreated(GstPromise* promise, WebRTCStream* pThis) {
   gst_promise_unref(promise);
 
   promise = gst_promise_new();
-  g_signal_emit_by_name(webrtc1, "set-local-description", answer, promise);
+  g_signal_emit_by_name(pThis->mWebrtcBin.get(), "set-local-description", answer, promise);
   gst_promise_interrupt(promise);
   gst_promise_unref(promise);
 
@@ -499,7 +487,7 @@ void WebRTCStream::onOfferCreated(GstPromise* promise, WebRTCStream* pThis) {
   gst_promise_unref(promise);
 
   promise = gst_promise_new();
-  g_signal_emit_by_name(webrtc1, "set-local-description", offer, promise);
+  g_signal_emit_by_name(pThis->mWebrtcBin.get(), "set-local-description", offer, promise);
   gst_promise_interrupt(promise);
   gst_promise_unref(promise);
 
@@ -516,7 +504,7 @@ void WebRTCStream::onNegotiationNeeded(GstElement* element, WebRTCStream* pThis)
   if (pThis->mCreateOffer) {
     GstPromise* promise = gst_promise_new_with_change_func(
         reinterpret_cast<GstPromiseChangeFunc>(&WebRTCStream::onOfferCreated), pThis, NULL);
-    g_signal_emit_by_name(webrtc1, "create-offer", NULL, promise);
+    g_signal_emit_by_name(pThis->mWebrtcBin.get(), "create-offer", NULL, promise);
   } else {
     pThis->mSignallingServer.send("OFFER_REQUEST");
   }
@@ -580,7 +568,7 @@ void WebRTCStream::onIncomingStream(GstElement* webrtc, GstPad* pad, WebRTCStrea
   decodebin = gst_element_factory_make("decodebin", NULL);
   g_signal_connect(
       decodebin, "pad-added", G_CALLBACK(WebRTCStream::onIncomingDecodebinStream), pThis);
-  gst_bin_add(GST_BIN(pipe1), decodebin);
+  gst_bin_add(GST_BIN(pThis->mPipeline.get()), decodebin);
   gst_element_sync_state_with_parent(decodebin);
 
   sinkpad = gst_element_get_static_pad(decodebin, "sink");
@@ -621,7 +609,7 @@ void WebRTCStream::onOfferReceived(GstSDPMessage* sdp) {
   {
     GstPromise* promise = gst_promise_new_with_change_func(
         reinterpret_cast<GstPromiseChangeFunc>(&WebRTCStream::onOfferSet), this, NULL);
-    g_signal_emit_by_name(webrtc1, "set-remote-description", offer, promise);
+    g_signal_emit_by_name(mWebrtcBin.get(), "set-remote-description", offer, promise);
   }
   gst_webrtc_session_description_free(offer);
 }
@@ -636,7 +624,7 @@ void WebRTCStream::onAnswerReceived(GstSDPMessage* sdp) {
   // Set remote description on our pipeline
   {
     GstPromise* promise = gst_promise_new();
-    g_signal_emit_by_name(webrtc1, "set-remote-description", answer, promise);
+    g_signal_emit_by_name(mWebrtcBin.get(), "set-remote-description", answer, promise);
     gst_promise_interrupt(promise);
     gst_promise_unref(promise);
   }
@@ -701,7 +689,7 @@ void WebRTCStream::handleVideoStream(GstPad* pad) {
       gst_bin_get_by_name(GST_BIN(bin), "framecapture"),
       [](GstElement* appsink) { gst_object_unref(appsink); });
 
-  gst_bin_add_many(GST_BIN(pipe1), bin, NULL);
+  gst_bin_add_many(GST_BIN(mPipeline.get()), bin, NULL);
   gst_element_sync_state_with_parent(bin);
 
   GstPad*          binpad = gst_element_get_static_pad(bin, "sink");
@@ -712,37 +700,45 @@ void WebRTCStream::handleVideoStream(GstPad* pad) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 gboolean WebRTCStream::startPipeline() {
-  pipe1 = gst_pipeline_new("pipeline");
-  g_assert_nonnull(pipe1);
+  mPipeline = std::unique_ptr<GstElement, std::function<void(GstElement*)>>(
+      gst_pipeline_new("pipeline"), [](GstElement* pipeline) {
+        gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_NULL);
+        logger().trace("Pipeline stopped.");
+        gst_object_unref(pipeline);
+      });
+  g_assert_nonnull(mPipeline.get());
 
-  webrtc1 = gst_element_factory_make("webrtcbin", "sendrecv");
-  g_assert_nonnull(webrtc1);
-  g_object_set(webrtc1, "bundle-policy", GST_WEBRTC_BUNDLE_POLICY_MAX_BUNDLE, NULL);
-  g_object_set(webrtc1, "stun-server", "stun://stun.l.google.com:19302", NULL);
+  mWebrtcBin = std::unique_ptr<GstElement, std::function<void(GstElement*)>>(
+      gst_element_factory_make("webrtcbin", "sendrecv"), [](GstElement*) {});
+  g_assert_nonnull(mWebrtcBin.get());
+  g_object_set(mWebrtcBin.get(), "bundle-policy", GST_WEBRTC_BUNDLE_POLICY_MAX_BUNDLE, NULL);
+  g_object_set(mWebrtcBin.get(), "stun-server", "stun://stun.l.google.com:19302", NULL);
 
-  gst_bin_add_many(GST_BIN(pipe1), webrtc1, NULL);
+  gst_bin_add_many(GST_BIN(mPipeline.get()), mWebrtcBin.get(), NULL);
 
-  gst_element_sync_state_with_parent(webrtc1);
+  gst_element_sync_state_with_parent(mWebrtcBin.get());
 
   GstWebRTCRTPTransceiver* transceiver;
-  g_signal_emit_by_name(webrtc1, "add-transceiver", GST_WEBRTC_RTP_TRANSCEIVER_DIRECTION_RECVONLY,
-      gst_caps_from_string(RTP_CAPS_VP8 "96"), &transceiver);
+  g_signal_emit_by_name(mWebrtcBin.get(), "add-transceiver",
+      GST_WEBRTC_RTP_TRANSCEIVER_DIRECTION_RECVONLY, gst_caps_from_string(RTP_CAPS_VP8 "96"),
+      &transceiver);
   gst_object_unref(transceiver);
 
   // This is the gstwebrtc entry point where we create the offer and so on.
   // It will be called when the pipeline goes to PLAYING.
-  g_signal_connect(
-      webrtc1, "on-negotiation-needed", G_CALLBACK(WebRTCStream::onNegotiationNeeded), this);
+  g_signal_connect(mWebrtcBin.get(), "on-negotiation-needed",
+      G_CALLBACK(WebRTCStream::onNegotiationNeeded), this);
   // We need to transmit this ICE candidate to the browser via the websockets
   // signalling server. Incoming ice candidates from the browser need to be
   // added by us too, see on_server_message()
-  g_signal_connect(webrtc1, "on-ice-candidate", G_CALLBACK(WebRTCStream::onIceCandidate), this);
-  g_signal_connect(webrtc1, "notify::ice-gathering-state",
+  g_signal_connect(
+      mWebrtcBin.get(), "on-ice-candidate", G_CALLBACK(WebRTCStream::onIceCandidate), this);
+  g_signal_connect(mWebrtcBin.get(), "notify::ice-gathering-state",
       G_CALLBACK(WebRTCStream::onIceGatheringStateNotify), this);
 
-  gst_element_set_state(pipe1, GST_STATE_READY);
+  gst_element_set_state(mPipeline.get(), GST_STATE_READY);
 
-  g_signal_emit_by_name(webrtc1, "create-data-channel", "channel", NULL, &send_channel);
+  g_signal_emit_by_name(mWebrtcBin.get(), "create-data-channel", "channel", NULL, &send_channel);
   if (send_channel) {
     logger().trace("Created data channel.");
     connect_data_channel_signals(send_channel);
@@ -750,23 +746,17 @@ gboolean WebRTCStream::startPipeline() {
     logger().warn("Could not create data channel, is usrsctp available?");
   }
 
-  g_signal_connect(webrtc1, "on-data-channel", G_CALLBACK(on_data_channel), NULL);
+  g_signal_connect(mWebrtcBin.get(), "on-data-channel", G_CALLBACK(on_data_channel), NULL);
   // Incoming streams will be exposed via this signal
-  g_signal_connect(webrtc1, "pad-added", G_CALLBACK(WebRTCStream::onIncomingStream), this);
+  g_signal_connect(mWebrtcBin.get(), "pad-added", G_CALLBACK(WebRTCStream::onIncomingStream), this);
 
   logger().trace("Starting pipeline.");
-  GstStateChangeReturn ret = gst_element_set_state(GST_ELEMENT(pipe1), GST_STATE_PLAYING);
-  if (ret == GST_STATE_CHANGE_FAILURE)
-    goto err;
+  GstStateChangeReturn ret = gst_element_set_state(GST_ELEMENT(mPipeline.get()), GST_STATE_PLAYING);
+  if (ret == GST_STATE_CHANGE_FAILURE) {
+    // TODO
+  }
 
   return TRUE;
-
-err:
-  if (pipe1)
-    g_clear_object(&pipe1);
-  if (webrtc1)
-    webrtc1 = NULL;
-  return FALSE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

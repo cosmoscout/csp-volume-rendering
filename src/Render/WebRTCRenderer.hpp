@@ -47,7 +47,8 @@ class SignallingServer {
   gboolean registerWithServer();
   gboolean setupCall();
 
-  std::unique_ptr<SoupWebsocketConnection> wsConnection;
+  std::unique_ptr<SoupWebsocketConnection, std::function<void(SoupWebsocketConnection*)>>
+      wsConnection;
 
   std::string mOurId;
   std::string mPeerId;
@@ -88,8 +89,11 @@ class WebRTCStream {
 
   SignallingServer mSignallingServer;
 
-  std::thread mMainLoop;
+  std::unique_ptr<GMainLoop, std::function<void(GMainLoop*)>> mMainLoop;
+  std::thread                                                 mMainLoopThread;
 
+  std::unique_ptr<GstElement, std::function<void(GstElement*)>> mPipeline;
+  std::unique_ptr<GstElement, std::function<void(GstElement*)>> mWebrtcBin;
   std::unique_ptr<GstElement, std::function<void(GstElement*)>> mAppSink;
 };
 
