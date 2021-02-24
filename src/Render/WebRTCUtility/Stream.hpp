@@ -66,6 +66,9 @@ class Stream {
   std::unique_ptr<GstElement, std::function<void(GstElement*)>> mPipeline;
   std::unique_ptr<GstElement, std::function<void(GstElement*)>> mWebrtcBin;
   std::unique_ptr<GstElement, std::function<void(GstElement*)>> mAppSink;
+  std::unique_ptr<GstElement, std::function<void(GstElement*)>> mCapsFilter;
+
+  int mResolution = 512;
 };
 
 } // namespace csp::volumerendering::webrtc

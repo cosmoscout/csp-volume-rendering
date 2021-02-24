@@ -10,6 +10,8 @@
 
 #include <json-glib/json-glib.h>
 
+#include <sstream>
+
 namespace {
 
 static gchar* get_string_from_json_object(JsonObject* object) {
@@ -62,7 +64,7 @@ Stream::Stream()
   GError* error = NULL;
 
   if (!gst_init_check(nullptr, nullptr, &error) || !check_plugins()) {
-    // TODO
+    throw std::runtime_error("Could not initialize GStreamer");
   }
 
   mSignallingServer.onPeerConnected().connect([this]() {
@@ -126,8 +128,27 @@ std::optional<std::vector<uint8_t>> Stream::getSample(int resolution) {
   if (!mAppSink) {
     return {};
   }
-  GstSample* sample;
-  g_signal_emit_by_name(mAppSink.get(), "pull-sample", &sample, NULL);
+  GstSample* sample = NULL;
+  if (resolution != mResolution) {
+    mResolution = resolution;
+    std::stringstream capsStr;
+    capsStr << "video/x-raw,format=RGBA,width=" << mResolution << ",height=" << mResolution;
+    GstCaps* caps = gst_caps_from_string(capsStr.str().c_str());
+    g_object_set(mCapsFilter.get(), "caps", caps, NULL);
+    gst_caps_unref(caps);
+
+    // Drop samples with incorrect resolution
+    GstCaps* sampleCaps;
+    do {
+      if (sample) {
+        gst_sample_unref(sample);
+      }
+      g_signal_emit_by_name(mAppSink.get(), "pull-sample", &sample, NULL);
+      sampleCaps = gst_sample_get_caps(sample);
+    } while (!gst_caps_is_subset(sampleCaps, caps));
+  } else {
+    g_signal_emit_by_name(mAppSink.get(), "pull-sample", &sample, NULL);
+  }
   GstBuffer* buf = gst_sample_get_buffer(sample);
   gst_sample_unref(sample);
   if (!buf) {
@@ -210,8 +231,7 @@ void Stream::onNegotiationNeeded(GstElement* element, Stream* pThis) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Stream::onIceCandidate(
-    GstElement* webrtc, guint mlineindex, gchar* candidate, Stream* pThis) {
+void Stream::onIceCandidate(GstElement* webrtc, guint mlineindex, gchar* candidate, Stream* pThis) {
   gchar*      text;
   JsonObject *ice, *msg;
 
@@ -235,8 +255,7 @@ void Stream::onIceCandidate(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Stream::onIceGatheringStateNotify(
-    GstElement* webrtcbin, GParamSpec* pspec, Stream* pThis) {
+void Stream::onIceGatheringStateNotify(GstElement* webrtcbin, GParamSpec* pspec, Stream* pThis) {
   GstWebRTCICEGatheringState ice_gather_state;
   const gchar*               new_state = "unknown";
 
@@ -271,8 +290,7 @@ void Stream::onIncomingStream(GstElement* webrtc, GstPad* pad, Stream* pThis) {
     return;
 
   decodebin = gst_element_factory_make("decodebin", NULL);
-  g_signal_connect(
-      decodebin, "pad-added", G_CALLBACK(Stream::onIncomingDecodebinStream), pThis);
+  g_signal_connect(decodebin, "pad-added", G_CALLBACK(Stream::onIncomingDecodebinStream), pThis);
   gst_bin_add(GST_BIN(pThis->mPipeline.get()), decodebin);
   gst_element_sync_state_with_parent(decodebin);
 
@@ -283,8 +301,7 @@ void Stream::onIncomingStream(GstElement* webrtc, GstPad* pad, Stream* pThis) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Stream::onIncomingDecodebinStream(
-    GstElement* decodebin, GstPad* pad, Stream* pThis) {
+void Stream::onIncomingDecodebinStream(GstElement* decodebin, GstPad* pad, Stream* pThis) {
   GstCaps*     caps;
   const gchar* name;
 
@@ -382,8 +399,8 @@ void Stream::handleVideoStream(GstPad* pad) {
 
   GstElement* bin = gst_parse_bin_from_description(
       "queue ! videoconvert ! videoscale add-borders=false ! capsfilter "
-      "caps=video/x-raw,format=RGBA,width=512,height=512 ! "
-      "appsink emit-signals=true drop=true max-buffers=1 name=framecapture",
+      "caps=video/x-raw,format=RGBA,width=512,height=512 name=capsfilter ! "
+      "appsink drop=true max-buffers=1 name=framecapture",
       TRUE, &error);
   if (error) {
     logger().error("Failed to parse launch: {}!", error->message);
@@ -393,7 +410,10 @@ void Stream::handleVideoStream(GstPad* pad) {
 
   mAppSink = std::unique_ptr<GstElement, std::function<void(GstElement*)>>(
       gst_bin_get_by_name(GST_BIN(bin), "framecapture"),
-      [](GstElement* appsink) { gst_object_unref(appsink); });
+      [](GstElement* element) { gst_object_unref(element); });
+  mCapsFilter = std::unique_ptr<GstElement, std::function<void(GstElement*)>>(
+      gst_bin_get_by_name(GST_BIN(bin), "capsfilter"),
+      [](GstElement* element) { gst_object_unref(element); });
 
   gst_bin_add_many(GST_BIN(mPipeline.get()), bin, NULL);
   gst_element_sync_state_with_parent(bin);
@@ -425,21 +445,21 @@ gboolean Stream::startPipeline() {
   gst_element_sync_state_with_parent(mWebrtcBin.get());
 
   GstWebRTCRTPTransceiver* transceiver;
+  GstCaps*                 caps =
+      gst_caps_from_string("application/x-rtp,media=video,encoding-name=VP8,payload=96");
   g_signal_emit_by_name(mWebrtcBin.get(), "add-transceiver",
-      GST_WEBRTC_RTP_TRANSCEIVER_DIRECTION_RECVONLY,
-      gst_caps_from_string("application/x-rtp,media=video,encoding-name=VP8,payload=96"),
-      &transceiver);
+      GST_WEBRTC_RTP_TRANSCEIVER_DIRECTION_RECVONLY, caps, &transceiver);
+  gst_caps_unref(caps);
   gst_object_unref(transceiver);
 
   // This is the gstwebrtc entry point where we create the offer and so on.
   // It will be called when the pipeline goes to PLAYING.
-  g_signal_connect(mWebrtcBin.get(), "on-negotiation-needed",
-      G_CALLBACK(Stream::onNegotiationNeeded), this);
+  g_signal_connect(
+      mWebrtcBin.get(), "on-negotiation-needed", G_CALLBACK(Stream::onNegotiationNeeded), this);
   // We need to transmit this ICE candidate to the browser via the websockets
   // signalling server. Incoming ice candidates from the browser need to be
   // added by us too, see on_server_message()
-  g_signal_connect(
-      mWebrtcBin.get(), "on-ice-candidate", G_CALLBACK(Stream::onIceCandidate), this);
+  g_signal_connect(mWebrtcBin.get(), "on-ice-candidate", G_CALLBACK(Stream::onIceCandidate), this);
   g_signal_connect(mWebrtcBin.get(), "notify::ice-gathering-state",
       G_CALLBACK(Stream::onIceGatheringStateNotify), this);
 
@@ -449,8 +469,7 @@ gboolean Stream::startPipeline() {
     mSendChannel = std::make_unique<DataChannel>(mWebrtcBin.get());
   } catch (std::exception const& e) { logger().warn(e.what()); }
 
-  g_signal_connect(
-      mWebrtcBin.get(), "on-data-channel", G_CALLBACK(Stream::onDataChannel), this);
+  g_signal_connect(mWebrtcBin.get(), "on-data-channel", G_CALLBACK(Stream::onDataChannel), this);
   // Incoming streams will be exposed via this signal
   g_signal_connect(mWebrtcBin.get(), "pad-added", G_CALLBACK(Stream::onIncomingStream), this);
 
