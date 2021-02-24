@@ -22,40 +22,18 @@ namespace {
  * Author: Nirbheek Chauhan <nirbheek@centricular.com>
  */
 
-enum AppState {
-  APP_STATE_UNKNOWN = 0,
-  APP_STATE_ERROR   = 1, /* generic error */
-  SERVER_CONNECTING = 1000,
-  SERVER_CONNECTION_ERROR,
-  SERVER_CONNECTED, /* Ready to register */
-  SERVER_REGISTERING = 2000,
-  SERVER_REGISTRATION_ERROR,
-  SERVER_REGISTERED, /* Ready to call a peer */
-  SERVER_CLOSED,     /* server connection closed by us or the server */
-  PEER_CONNECTING = 3000,
-  PEER_CONNECTION_ERROR,
-  PEER_CONNECTED,
-  PEER_CALL_NEGOTIATING = 4000,
-  PEER_CALL_STARTED,
-  PEER_CALL_STOPPING,
-  PEER_CALL_STOPPED,
-  PEER_CALL_ERROR,
-};
-
 static GObject *send_channel, *receive_channel;
-
-static enum AppState app_state = static_cast<AppState>(0);
 
 #define RTP_CAPS_OPUS "application/x-rtp,media=audio,encoding-name=OPUS,payload="
 #define RTP_CAPS_VP8 "application/x-rtp,media=video,encoding-name=VP8,payload="
 
-static gboolean cleanup_and_quit_loop(const gchar* msg, enum AppState state) {
-  if (msg)
-    gst_printerr("%s\n", msg);
-  if (state > 0)
-    app_state = state;
+static gboolean cleanup_and_quit_loop(const gchar* msg) {
+  // TODO notify other classes of error to initiate destruction
+  if (msg) {
+    csp::volumerendering::logger().error("{}", msg);
+  }
 
-  /* To allow usage as a GSourceFunc */
+  // To allow usage as a GSourceFunc
   return G_SOURCE_REMOVE;
 }
 
@@ -77,7 +55,7 @@ static gchar* get_string_from_json_object(JsonObject* object) {
 }
 
 static void data_channel_on_error(GObject* dc, gpointer user_data) {
-  cleanup_and_quit_loop("Data channel error", static_cast<AppState>(0));
+  cleanup_and_quit_loop("Data channel error");
 }
 
 static void data_channel_on_open(GObject* dc, gpointer user_data) {
@@ -89,7 +67,7 @@ static void data_channel_on_open(GObject* dc, gpointer user_data) {
 }
 
 static void data_channel_on_close(GObject* dc, gpointer user_data) {
-  cleanup_and_quit_loop("Data channel closed", static_cast<AppState>(0));
+  cleanup_and_quit_loop("Data channel closed");
 }
 
 static void data_channel_on_message_string(GObject* dc, gchar* str, gpointer user_data) {
@@ -159,7 +137,7 @@ SignallingServer::SignallingServer(std::string const& url, std::string peerId)
   // Once connected, we will register
   soup_session_websocket_connect_async(session, message, NULL, NULL, NULL,
       reinterpret_cast<GAsyncReadyCallback>(&SignallingServer::onServerConnected), this);
-  app_state = SERVER_CONNECTING;
+  mState = ConnectionState::eServerConnecting;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -208,7 +186,8 @@ void SignallingServer::onServerConnected(
             g_object_unref(conn);
           });
   if (error) {
-    cleanup_and_quit_loop(error->message, SERVER_CONNECTION_ERROR);
+    pThis->mState = ConnectionState::eServerConnectionError;
+    cleanup_and_quit_loop(error->message);
     g_error_free(error);
     return;
   }
@@ -216,7 +195,7 @@ void SignallingServer::onServerConnected(
   g_assert_nonnull(pThis->wsConnection.get());
 
   logger().trace("Connected to signalling server.");
-  app_state = SERVER_CONNECTED;
+  pThis->mState = ConnectionState::eServerConnected;
 
   g_signal_connect(
       pThis->wsConnection.get(), "closed", G_CALLBACK(SignallingServer::onServerMessage), pThis);
@@ -230,8 +209,8 @@ void SignallingServer::onServerConnected(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void SignallingServer::onServerClosed(SoupSession* session, SignallingServer* pThis) {
-  app_state = SERVER_CLOSED;
-  cleanup_and_quit_loop("Server connection closed", static_cast<AppState>(0));
+  pThis->mState = ConnectionState::eServerClosed;
+  cleanup_and_quit_loop("Server connection closed");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -256,46 +235,48 @@ void SignallingServer::onServerMessage(SoupWebsocketConnection* conn, SoupWebsoc
 
   if (text == "HELLO") {
     // Server has accepted our registration, we are ready to send commands
-    if (app_state != SERVER_REGISTERING) {
-      cleanup_and_quit_loop("ERROR: Received HELLO when not registering", APP_STATE_ERROR);
+    if (pThis->mState != ConnectionState::eServerRegistering) {
+      pThis->mState = ConnectionState::eError;
+      cleanup_and_quit_loop("ERROR: Received HELLO when not registering");
       return;
     }
-    app_state = SERVER_REGISTERED;
+    pThis->mState = ConnectionState::eServerRegistered;
     logger().trace("Registered with server.");
     // Ask signalling server to connect us with a specific peer
     if (!pThis->setupCall()) {
-      cleanup_and_quit_loop("ERROR: Failed to setup call", PEER_CALL_ERROR);
+      pThis->mState = ConnectionState::ePeerCallError;
+      cleanup_and_quit_loop("ERROR: Failed to setup call");
       return;
     }
   } else if (text == "SESSION_OK") {
     // The call initiated by us has been setup by the server; now we can start negotiation
-    if (app_state != PEER_CONNECTING) {
-      cleanup_and_quit_loop("ERROR: Received SESSION_OK when not calling", PEER_CONNECTION_ERROR);
+    if (pThis->mState != ConnectionState::ePeerConnecting) {
+      pThis->mState = ConnectionState::ePeerConnectionError;
+      cleanup_and_quit_loop("ERROR: Received SESSION_OK when not calling");
       return;
     }
 
-    app_state = PEER_CONNECTED;
+    pThis->mState = ConnectionState::ePeerConnected;
     pThis->mOnPeerConnected.emit();
   } else if (text.rfind("ERROR", 0) == 0) {
     // Handle errors
-    switch (app_state) {
-    case SERVER_CONNECTING:
-      app_state = SERVER_CONNECTION_ERROR;
+    switch (pThis->mState) {
+    case ConnectionState::eServerConnecting:
+      pThis->mState = ConnectionState::eServerConnectionError;
       break;
-    case SERVER_REGISTERING:
-      app_state = SERVER_REGISTRATION_ERROR;
+    case ConnectionState::eServerRegistering:
+      pThis->mState = ConnectionState::eServerRegistrationError;
       break;
-    case PEER_CONNECTING:
-      app_state = PEER_CONNECTION_ERROR;
+    case ConnectionState::ePeerConnecting:
+      pThis->mState = ConnectionState::ePeerConnectionError;
       break;
-    case PEER_CONNECTED:
-    case PEER_CALL_NEGOTIATING:
-      app_state = PEER_CALL_ERROR;
+    case ConnectionState::ePeerConnected:
+      pThis->mState = ConnectionState::ePeerCallError;
       break;
     default:
-      app_state = APP_STATE_ERROR;
+      pThis->mState = ConnectionState::eError;
     }
-    cleanup_and_quit_loop(text.c_str(), static_cast<AppState>(0));
+    cleanup_and_quit_loop(text.c_str());
   } else {
     // Look for JSON messages containing SDP and ICE candidates
     JsonNode*   root;
@@ -319,12 +300,14 @@ void SignallingServer::onServerMessage(SoupWebsocketConnection* conn, SoupWebsoc
     if (json_object_has_member(object, "sdp")) {
       const gchar *text, *sdptype;
 
-      g_assert_cmphex(app_state, ==, PEER_CALL_NEGOTIATING);
+      g_assert_cmphex(static_cast<guint64>(pThis->mState), ==,
+          static_cast<guint64>(ConnectionState::ePeerConnected));
 
       child = json_object_get_object_member(object, "sdp");
 
       if (!json_object_has_member(child, "type")) {
-        cleanup_and_quit_loop("ERROR: received SDP without 'type'", PEER_CALL_ERROR);
+        pThis->mState = ConnectionState::ePeerCallError;
+        cleanup_and_quit_loop("ERROR: received SDP without 'type'");
         return;
       }
 
@@ -355,7 +338,7 @@ gboolean SignallingServer::registerWithServer() {
   // Register with the server with a random integer id. Reply will be received
   // by onServerMessage()
   logger().trace("Registering id '{}' with server.", mOurId);
-  app_state = SERVER_REGISTERING;
+  mState = ConnectionState::eServerRegistering;
   send("HELLO " + mOurId);
   return TRUE;
 }
@@ -367,7 +350,7 @@ gboolean SignallingServer::setupCall() {
     return FALSE;
 
   logger().trace("Setting up call with '{}'.", mPeerId);
-  app_state = PEER_CONNECTING;
+  mState = ConnectionState::ePeerConnecting;
   send("SESSION " + mPeerId);
   return TRUE;
 }
@@ -383,9 +366,12 @@ WebRTCStream::WebRTCStream()
   }
 
   mSignallingServer.onPeerConnected().connect([this]() {
+    mState = PeerCallState::eNegotiating;
     // Start negotiation (exchange SDP and ICE candidates)
-    if (!startPipeline())
-      cleanup_and_quit_loop("ERROR: failed to start pipeline", PEER_CALL_ERROR);
+    if (!startPipeline()) {
+      mState = PeerCallState::eError;
+      cleanup_and_quit_loop("ERROR: failed to start pipeline");
+    }
   });
   mSignallingServer.onSdpReceived().connect([this](std::string type, std::string text) {
     GstSDPMessage* sdp;
@@ -458,7 +444,8 @@ void WebRTCStream::onAnswerCreated(GstPromise* promise, WebRTCStream* pThis) {
   GstWebRTCSessionDescription* answer = NULL;
   const GstStructure*          reply;
 
-  g_assert_cmphex(app_state, ==, PEER_CALL_NEGOTIATING);
+  g_assert_cmphex(
+      static_cast<guint64>(pThis->mState), ==, static_cast<guint64>(PeerCallState::eNegotiating));
 
   g_assert_cmphex(gst_promise_wait(promise), ==, GST_PROMISE_RESULT_REPLIED);
   reply = gst_promise_get_reply(promise);
@@ -479,7 +466,8 @@ void WebRTCStream::onAnswerCreated(GstPromise* promise, WebRTCStream* pThis) {
 void WebRTCStream::onOfferCreated(GstPromise* promise, WebRTCStream* pThis) {
   GstWebRTCSessionDescription* offer = NULL;
 
-  g_assert_cmphex(app_state, ==, PEER_CALL_NEGOTIATING);
+  g_assert_cmphex(
+      static_cast<guint64>(pThis->mState), ==, static_cast<guint64>(PeerCallState::eNegotiating));
 
   g_assert_cmphex(gst_promise_wait(promise), ==, GST_PROMISE_RESULT_REPLIED);
   const GstStructure* reply = gst_promise_get_reply(promise);
@@ -499,7 +487,7 @@ void WebRTCStream::onOfferCreated(GstPromise* promise, WebRTCStream* pThis) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void WebRTCStream::onNegotiationNeeded(GstElement* element, WebRTCStream* pThis) {
-  app_state = PEER_CALL_NEGOTIATING;
+  pThis->mState = PeerCallState::eNegotiating;
 
   if (pThis->mCreateOffer) {
     GstPromise* promise = gst_promise_new_with_change_func(
@@ -517,8 +505,9 @@ void WebRTCStream::onIceCandidate(
   gchar*      text;
   JsonObject *ice, *msg;
 
-  if (app_state < PEER_CALL_NEGOTIATING) {
-    cleanup_and_quit_loop("Can't send ICE, not in call", APP_STATE_ERROR);
+  if (pThis->mState < PeerCallState::eNegotiating) {
+    pThis->mState = PeerCallState::eError;
+    cleanup_and_quit_loop("Can't send ICE, not in call");
     return;
   }
 
@@ -628,7 +617,7 @@ void WebRTCStream::onAnswerReceived(GstSDPMessage* sdp) {
     gst_promise_interrupt(promise);
     gst_promise_unref(promise);
   }
-  app_state = PEER_CALL_STARTED;
+  mState = PeerCallState::eStarted;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -637,8 +626,9 @@ void WebRTCStream::sendSdpToPeer(GstWebRTCSessionDescription* desc) {
   gchar*      text;
   JsonObject *msg, *sdp;
 
-  if (app_state < PEER_CALL_NEGOTIATING) {
-    cleanup_and_quit_loop("Can't send SDP to peer, not in call", APP_STATE_ERROR);
+  if (mState < PeerCallState::eNegotiating) {
+    mState = PeerCallState::eError;
+    cleanup_and_quit_loop("Can't send SDP to peer, not in call");
     return;
   }
 

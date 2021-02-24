@@ -39,6 +39,22 @@ class SignallingServer {
   cs::utils::Signal<std::string, gint64> const&      onIceReceived() const;
 
  private:
+  enum class ConnectionState {
+    eUnknown          = 0,
+    eError            = 1, // generic error
+    eServerConnecting = 1000,
+    eServerConnectionError,
+    eServerConnected, // Ready to register
+    eServerRegistering = 2000,
+    eServerRegistrationError,
+    eServerRegistered, // Ready to call a peer
+    eServerClosed,     // server connection closed by us or the server
+    ePeerConnecting = 3000,
+    ePeerConnectionError,
+    ePeerConnected,
+    ePeerCallError,
+  };
+
   static void onServerConnected(SoupSession* session, GAsyncResult* res, SignallingServer* pThis);
   static void onServerClosed(SoupSession* session, SignallingServer* pThis);
   static void onServerMessage(SoupWebsocketConnection* conn, SoupWebsocketDataType type,
@@ -46,6 +62,8 @@ class SignallingServer {
 
   gboolean registerWithServer();
   gboolean setupCall();
+
+  ConnectionState mState = ConnectionState::eUnknown;
 
   std::unique_ptr<SoupWebsocketConnection, std::function<void(SoupWebsocketConnection*)>>
       wsConnection;
@@ -66,6 +84,8 @@ class WebRTCStream {
   std::optional<std::vector<uint8_t>> getSample(int resolution);
 
  private:
+  enum class PeerCallState { eUnknown = 0, eNegotiating, eStarted, eError };
+
   static void onOfferSet(GstPromise* promise, WebRTCStream* pThis);
   static void onAnswerCreated(GstPromise* promise, WebRTCStream* pThis);
   static void onOfferCreated(GstPromise* promise, WebRTCStream* pThis);
@@ -84,6 +104,8 @@ class WebRTCStream {
   void handleVideoStream(GstPad* pad);
 
   gboolean startPipeline();
+
+  PeerCallState mState = PeerCallState::eUnknown;
 
   bool mCreateOffer = true;
 
