@@ -13,6 +13,10 @@
 #include "../../../../src/cs-utils/Signal.hpp"
 
 #include <gst/gst.h>
+#include <gst/sdp/sdp.h>
+
+#define GST_USE_UNSTABLE_API
+#include <gst/webrtc/webrtc.h>
 
 #include <libsoup/soup.h>
 
@@ -36,6 +40,7 @@ class SignallingServer {
 
  private:
   static void onServerConnected(SoupSession* session, GAsyncResult* res, SignallingServer* pThis);
+  static void onServerClosed(SoupSession* session, SignallingServer* pThis);
   static void onServerMessage(SoupWebsocketConnection* conn, SoupWebsocketDataType type,
       GBytes* message, SignallingServer* pThis);
 
@@ -50,6 +55,42 @@ class SignallingServer {
   cs::utils::Signal<>                         mOnPeerConnected;
   cs::utils::Signal<std::string, std::string> mOnSdpReceived;
   cs::utils::Signal<std::string, gint64>      mOnIceReceived;
+};
+
+class WebRTCStream {
+ public:
+  WebRTCStream();
+  ~WebRTCStream();
+
+  std::optional<std::vector<uint8_t>> getSample(int resolution);
+
+ private:
+  static void onOfferSet(GstPromise* promise, WebRTCStream* pThis);
+  static void onAnswerCreated(GstPromise* promise, WebRTCStream* pThis);
+  static void onOfferCreated(GstPromise* promise, WebRTCStream* pThis);
+  static void onNegotiationNeeded(GstElement* element, WebRTCStream* pThis);
+  static void onIceCandidate(
+      GstElement* webrtc, guint mlineindex, gchar* candidate, WebRTCStream* pThis);
+  static void onIceGatheringStateNotify(
+      GstElement* webrtcbin, GParamSpec* pspec, WebRTCStream* pThis);
+
+  static void onIncomingStream(GstElement* webrtc, GstPad* pad, WebRTCStream* pThis);
+  static void onIncomingDecodebinStream(GstElement* decodebin, GstPad* pad, WebRTCStream* pThis);
+
+  void onOfferReceived(GstSDPMessage* sdp);
+  void onAnswerReceived(GstSDPMessage* sdp);
+  void sendSdpToPeer(GstWebRTCSessionDescription* desc);
+  void handleVideoStream(GstPad* pad);
+
+  gboolean startPipeline();
+
+  bool mCreateOffer = true;
+
+  SignallingServer mSignallingServer;
+
+  std::thread mMainLoop;
+
+  std::unique_ptr<GstElement, std::function<void(GstElement*)>> mAppSink;
 };
 
 class WebRTCRenderer : public Renderer {
@@ -68,7 +109,7 @@ class WebRTCRenderer : public Renderer {
 
   glm::mat4 getOSPRayMVP(float volumeHeight, glm::mat4 observerTransform);
 
-  std::thread mMainLoop;
+  WebRTCStream mStream;
 };
 
 } // namespace csp::volumerendering
