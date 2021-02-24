@@ -112,6 +112,16 @@ Stream::~Stream() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void Stream::sendMessage(std::string const& message) {
+  if (mSendChannel) {
+    mSendChannel->send(message);
+  } else if (mReceiveChannel) {
+    mReceiveChannel->send(message);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 std::optional<std::vector<uint8_t>> Stream::getSample(int resolution) {
   if (!mAppSink) {
     return {};

@@ -28,6 +28,7 @@ class Stream {
   Stream();
   ~Stream();
 
+  void                                sendMessage(std::string const& message);
   std::optional<std::vector<uint8_t>> getSample(int resolution);
 
  private:
