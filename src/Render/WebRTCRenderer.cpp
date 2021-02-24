@@ -22,8 +22,6 @@ namespace {
  * Author: Nirbheek Chauhan <nirbheek@centricular.com>
  */
 
-static GObject *send_channel, *receive_channel;
-
 #define RTP_CAPS_OPUS "application/x-rtp,media=audio,encoding-name=OPUS,payload="
 #define RTP_CAPS_VP8 "application/x-rtp,media=video,encoding-name=VP8,payload="
 
@@ -54,39 +52,6 @@ static gchar* get_string_from_json_object(JsonObject* object) {
   return text;
 }
 
-static void data_channel_on_error(GObject* dc, gpointer user_data) {
-  cleanup_and_quit_loop("Data channel error");
-}
-
-static void data_channel_on_open(GObject* dc, gpointer user_data) {
-  GBytes* bytes = g_bytes_new("data", strlen("data"));
-  gst_print("data channel opened\n");
-  g_signal_emit_by_name(dc, "send-string", "Hi! from GStreamer");
-  g_signal_emit_by_name(dc, "send-data", bytes);
-  g_bytes_unref(bytes);
-}
-
-static void data_channel_on_close(GObject* dc, gpointer user_data) {
-  cleanup_and_quit_loop("Data channel closed");
-}
-
-static void data_channel_on_message_string(GObject* dc, gchar* str, gpointer user_data) {
-  gst_print("Received data channel message: %s\n", str);
-}
-
-static void connect_data_channel_signals(GObject* data_channel) {
-  g_signal_connect(data_channel, "on-error", G_CALLBACK(data_channel_on_error), NULL);
-  g_signal_connect(data_channel, "on-open", G_CALLBACK(data_channel_on_open), NULL);
-  g_signal_connect(data_channel, "on-close", G_CALLBACK(data_channel_on_close), NULL);
-  g_signal_connect(
-      data_channel, "on-message-string", G_CALLBACK(data_channel_on_message_string), NULL);
-}
-
-static void on_data_channel(GstElement* webrtc, GObject* data_channel, gpointer user_data) {
-  connect_data_channel_signals(data_channel);
-  receive_channel = data_channel;
-}
-
 gboolean check_plugins() {
   guint        i;
   gboolean     ret;
@@ -112,6 +77,68 @@ gboolean check_plugins() {
 } // namespace
 
 namespace csp::volumerendering {
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+DataChannel::DataChannel(GstElement* webrtc) {
+  GObject* channel;
+  g_signal_emit_by_name(webrtc, "create-data-channel", "channel", NULL, &channel);
+  if (channel) {
+    logger().trace("Created data channel.");
+    mChannel = std::unique_ptr<GObject, std::function<void(GObject*)>>(channel, [](GObject*) {});
+    connectSignals();
+  } else {
+    throw std::runtime_error("Could not create data channel, is usrsctp available?");
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+DataChannel::DataChannel(GObject* channel) {
+  mChannel = std::unique_ptr<GObject, std::function<void(GObject*)>>(channel, [](GObject*) {});
+  connectSignals();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void DataChannel::send(std::string data) {
+  g_signal_emit_by_name(mChannel.get(), "send-string", data.c_str());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void DataChannel::onError(GObject* dc, DataChannel* pThis) {
+  cleanup_and_quit_loop("Data channel error");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void DataChannel::onOpen(GObject* dc, DataChannel* pThis) {
+  logger().trace("Data channel opened.");
+  pThis->send("Hi! from GStreamer");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void DataChannel::onClose(GObject* dc, DataChannel* pThis) {
+  cleanup_and_quit_loop("Data channel closed");
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void DataChannel::onMessageString(GObject* dc, gchar* str, DataChannel* pThis) {
+  logger().trace("Received data channel message: '{}'", str);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void DataChannel::connectSignals() {
+  g_signal_connect(mChannel.get(), "on-error", G_CALLBACK(DataChannel::onError), this);
+  g_signal_connect(mChannel.get(), "on-open", G_CALLBACK(DataChannel::onOpen), this);
+  g_signal_connect(mChannel.get(), "on-close", G_CALLBACK(DataChannel::onClose), this);
+  g_signal_connect(
+      mChannel.get(), "on-message-string", G_CALLBACK(DataChannel::onMessageString), this);
+}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -547,6 +574,12 @@ void WebRTCStream::onIceGatheringStateNotify(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void WebRTCStream::onDataChannel(GstElement* webrtc, GObject* data_channel, WebRTCStream* pThis) {
+  pThis->mReceiveChannel = std::make_unique<DataChannel>(data_channel);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void WebRTCStream::onIncomingStream(GstElement* webrtc, GstPad* pad, WebRTCStream* pThis) {
   GstElement* decodebin;
   GstPad*     sinkpad;
@@ -728,15 +761,12 @@ gboolean WebRTCStream::startPipeline() {
 
   gst_element_set_state(mPipeline.get(), GST_STATE_READY);
 
-  g_signal_emit_by_name(mWebrtcBin.get(), "create-data-channel", "channel", NULL, &send_channel);
-  if (send_channel) {
-    logger().trace("Created data channel.");
-    connect_data_channel_signals(send_channel);
-  } else {
-    logger().warn("Could not create data channel, is usrsctp available?");
-  }
+  try {
+    mSendChannel = std::make_unique<DataChannel>(mWebrtcBin.get());
+  } catch (std::exception const& e) { logger().warn(e.what()); }
 
-  g_signal_connect(mWebrtcBin.get(), "on-data-channel", G_CALLBACK(on_data_channel), NULL);
+  g_signal_connect(
+      mWebrtcBin.get(), "on-data-channel", G_CALLBACK(WebRTCStream::onDataChannel), this);
   // Incoming streams will be exposed via this signal
   g_signal_connect(mWebrtcBin.get(), "pad-added", G_CALLBACK(WebRTCStream::onIncomingStream), this);
 

@@ -27,6 +27,24 @@
 
 namespace csp::volumerendering {
 
+class DataChannel {
+ public:
+  DataChannel(GstElement* webrtc);
+  DataChannel(GObject* channel);
+
+  void send(std::string data);
+
+ private:
+  static void onError(GObject* dc, DataChannel* pThis);
+  static void onOpen(GObject* dc, DataChannel* pThis);
+  static void onClose(GObject* dc, DataChannel* pThis);
+  static void onMessageString(GObject* dc, gchar* str, DataChannel* pThis);
+
+  void connectSignals();
+
+  std::unique_ptr<GObject, std::function<void(GObject*)>> mChannel;
+};
+
 class SignallingServer {
  public:
   SignallingServer(std::string const& url, std::string peerId);
@@ -94,6 +112,7 @@ class WebRTCStream {
       GstElement* webrtc, guint mlineindex, gchar* candidate, WebRTCStream* pThis);
   static void onIceGatheringStateNotify(
       GstElement* webrtcbin, GParamSpec* pspec, WebRTCStream* pThis);
+  static void onDataChannel(GstElement* webrtc, GObject* data_channel, WebRTCStream* pThis);
 
   static void onIncomingStream(GstElement* webrtc, GstPad* pad, WebRTCStream* pThis);
   static void onIncomingDecodebinStream(GstElement* decodebin, GstPad* pad, WebRTCStream* pThis);
@@ -105,11 +124,13 @@ class WebRTCStream {
 
   gboolean startPipeline();
 
+  SignallingServer             mSignallingServer;
+  std::unique_ptr<DataChannel> mSendChannel;
+  std::unique_ptr<DataChannel> mReceiveChannel;
+
   PeerCallState mState = PeerCallState::eUnknown;
 
   bool mCreateOffer = true;
-
-  SignallingServer mSignallingServer;
 
   std::unique_ptr<GMainLoop, std::function<void(GMainLoop*)>> mMainLoop;
   std::thread                                                 mMainLoopThread;
