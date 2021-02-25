@@ -14,23 +14,6 @@
 
 namespace {
 
-static gchar* get_string_from_json_object(JsonObject* object) {
-  JsonNode*      root;
-  JsonGenerator* generator;
-  gchar*         text;
-
-  // Make it the root node
-  root      = json_node_init_object(json_node_alloc(), object);
-  generator = json_generator_new();
-  json_generator_set_root(generator, root);
-  text = json_generator_to_data(generator, NULL);
-
-  // Release everything
-  g_object_unref(generator);
-  json_node_free(root);
-  return text;
-}
-
 gboolean check_plugins() {
   guint        i;
   gboolean     ret;
@@ -60,14 +43,14 @@ namespace csp::volumerendering::webrtc {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Stream::Stream()
-    : mSignallingServer("wss://webrtc.nirbheek.in:8443", "1234") {
+    : mSignallingServer("ws://127.0.0.1:57778/ws") {
   GError* error = NULL;
 
   if (!gst_init_check(nullptr, nullptr, &error) || !check_plugins()) {
     throw std::runtime_error("Could not initialize GStreamer");
   }
 
-  mSignallingServer.onPeerConnected().connect([this]() {
+  mSignallingServer.onConnected().connect([this]() {
     mState = PeerCallState::eNegotiating;
     // Start negotiation (exchange SDP and ICE candidates)
     if (!startPipeline()) {
@@ -224,33 +207,19 @@ void Stream::onNegotiationNeeded(GstElement* element, Stream* pThis) {
     GstPromise* promise = gst_promise_new_with_change_func(
         reinterpret_cast<GstPromiseChangeFunc>(&Stream::onOfferCreated), pThis, NULL);
     g_signal_emit_by_name(pThis->mWebrtcBin.get(), "create-offer", NULL, promise);
-  } else {
-    pThis->mSignallingServer.send("OFFER_REQUEST");
   }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Stream::onIceCandidate(GstElement* webrtc, guint mlineindex, gchar* candidate, Stream* pThis) {
-  gchar*      text;
-  JsonObject *ice, *msg;
-
   if (pThis->mState < PeerCallState::eNegotiating) {
     pThis->mState = PeerCallState::eError;
     logger().error("Can't send ICE, not in call");
     return;
   }
 
-  ice = json_object_new();
-  json_object_set_string_member(ice, "candidate", candidate);
-  json_object_set_int_member(ice, "sdpMLineIndex", mlineindex);
-  msg = json_object_new();
-  json_object_set_object_member(msg, "ice", ice);
-  text = get_string_from_json_object(msg);
-  json_object_unref(msg);
-
-  pThis->mSignallingServer.send(text);
-  g_free(text);
+  pThis->mSignallingServer.sendIce(mlineindex, candidate);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -356,38 +325,13 @@ void Stream::onAnswerReceived(GstSDPMessage* sdp) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Stream::sendSdpToPeer(GstWebRTCSessionDescription* desc) {
-  gchar*      text;
-  JsonObject *msg, *sdp;
-
   if (mState < PeerCallState::eNegotiating) {
     mState = PeerCallState::eError;
     logger().error("Can't send SDP to peer, not in call");
     return;
   }
 
-  text = gst_sdp_message_as_text(desc->sdp);
-  sdp  = json_object_new();
-
-  if (desc->type == GST_WEBRTC_SDP_TYPE_OFFER) {
-    logger().trace("Sending offer.");
-    json_object_set_string_member(sdp, "type", "offer");
-  } else if (desc->type == GST_WEBRTC_SDP_TYPE_ANSWER) {
-    logger().trace("Sending answer.");
-    json_object_set_string_member(sdp, "type", "answer");
-  } else {
-    g_assert_not_reached();
-  }
-
-  json_object_set_string_member(sdp, "sdp", text);
-  g_free(text);
-
-  msg = json_object_new();
-  json_object_set_object_member(msg, "sdp", sdp);
-  text = get_string_from_json_object(msg);
-  json_object_unref(msg);
-
-  mSignallingServer.send(text);
-  g_free(text);
+  mSignallingServer.sendSdp(desc);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

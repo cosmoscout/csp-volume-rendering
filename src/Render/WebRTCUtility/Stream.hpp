@@ -58,7 +58,7 @@ class Stream {
 
   PeerCallState mState = PeerCallState::eUnknown;
 
-  bool mCreateOffer = true;
+  bool mCreateOffer = false;
 
   std::unique_ptr<GMainLoop, std::function<void(GMainLoop*)>> mMainLoop;
   std::thread                                                 mMainLoopThread;
