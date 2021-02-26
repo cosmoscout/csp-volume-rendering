@@ -139,10 +139,16 @@ void SignallingServer::onServerConnected(
   pThis->wsConnection =
       std::unique_ptr<SoupWebsocketConnection, std::function<void(SoupWebsocketConnection*)>>(
           soup_session_websocket_connect_finish(session, res, &error),
-          [](SoupWebsocketConnection* conn) {
+          [pThis](SoupWebsocketConnection* conn) {
             if (soup_websocket_connection_get_state(conn) == SOUP_WEBSOCKET_STATE_OPEN) {
-              soup_websocket_connection_close(conn, 1000, "");
-              // TODO wait until 'closed' fired
+              std::unique_lock<std::mutex> lock(pThis->mClosedMutex);
+              // Code should be SOUP_WEBSOCKET_CLOSE_NORMAL, but this leads to a server side crash
+              // when connecting to the sendonly gst example
+              int code = 0;
+              soup_websocket_connection_close(conn, code, "");
+              while (!pThis->mIsClosed) {
+                pThis->mClosedCV.wait(lock);
+              }
             }
             g_object_unref(conn);
           });
@@ -155,10 +161,11 @@ void SignallingServer::onServerConnected(
   g_assert_nonnull(pThis->wsConnection.get());
 
   logger().trace("Connected to signalling server.");
+  pThis->mIsClosed = false;
   pThis->mOnConnected.emit();
 
   g_signal_connect(
-      pThis->wsConnection.get(), "closed", G_CALLBACK(SignallingServer::onServerMessage), pThis);
+      pThis->wsConnection.get(), "closed", G_CALLBACK(SignallingServer::onServerClosed), pThis);
   g_signal_connect(
       pThis->wsConnection.get(), "message", G_CALLBACK(SignallingServer::onServerMessage), pThis);
 }
@@ -166,7 +173,10 @@ void SignallingServer::onServerConnected(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void SignallingServer::onServerClosed(SoupSession* session, SignallingServer* pThis) {
-  logger().error("Server connection closed");
+  logger().trace("Server connection closed.");
+  std::lock_guard(pThis->mClosedMutex);
+  pThis->mIsClosed = true;
+  pThis->mClosedCV.notify_all();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

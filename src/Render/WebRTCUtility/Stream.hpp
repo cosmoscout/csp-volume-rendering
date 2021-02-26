@@ -52,9 +52,9 @@ class Stream {
 
   gboolean startPipeline();
 
-  SignallingServer             mSignallingServer;
-  std::unique_ptr<DataChannel> mSendChannel;
-  std::unique_ptr<DataChannel> mReceiveChannel;
+  std::unique_ptr<SignallingServer> mSignallingServer;
+  std::unique_ptr<DataChannel>      mSendChannel;
+  std::unique_ptr<DataChannel>      mReceiveChannel;
 
   PeerCallState mState = PeerCallState::eUnknown;
 

@@ -17,6 +17,7 @@
 
 #include <libsoup/soup.h>
 
+#include <condition_variable>
 #include <string>
 
 namespace csp::volumerendering::webrtc {
@@ -46,6 +47,10 @@ class SignallingServer {
   cs::utils::Signal<>                         mOnConnected;
   cs::utils::Signal<std::string, std::string> mOnSdpReceived;
   cs::utils::Signal<std::string, gint64>      mOnIceReceived;
+
+  std::mutex              mClosedMutex;
+  std::condition_variable mClosedCV;
+  bool                    mIsClosed;
 };
 
 } // namespace csp::volumerendering::webrtc

@@ -43,14 +43,14 @@ namespace csp::volumerendering::webrtc {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Stream::Stream()
-    : mSignallingServer("ws://127.0.0.1:57778/ws") {
+    : mSignallingServer(std::make_unique<SignallingServer>("ws://127.0.0.1:57778/ws")) {
   GError* error = NULL;
 
   if (!gst_init_check(nullptr, nullptr, &error) || !check_plugins()) {
     throw std::runtime_error("Could not initialize GStreamer");
   }
 
-  mSignallingServer.onConnected().connect([this]() {
+  mSignallingServer->onConnected().connect([this]() {
     mState = PeerCallState::eNegotiating;
     // Start negotiation (exchange SDP and ICE candidates)
     if (!startPipeline()) {
@@ -58,7 +58,7 @@ Stream::Stream()
       logger().error("ERROR: failed to start pipeline");
     }
   });
-  mSignallingServer.onSdpReceived().connect([this](std::string type, std::string text) {
+  mSignallingServer->onSdpReceived().connect([this](std::string type, std::string text) {
     GstSDPMessage* sdp;
     int            ret = gst_sdp_message_new(&sdp);
     g_assert_cmphex(ret, ==, GST_SDP_OK);
@@ -73,7 +73,7 @@ Stream::Stream()
       onOfferReceived(sdp);
     }
   });
-  mSignallingServer.onIceReceived().connect([this](std::string text, guint64 spdmLineIndex) {
+  mSignallingServer->onIceReceived().connect([this](std::string text, guint64 spdmLineIndex) {
     // Add ice candidate sent by remote peer
     g_signal_emit_by_name(mWebrtcBin.get(), "add-ice-candidate", spdmLineIndex, text.c_str());
   });
@@ -90,8 +90,9 @@ Stream::Stream()
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Stream::~Stream() {
-  mMainLoop.reset();
+  mSignallingServer.reset();
   mPipeline.reset();
+  mMainLoop.reset();
   mMainLoopThread.join();
 }
 
@@ -219,7 +220,7 @@ void Stream::onIceCandidate(GstElement* webrtc, guint mlineindex, gchar* candida
     return;
   }
 
-  pThis->mSignallingServer.sendIce(mlineindex, candidate);
+  pThis->mSignallingServer->sendIce(mlineindex, candidate);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -331,7 +332,7 @@ void Stream::sendSdpToPeer(GstWebRTCSessionDescription* desc) {
     return;
   }
 
-  mSignallingServer.sendSdp(desc);
+  mSignallingServer->sendSdp(desc);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

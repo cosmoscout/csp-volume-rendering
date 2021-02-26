@@ -7,10 +7,9 @@
 #ifndef CSP_VOLUME_RENDERING_DATACHANNEL_HPP
 #define CSP_VOLUME_RENDERING_DATACHANNEL_HPP
 
-#include "../../../../src/cs-utils/Signal.hpp"
-
 #include <gst/gst.h>
 
+#include <functional>
 #include <string>
 
 namespace csp::volumerendering::webrtc {
