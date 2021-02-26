@@ -42,7 +42,7 @@ class SignallingServer {
       GBytes* message, SignallingServer* pThis);
 
   std::unique_ptr<SoupWebsocketConnection, std::function<void(SoupWebsocketConnection*)>>
-      wsConnection;
+      mWebsocketConn;
 
   cs::utils::Signal<>                         mOnConnected;
   cs::utils::Signal<std::string, std::string> mOnSdpReceived;

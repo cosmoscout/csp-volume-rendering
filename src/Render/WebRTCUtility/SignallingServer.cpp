@@ -8,28 +8,7 @@
 
 #include "../../logger.hpp"
 
-#include <json-glib/json-glib.h>
-
-namespace {
-
-static gchar* get_string_from_json_object(JsonObject* object) {
-  JsonNode*      root;
-  JsonGenerator* generator;
-  gchar*         text;
-
-  // Make it the root node
-  root      = json_node_init_object(json_node_alloc(), object);
-  generator = json_generator_new();
-  json_generator_set_root(generator, root);
-  text = json_generator_to_data(generator, NULL);
-
-  // Release everything
-  g_object_unref(generator);
-  json_node_free(root);
-  return text;
-}
-
-} // namespace
+#include <nlohmann/json.hpp>
 
 namespace csp::volumerendering::webrtc {
 
@@ -64,52 +43,41 @@ SignallingServer::~SignallingServer() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void SignallingServer::send(std::string const& text) {
-  soup_websocket_connection_send_text(wsConnection.get(), text.c_str());
+  soup_websocket_connection_send_text(mWebsocketConn.get(), text.c_str());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void SignallingServer::sendSdp(GstWebRTCSessionDescription* desc) {
-  JsonObject* sdp = json_object_new();
+  nlohmann::json msg;
+  msg["type"] = "sdp";
 
   if (desc->type == GST_WEBRTC_SDP_TYPE_OFFER) {
     logger().trace("Sending offer.");
-    json_object_set_string_member(sdp, "type", "offer");
+    msg["data"]["type"] = "offer";
   } else if (desc->type == GST_WEBRTC_SDP_TYPE_ANSWER) {
     logger().trace("Sending answer.");
-    json_object_set_string_member(sdp, "type", "answer");
+    msg["data"]["type"] = "answer";
   } else {
     g_assert_not_reached();
   }
 
-  gchar* sdpText = gst_sdp_message_as_text(desc->sdp);
-  json_object_set_string_member(sdp, "sdp", sdpText);
+  gchar* sdpText     = gst_sdp_message_as_text(desc->sdp);
+  msg["data"]["sdp"] = sdpText;
   g_free(sdpText);
 
-  JsonObject* msg = json_object_new();
-  json_object_set_object_member(msg, "data", sdp);
-  json_object_set_string_member(msg, "type", "sdp");
-  gchar* text = get_string_from_json_object(msg);
-  json_object_unref(msg);
-
-  send(text);
-  g_free(text);
+  send(msg.dump());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void SignallingServer::sendIce(guint mlineindex, gchar* candidate) {
-  JsonObject* ice = json_object_new();
-  json_object_set_string_member(ice, "candidate", candidate);
-  json_object_set_int_member(ice, "sdpMLineIndex", mlineindex);
-  JsonObject* msg = json_object_new();
-  json_object_set_object_member(msg, "data", ice);
-  json_object_set_string_member(msg, "type", "ice");
-  gchar* text = get_string_from_json_object(msg);
-  json_object_unref(msg);
+  nlohmann::json msg;
+  msg["type"]                  = "ice";
+  msg["data"]["candidate"]     = candidate;
+  msg["data"]["sdpMLineIndex"] = mlineindex;
 
-  send(text);
-  g_free(text);
+  send(msg.dump());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -136,7 +104,7 @@ void SignallingServer::onServerConnected(
     SoupSession* session, GAsyncResult* res, SignallingServer* pThis) {
   GError* error = NULL;
 
-  pThis->wsConnection =
+  pThis->mWebsocketConn =
       std::unique_ptr<SoupWebsocketConnection, std::function<void(SoupWebsocketConnection*)>>(
           soup_session_websocket_connect_finish(session, res, &error),
           [pThis](SoupWebsocketConnection* conn) {
@@ -158,16 +126,16 @@ void SignallingServer::onServerConnected(
     return;
   }
 
-  g_assert_nonnull(pThis->wsConnection.get());
+  g_assert_nonnull(pThis->mWebsocketConn.get());
 
   logger().trace("Connected to signalling server.");
   pThis->mIsClosed = false;
   pThis->mOnConnected.emit();
 
   g_signal_connect(
-      pThis->wsConnection.get(), "closed", G_CALLBACK(SignallingServer::onServerClosed), pThis);
+      pThis->mWebsocketConn.get(), "closed", G_CALLBACK(SignallingServer::onServerClosed), pThis);
   g_signal_connect(
-      pThis->wsConnection.get(), "message", G_CALLBACK(SignallingServer::onServerMessage), pThis);
+      pThis->mWebsocketConn.get(), "message", G_CALLBACK(SignallingServer::onServerMessage), pThis);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -201,57 +169,49 @@ void SignallingServer::onServerMessage(SoupWebsocketConnection* conn,
   }
 
   // Look for JSON messages containing SDP and ICE candidates
-  JsonNode*   root;
-  JsonObject *object, *child;
-  JsonParser* parser = json_parser_new();
-  if (!json_parser_load_from_data(parser, text.c_str(), -1, NULL)) {
-    logger().warn("Unknown message '{}', ignoring!", text);
-    g_object_unref(parser);
+  nlohmann::json msg;
+  try {
+    msg = nlohmann::json::parse(text);
+  } catch (nlohmann::json::parse_error& e) {
+    logger().warn("Failed to parse message '{}', ignoring! Reason: '{}'", text, e.what());
     return;
   }
 
-  root = json_parser_get_root(parser);
-  if (!JSON_NODE_HOLDS_OBJECT(root)) {
-    logger().warn("Unknown json message '{}', ignoring!", text);
-    g_object_unref(parser);
-    return;
-  }
-
-  object = json_node_get_object(root);
   // Check type of JSON message
-  if (!json_object_has_member(object, "type")) {
+  auto type = msg.find("type");
+  if (type == msg.end()) {
     logger().warn("No type given in json message '{}', ignoring!", text);
-    g_object_unref(parser);
     return;
   }
-  std::string type(json_object_get_string_member(object, "type"));
+  auto data = msg.find("data");
+  if (data == msg.end() || !data->is_object()) {
+    logger().warn("No data given in json message '{}', ignoring!", text);
+    return;
+  }
 
-  if (type == "sdp") {
-    const gchar *text, *sdptype;
-
-    child = json_object_get_object_member(object, "data");
-
-    if (!json_object_has_member(child, "type")) {
-      logger().error("ERROR: received SDP without 'type'");
-      g_object_unref(parser);
+  if (*type == "sdp") {
+    try {
+      std::string sdpType = data->at("type");
+      std::string sdp     = data->at("sdp");
+      pThis->mOnSdpReceived.emit(sdpType, sdp);
+    } catch (nlohmann::json::out_of_range& e) {
+      logger().warn(
+          "Could not parse data of json message '{}', ignoring! Reason: '{}'", text, e.what());
       return;
     }
-
-    sdptype = json_object_get_string_member(child, "type");
-    text    = json_object_get_string_member(child, "sdp");
-    pThis->mOnSdpReceived.emit(sdptype, text);
-  } else if (type == "ice") {
-    const gchar* candidate;
-    gint64       sdpmlineindex;
-
-    child         = json_object_get_object_member(object, "data");
-    candidate     = json_object_get_string_member(child, "candidate");
-    sdpmlineindex = json_object_get_int_member(child, "sdpMLineIndex");
-    pThis->mOnIceReceived.emit(candidate, sdpmlineindex);
+  } else if (*type == "ice") {
+    try {
+      std::string candidate  = data->at("candidate");
+      int         mlineIndex = data->at("sdpMLineIndex");
+      pThis->mOnIceReceived.emit(candidate, mlineIndex);
+    } catch (nlohmann::json::out_of_range& e) {
+      logger().warn(
+          "Could not parse data of json message '{}', ignoring! Reason: '{}'", text, e.what());
+      return;
+    }
   } else {
     logger().warn("Unknown json message '{}', ignoring!", text);
   }
-  g_object_unref(parser);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

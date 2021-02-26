@@ -77,10 +77,10 @@ if (WIN32)
 endif()
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(SOUP       REQUIRED IMPORTED_TARGET libsoup-2.4)
-pkg_check_modules(JSON_GLIB  REQUIRED IMPORTED_TARGET json-glib-1.0)
 pkg_check_modules(GST        REQUIRED IMPORTED_TARGET gstreamer-1.0)
 pkg_check_modules(GST_WEBRTC REQUIRED IMPORTED_TARGET gstreamer-webrtc-1.0)
 pkg_check_modules(GST_SDP    REQUIRED IMPORTED_TARGET gstreamer-sdp-1.0)
+pkg_check_modules(GST_GL     REQUIRED IMPORTED_TARGET gstreamer-gl-1.0)
 
 # build plugin -------------------------------------------------------------------------------------
 
@@ -101,11 +101,11 @@ target_link_libraries(csp-volume-rendering
     ospray::ospray
     OpenImageDenoise
     ${VTK_LIBRARIES}
+    PkgConfig::SOUP
     PkgConfig::GST
     PkgConfig::GST_WEBRTC
     PkgConfig::GST_SDP
-    PkgConfig::SOUP
-    PkgConfig::JSON_GLIB
+    PkgConfig::GST_GL
 )
 
 target_include_directories(csp-volume-rendering
