@@ -6,28 +6,41 @@
 
 #include "SignallingServer.hpp"
 
+#include "../../../../src/cs-utils/logger.hpp"
 #include "../../logger.hpp"
 
 #include <nlohmann/json.hpp>
+
+namespace {
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void soupLoggerPrinter(SoupLogger* soupLogger, SoupLoggerLogLevel level, char direction,
+    const char* data, gpointer user_data) {
+  static auto logger = cs::utils::createLogger("soup-websocket");
+  logger->trace("{} {}", direction, data);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+} // namespace
 
 namespace csp::volumerendering::webrtc {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 SignallingServer::SignallingServer(std::string const& url) {
-  SoupLogger*  soupLogger;
-  SoupMessage* message;
-  SoupSession* session;
-  const char*  https_aliases[] = {"wss", NULL};
+  const char* https_aliases[] = {"wss", NULL};
 
-  session = soup_session_new_with_options(SOUP_SESSION_SSL_STRICT, false,
+  SoupSession* session = soup_session_new_with_options(SOUP_SESSION_SSL_STRICT, false,
       SOUP_SESSION_SSL_USE_SYSTEM_CA_FILE, TRUE, SOUP_SESSION_HTTPS_ALIASES, https_aliases, NULL);
 
-  soupLogger = soup_logger_new(SOUP_LOGGER_LOG_BODY, -1);
+  SoupLogger* soupLogger = soup_logger_new(SOUP_LOGGER_LOG_MINIMAL, -1);
+  soup_logger_set_printer(soupLogger, soupLoggerPrinter, NULL, NULL);
   soup_session_add_feature(session, SOUP_SESSION_FEATURE(soupLogger));
   g_object_unref(soupLogger);
 
-  message = soup_message_new(SOUP_METHOD_GET, url.c_str());
+  SoupMessage* message = soup_message_new(SOUP_METHOD_GET, url.c_str());
 
   logger().trace("Connecting to signalling server...");
 
