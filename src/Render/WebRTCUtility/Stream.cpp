@@ -8,8 +8,6 @@
 
 #include "../../logger.hpp"
 
-#include <json-glib/json-glib.h>
-
 #include <sstream>
 
 namespace {
