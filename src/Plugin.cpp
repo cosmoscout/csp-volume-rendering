@@ -51,6 +51,9 @@ EXPORT_FN void destroy(cs::core::PluginBase* pluginBase) {
 
 namespace csp::volumerendering {
 
+cs::utils::Signal<> Plugin::mOnUncurrentRequired;
+cs::utils::Signal<> Plugin::mOnUncurrentRelease;
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 NLOHMANN_JSON_SERIALIZE_ENUM(VolumeFileType, {
@@ -663,7 +666,7 @@ void Plugin::receiveFrame() {
   mRenderingFrame.mColorImage          = renderedImage.mColorData;
   mRenderingFrame.mDepthImage          = renderedImage.mDepthData;
   mRenderingFrame.mModelViewProjection = renderedImage.mMVP;
-  mRenderedFrames.push_back(mRenderingFrame);
+  // mRenderedFrames.push_back(mRenderingFrame);
 
   displayFrame(mRenderingFrame);
 }

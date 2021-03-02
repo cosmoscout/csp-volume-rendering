@@ -34,6 +34,8 @@ class Stream {
  private:
   enum class PeerCallState { eUnknown = 0, eNegotiating, eStarted, eError };
 
+  static void onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis);
+
   static void onOfferSet(GstPromise* promise, Stream* pThis);
   static void onAnswerCreated(GstPromise* promise, Stream* pThis);
   static void onOfferCreated(GstPromise* promise, Stream* pThis);
@@ -52,6 +54,9 @@ class Stream {
 
   gboolean startPipeline();
 
+  cs::utils::Signal<> const& onUncurrentRequired() const;
+  cs::utils::Signal<> const& onUncurrentRelease() const;
+
   std::unique_ptr<SignallingServer> mSignallingServer;
   std::unique_ptr<DataChannel>      mSendChannel;
   std::unique_ptr<DataChannel>      mReceiveChannel;
@@ -69,6 +74,10 @@ class Stream {
   std::unique_ptr<GstElement, std::function<void(GstElement*)>> mCapsFilter;
 
   int mResolution = 512;
+
+  guintptr            mGlContext;
+  cs::utils::Signal<> mOnUncurrentRequired;
+  cs::utils::Signal<> mOnUncurrentRelease;
 };
 
 } // namespace csp::volumerendering::webrtc

@@ -6,9 +6,13 @@
 
 #include "Stream.hpp"
 
+#include "../../Plugin.hpp"
+
 #include "../../logger.hpp"
 
-#include <json-glib/json-glib.h>
+#include <Windows.h>
+
+#include <gst/gl/gl.h>
 
 #include <sstream>
 
@@ -43,7 +47,8 @@ namespace csp::volumerendering::webrtc {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Stream::Stream()
-    : mSignallingServer(std::make_unique<SignallingServer>("ws://127.0.0.1:57778/ws")) {
+    : mSignallingServer(std::make_unique<SignallingServer>("ws://127.0.0.1:57778/ws"))
+    , mGlContext((guintptr)wglGetCurrentContext()) {
   GError* error = NULL;
 
   if (!gst_init_check(nullptr, nullptr, &error) || !check_plugins()) {
@@ -116,7 +121,8 @@ std::optional<std::vector<uint8_t>> Stream::getSample(int resolution) {
   if (resolution != mResolution) {
     mResolution = resolution;
     std::stringstream capsStr;
-    capsStr << "video/x-raw,format=RGBA,width=" << mResolution << ",height=" << mResolution;
+    capsStr << "video/x-raw(memory:GLMemory),format=RGBA,width=" << mResolution
+            << ",height=" << mResolution;
     GstCaps* caps = gst_caps_from_string(capsStr.str().c_str());
     g_object_set(mCapsFilter.get(), "caps", caps, NULL);
     gst_caps_unref(caps);
@@ -139,9 +145,65 @@ std::optional<std::vector<uint8_t>> Stream::getSample(int resolution) {
     return {};
   }
 
+  GstMemory* mem = gst_buffer_get_all_memory(buf);
+  if (gst_is_gl_memory(mem)) {
+    GstGLMemory* glmem = (GstGLMemory*)mem;
+    logger().trace("{}, {}, {}", glmem->tex_id, glmem->tex_target, glmem->tex_format);
+  }
+
   std::vector<uint8_t> image(resolution * resolution * 4);
-  gst_buffer_extract(buf, 0, image.data(), resolution * resolution * 4);
+  // gst_buffer_extract(buf, 0, image.data(), resolution * resolution * 4);
   return image;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::thread t;
+
+void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
+  switch (GST_MESSAGE_TYPE(msg)) {
+  case GST_MESSAGE_NEED_CONTEXT: {
+    const gchar* context_type;
+    GstContext*  context = NULL;
+
+    static GstGLDisplay* gl_display = NULL;
+
+    gst_message_parse_context_type(msg, &context_type);
+    logger().trace("Got need context {}", context_type);
+
+    if (g_strcmp0(context_type, GST_GL_DISPLAY_CONTEXT_TYPE) == 0) {
+      if (!gl_display) {
+        gl_display = gst_gl_display_new();
+      }
+
+      context = gst_context_new(GST_GL_DISPLAY_CONTEXT_TYPE, TRUE);
+      gst_context_set_gl_display(context, gl_display);
+
+      gst_element_set_context(GST_ELEMENT(msg->src), context);
+    } else if (g_strcmp0(context_type, "gst.gl.app_context") == 0) {
+      Plugin::mOnUncurrentRequired.emit();
+      GstGLContext* gst_gl_context = gst_gl_context_new_wrapped(
+          gl_display, pThis->mGlContext, GST_GL_PLATFORM_WGL, GST_GL_API_OPENGL3);
+
+      context         = gst_context_new("gst.gl.app_context", TRUE);
+      GstStructure* s = gst_context_writable_structure(context);
+      gst_structure_set(s, "context", GST_TYPE_GL_CONTEXT, gst_gl_context, NULL);
+
+      gst_element_set_context(GST_ELEMENT(msg->src), context);
+      t = std::thread([]() {
+        std::this_thread::sleep_for(std::chrono::seconds(20));
+        Plugin::mOnUncurrentRelease.emit();
+      });
+    }
+    if (context) {
+      gst_context_unref(context);
+    }
+    break;
+  }
+  default: {
+    break;
+  }
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -343,8 +405,8 @@ void Stream::handleVideoStream(GstPad* pad) {
   logger().trace("Trying to handle video stream.");
 
   GstElement* bin = gst_parse_bin_from_description(
-      "queue ! videoconvert ! videoscale add-borders=false ! capsfilter "
-      "caps=video/x-raw,format=RGBA,width=512,height=512 name=capsfilter ! "
+      "queue ! videoconvert ! videoscale add-borders=false ! glupload ! capsfilter "
+      "caps=video/x-raw(memory:GLMemory),format=RGBA,width=512,height=512 name=capsfilter ! "
       "appsink drop=true max-buffers=1 name=framecapture",
       TRUE, &error);
   if (error) {
@@ -378,6 +440,10 @@ gboolean Stream::startPipeline() {
         gst_object_unref(pipeline);
       });
   g_assert_nonnull(mPipeline.get());
+
+  GstBus* bus = gst_pipeline_get_bus(GST_PIPELINE(mPipeline.get()));
+  gst_bus_enable_sync_message_emission(bus);
+  g_signal_connect(bus, "sync-message", G_CALLBACK(Stream::onBusSyncMessage), this);
 
   mWebrtcBin = std::unique_ptr<GstElement, std::function<void(GstElement*)>>(
       gst_element_factory_make("webrtcbin", "sendrecv"), [](GstElement*) {});
@@ -425,6 +491,18 @@ gboolean Stream::startPipeline() {
   }
 
   return TRUE;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+cs::utils::Signal<> const& Stream::onUncurrentRequired() const {
+  return mOnUncurrentRequired;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+cs::utils::Signal<> const& Stream::onUncurrentRelease() const {
+  return mOnUncurrentRelease;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
