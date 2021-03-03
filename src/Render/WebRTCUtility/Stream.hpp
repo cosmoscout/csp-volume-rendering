@@ -21,6 +21,27 @@
 #include <thread>
 #include <vector>
 
+namespace {
+template <typename T>
+struct NoDeleter {
+  inline void operator()(T* p) {
+  }
+};
+
+template <typename T>
+struct GstObjectDeleter {
+  inline void operator()(T* p) {
+    gst_object_unref(p);
+  }
+};
+
+struct GstSampleDeleter {
+  inline void operator()(GstSample* p) {
+    gst_sample_unref(p);
+  }
+};
+} // namespace
+
 namespace csp::volumerendering::webrtc {
 
 class Stream {
@@ -69,9 +90,9 @@ class Stream {
   std::thread                                                 mMainLoopThread;
 
   std::unique_ptr<GstElement, std::function<void(GstElement*)>> mPipeline;
-  std::unique_ptr<GstElement, std::function<void(GstElement*)>> mWebrtcBin;
-  std::unique_ptr<GstElement, std::function<void(GstElement*)>> mAppSink;
-  std::unique_ptr<GstElement, std::function<void(GstElement*)>> mCapsFilter;
+  std::unique_ptr<GstElement, NoDeleter<GstElement>>            mWebrtcBin;
+  std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>     mAppSink;
+  std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>     mCapsFilter;
 
   int mResolution = 512;
 

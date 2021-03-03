@@ -415,12 +415,10 @@ void Stream::handleVideoStream(GstPad* pad) {
     return;
   }
 
-  mAppSink = std::unique_ptr<GstElement, std::function<void(GstElement*)>>(
-      gst_bin_get_by_name(GST_BIN(bin), "framecapture"),
-      [](GstElement* element) { gst_object_unref(element); });
-  mCapsFilter = std::unique_ptr<GstElement, std::function<void(GstElement*)>>(
-      gst_bin_get_by_name(GST_BIN(bin), "capsfilter"),
-      [](GstElement* element) { gst_object_unref(element); });
+  mAppSink = std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>(
+      gst_bin_get_by_name(GST_BIN(bin), "framecapture"));
+  mCapsFilter = std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>(
+      gst_bin_get_by_name(GST_BIN(bin), "capsfilter"));
 
   gst_bin_add_many(GST_BIN(mPipeline.get()), bin, NULL);
   gst_element_sync_state_with_parent(bin);
@@ -445,8 +443,8 @@ gboolean Stream::startPipeline() {
   gst_bus_enable_sync_message_emission(bus);
   g_signal_connect(bus, "sync-message", G_CALLBACK(Stream::onBusSyncMessage), this);
 
-  mWebrtcBin = std::unique_ptr<GstElement, std::function<void(GstElement*)>>(
-      gst_element_factory_make("webrtcbin", "sendrecv"), [](GstElement*) {});
+  mWebrtcBin = std::unique_ptr<GstElement, NoDeleter<GstElement>>(
+      gst_element_factory_make("webrtcbin", "sendrecv"));
   g_assert_nonnull(mWebrtcBin.get());
   g_object_set(mWebrtcBin.get(), "bundle-policy", GST_WEBRTC_BUNDLE_POLICY_MAX_BUNDLE, NULL);
   g_object_set(mWebrtcBin.get(), "stun-server", "stun://stun.l.google.com:19302", NULL);
