@@ -19,7 +19,7 @@ namespace csp::volumerendering {
 WebRTCRenderer::WebRTCRenderer(std::shared_ptr<DataManager> dataManager, VolumeStructure structure,
     VolumeShape shape, std::shared_ptr<cs::core::GuiManager> guiManager)
     : Renderer(dataManager, structure, shape)
-    , mStream(webrtc::Stream::SampleType::eOpenGL) {
+    , mStream(SampleType::eTexId) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -51,26 +51,35 @@ void WebRTCRenderer::cancelRendering() {
 
 Renderer::RenderedImage WebRTCRenderer::getFrameImpl(
     glm::mat4 cameraTransform, Parameters parameters, DataManager::State dataState) {
-  //std::optional<std::vector<uint8_t>> image = mStream.getColorImage(parameters.mResolution);
-   std::optional<int> texId = mStream.getTextureId(parameters.mResolution);
+  /*std::optional<std::vector<uint8_t>> image = mStream.getColorImage(parameters.mResolution);
 
-  logger().trace("ID: {}", texId.value_or(-1));
-  RenderedImage failed;
-  failed.mValid = false;
-  return failed;
-
-  /*if (!image.has_value()) {
+  if (!image.has_value()) {
     RenderedImage failed;
     failed.mValid = false;
     return failed;
   }
 
   RenderedImage result;
+  result.mType      = SampleType::eImageData;
   result.mColorData = std::move(image.value());
   result.mDepthData = std::vector<float>(parameters.mResolution * parameters.mResolution);
   result.mMVP       = getOSPRayMVP(512., cameraTransform);
   result.mValid     = true;
   return result;*/
+  std::optional<int> texId = mStream.getTextureId(parameters.mResolution);
+
+  if (!texId.has_value()) {
+    RenderedImage failed;
+    failed.mValid = false;
+    return failed;
+  }
+
+  RenderedImage result;
+  result.mType      = SampleType::eTexId;
+  result.mColorData = texId.value();
+  result.mMVP       = getOSPRayMVP(512., cameraTransform);
+  result.mValid     = true;
+  return result;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

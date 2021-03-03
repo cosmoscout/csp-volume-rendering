@@ -663,12 +663,14 @@ void Plugin::receiveFrame() {
     return;
   }
 
-  mRenderingFrame.mColorImage          = renderedImage.mColorData;
-  mRenderingFrame.mDepthImage          = renderedImage.mDepthData;
-  mRenderingFrame.mModelViewProjection = renderedImage.mMVP;
-  // mRenderedFrames.push_back(mRenderingFrame);
+  if (renderedImage.mType == SampleType::eImageData) {
+    mRenderingFrame.mColorImage          = std::get<std::vector<uint8_t>>(renderedImage.mColorData);
+    mRenderingFrame.mDepthImage          = std::get<std::vector<float>>(renderedImage.mDepthData);
+    mRenderingFrame.mModelViewProjection = renderedImage.mMVP;
+    // mRenderedFrames.push_back(mRenderingFrame);
 
-  displayFrame(mRenderingFrame);
+    displayFrame(mRenderingFrame);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

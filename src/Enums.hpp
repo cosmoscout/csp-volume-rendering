@@ -21,6 +21,7 @@ enum class DepthMode {
   eThreshold      = 8,
   eMultiThreshold = 16
 };
+enum class SampleType { eImageData, eTexId };
 
 } // namespace csp::volumerendering
 

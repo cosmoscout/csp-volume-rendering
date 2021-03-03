@@ -8,6 +8,7 @@
 
 #include "../../Plugin.hpp"
 
+#include "../../Enums.hpp"
 #include "../../logger.hpp"
 
 #include <Windows.h>
@@ -117,10 +118,10 @@ void Stream::sendMessage(std::string const& message) {
 std::unique_ptr<GstCaps, GstCapsDeleter> Stream::setCaps(int resolution, SampleType type) {
   std::string videoType;
   switch (type) {
-  case SampleType::eImage:
+  case SampleType::eImageData:
     videoType = "video/x-raw";
     break;
-  case SampleType::eOpenGL:
+  case SampleType::eTexId:
     videoType = "video/x-raw(memory:GLMemory)";
     break;
   }
@@ -450,12 +451,12 @@ void Stream::handleVideoStream(GstPad* pad) {
 
   std::string binString;
   switch (mSampleType) {
-  case SampleType::eImage:
+  case SampleType::eImageData:
     binString = "queue ! videoconvert ! videoscale add-borders=false "
                 "! capsfilter name=capsfilter "
                 "! appsink drop=true max-buffers=1 name=framecapture";
     break;
-  case SampleType::eOpenGL:
+  case SampleType::eTexId:
     binString = "queue ! videoconvert ! videoscale add-borders=false ! glupload "
                 "! capsfilter caps=video/x-raw(memory:GLMemory) name=capsfilter "
                 "! appsink drop=true max-buffers=1 name=framecapture";

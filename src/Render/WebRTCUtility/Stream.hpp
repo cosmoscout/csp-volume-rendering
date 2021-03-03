@@ -7,6 +7,7 @@
 #ifndef CSP_VOLUME_RENDERING_STREAM_HPP
 #define CSP_VOLUME_RENDERING_STREAM_HPP
 
+#include "../../Enums.hpp"
 #include "DataChannel.hpp"
 #include "SignallingServer.hpp"
 
@@ -53,8 +54,6 @@ namespace csp::volumerendering::webrtc {
 
 class Stream {
  public:
-  enum class SampleType { eImage, eOpenGL };
-
   Stream(SampleType type);
   ~Stream();
 
