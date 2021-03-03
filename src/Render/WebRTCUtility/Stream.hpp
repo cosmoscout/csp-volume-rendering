@@ -16,6 +16,7 @@
 #define GST_USE_UNSTABLE_API
 #include <gst/webrtc/webrtc.h>
 
+#include <array>
 #include <optional>
 #include <string>
 #include <thread>
@@ -40,17 +41,26 @@ struct GstSampleDeleter {
     gst_sample_unref(p);
   }
 };
+
+struct GstCapsDeleter {
+  inline void operator()(GstCaps* p) {
+    gst_caps_unref(p);
+  }
+};
 } // namespace
 
 namespace csp::volumerendering::webrtc {
 
 class Stream {
  public:
-  Stream();
+  enum class SampleType { eImage, eOpenGL };
+
+  Stream(SampleType type);
   ~Stream();
 
   void                                sendMessage(std::string const& message);
-  std::optional<std::vector<uint8_t>> getSample(int resolution);
+  std::optional<std::vector<uint8_t>> getColorImage(int resolution);
+  std::optional<int>                  getTextureId(int resolution);
 
  private:
   enum class PeerCallState { eUnknown = 0, eNegotiating, eStarted, eError };
@@ -75,6 +85,9 @@ class Stream {
 
   gboolean startPipeline();
 
+  std::unique_ptr<GstCaps, GstCapsDeleter> setCaps(int resolution, SampleType type);
+  bool                                     getSample(int resolution);
+
   cs::utils::Signal<> const& onUncurrentRequired() const;
   cs::utils::Signal<> const& onUncurrentRelease() const;
 
@@ -94,7 +107,12 @@ class Stream {
   std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>     mAppSink;
   std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>     mCapsFilter;
 
-  int mResolution = 512;
+  static constexpr int                                                   mSampleCount = 5;
+  int                                                                    mSampleIndex = 0;
+  std::array<std::unique_ptr<GstSample, GstSampleDeleter>, mSampleCount> mSamples;
+
+  int              mResolution = 1;
+  const SampleType mSampleType;
 
   guintptr            mGlContext;
   cs::utils::Signal<> mOnUncurrentRequired;

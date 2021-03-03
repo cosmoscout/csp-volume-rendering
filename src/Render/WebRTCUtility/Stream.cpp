@@ -46,9 +46,10 @@ namespace csp::volumerendering::webrtc {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Stream::Stream()
+Stream::Stream(SampleType type)
     : mSignallingServer(std::make_unique<SignallingServer>("ws://127.0.0.1:57778/ws"))
-    , mGlContext((guintptr)wglGetCurrentContext()) {
+    , mGlContext((guintptr)wglGetCurrentContext())
+    , mSampleType(std::move(type)) {
   GError* error = NULL;
 
   if (!gst_init_check(nullptr, nullptr, &error) || !check_plugins()) {
@@ -113,47 +114,90 @@ void Stream::sendMessage(std::string const& message) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::optional<std::vector<uint8_t>> Stream::getSample(int resolution) {
-  if (!mAppSink) {
-    return {};
+std::unique_ptr<GstCaps, GstCapsDeleter> Stream::setCaps(int resolution, SampleType type) {
+  std::string videoType;
+  switch (type) {
+  case SampleType::eImage:
+    videoType = "video/x-raw";
+    break;
+  case SampleType::eOpenGL:
+    videoType = "video/x-raw(memory:GLMemory)";
+    break;
   }
-  GstSample* sample = NULL;
+  std::stringstream capsStr;
+  capsStr << videoType << ",format=RGBA,width=" << resolution << ",height=" << resolution;
+  GstCaps* caps = gst_caps_from_string(capsStr.str().c_str());
+  g_object_set(mCapsFilter.get(), "caps", caps, NULL);
+  mResolution = resolution;
+  return std::unique_ptr<GstCaps, GstCapsDeleter>(caps);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+bool Stream::getSample(int resolution) {
+  if (!mAppSink) {
+    return false;
+  }
+
+  if (++mSampleIndex >= mSampleCount) {
+    mSampleIndex = 0;
+  }
+
   if (resolution != mResolution) {
-    mResolution = resolution;
-    std::stringstream capsStr;
-    capsStr << "video/x-raw(memory:GLMemory),format=RGBA,width=" << mResolution
-            << ",height=" << mResolution;
-    GstCaps* caps = gst_caps_from_string(capsStr.str().c_str());
-    g_object_set(mCapsFilter.get(), "caps", caps, NULL);
-    gst_caps_unref(caps);
+    auto caps = setCaps(resolution, mSampleType);
 
     // Drop samples with incorrect resolution
     GstCaps* sampleCaps;
     do {
-      if (sample) {
-        gst_sample_unref(sample);
-      }
+      GstSample* sample = NULL;
       g_signal_emit_by_name(mAppSink.get(), "pull-sample", &sample, NULL);
+      mSamples[mSampleIndex].reset(sample);
       sampleCaps = gst_sample_get_caps(sample);
-    } while (!gst_caps_is_subset(sampleCaps, caps));
+    } while (!gst_caps_is_subset(sampleCaps, caps.get()));
   } else {
+    GstSample* sample = NULL;
     g_signal_emit_by_name(mAppSink.get(), "pull-sample", &sample, NULL);
+    mSamples[mSampleIndex].reset(sample);
   }
-  GstBuffer* buf = gst_sample_get_buffer(sample);
-  gst_sample_unref(sample);
+  return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::optional<std::vector<uint8_t>> Stream::getColorImage(int resolution) {
+  assert(mSampleType == SampleType::eImage);
+  if (!getSample(resolution)) {
+    return {};
+  }
+  GstBuffer* buf = gst_sample_get_buffer(mSamples[mSampleIndex].get());
+  if (!buf) {
+    return {};
+  }
+
+  std::vector<uint8_t> image(resolution * resolution * 4);
+  gst_buffer_extract(buf, 0, image.data(), resolution * resolution * 4);
+  return image;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::optional<int> Stream::getTextureId(int resolution) {
+  assert(mSampleType == SampleType::eOpenGL);
+  if (!getSample(resolution)) {
+    return {};
+  }
+  GstBuffer* buf = gst_sample_get_buffer(mSamples[mSampleIndex].get());
   if (!buf) {
     return {};
   }
 
   GstMemory* mem = gst_buffer_get_all_memory(buf);
-  if (gst_is_gl_memory(mem)) {
-    GstGLMemory* glmem = (GstGLMemory*)mem;
-    logger().trace("{}, {}, {}", glmem->tex_id, glmem->tex_target, glmem->tex_format);
+  if (!gst_is_gl_memory(mem)) {
+    return {};
   }
 
-  std::vector<uint8_t> image(resolution * resolution * 4);
-  // gst_buffer_extract(buf, 0, image.data(), resolution * resolution * 4);
-  return image;
+  GstGLMemory* glmem = (GstGLMemory*)mem;
+  return glmem->tex_id;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -191,7 +235,7 @@ void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
 
       gst_element_set_context(GST_ELEMENT(msg->src), context);
       t = std::thread([]() {
-        std::this_thread::sleep_for(std::chrono::seconds(20));
+        std::this_thread::sleep_for(std::chrono::seconds(2));
         Plugin::mOnUncurrentRelease.emit();
       });
     }
@@ -404,11 +448,21 @@ void Stream::handleVideoStream(GstPad* pad) {
 
   logger().trace("Trying to handle video stream.");
 
-  GstElement* bin = gst_parse_bin_from_description(
-      "queue ! videoconvert ! videoscale add-borders=false ! glupload ! capsfilter "
-      "caps=video/x-raw(memory:GLMemory),format=RGBA,width=512,height=512 name=capsfilter ! "
-      "appsink drop=true max-buffers=1 name=framecapture",
-      TRUE, &error);
+  std::string binString;
+  switch (mSampleType) {
+  case SampleType::eImage:
+    binString = "queue ! videoconvert ! videoscale add-borders=false "
+                "! capsfilter name=capsfilter "
+                "! appsink drop=true max-buffers=1 name=framecapture";
+    break;
+  case SampleType::eOpenGL:
+    binString = "queue ! videoconvert ! videoscale add-borders=false ! glupload "
+                "! capsfilter caps=video/x-raw(memory:GLMemory) name=capsfilter "
+                "! appsink drop=true max-buffers=1 name=framecapture";
+    break;
+  }
+
+  GstElement* bin = gst_parse_bin_from_description(binString.c_str(), TRUE, &error);
   if (error) {
     logger().error("Failed to parse launch: {}!", error->message);
     g_error_free(error);
@@ -419,6 +473,8 @@ void Stream::handleVideoStream(GstPad* pad) {
       gst_bin_get_by_name(GST_BIN(bin), "framecapture"));
   mCapsFilter = std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>(
       gst_bin_get_by_name(GST_BIN(bin), "capsfilter"));
+
+  setCaps(mResolution, mSampleType);
 
   gst_bin_add_many(GST_BIN(mPipeline.get()), bin, NULL);
   gst_element_sync_state_with_parent(bin);
