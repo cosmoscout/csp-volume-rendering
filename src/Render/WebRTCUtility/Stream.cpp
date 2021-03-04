@@ -190,11 +190,19 @@ std::optional<std::pair<int, GLsync>> Stream::getTextureId(int resolution) {
     return {};
   }
 
-  GstMemory* mem = gst_buffer_get_all_memory(buf);
+  GstVideoFrame* frame = g_new0(GstVideoFrame, 1);
+  GstVideoInfo   info;
+  gst_video_info_from_caps(&info, gst_sample_get_caps(mSamples[mSampleIndex].get()));
+  if (!gst_video_frame_map(frame, &info, buf, (GstMapFlags)(GST_MAP_READ | GST_MAP_GL))) {
+    logger().error("Failed to map video frame");
+    return {};
+  }
+  gst_video_frame_unmap(frame);
+
+  GstMemory* mem = gst_buffer_peek_memory(buf, 0);
   if (!gst_is_gl_memory(mem)) {
     return {};
   }
-
   GstGLMemory* glmem = (GstGLMemory*)mem;
 
   GstGLSyncMeta* sync = gst_buffer_get_gl_sync_meta(buf);
