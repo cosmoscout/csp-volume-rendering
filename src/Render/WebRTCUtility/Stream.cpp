@@ -166,7 +166,7 @@ bool Stream::getSample(int resolution) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::optional<std::vector<uint8_t>> Stream::getColorImage(int resolution) {
-  assert(mSampleType == SampleType::eImage);
+  assert(mSampleType == SampleType::eImageData);
   if (!getSample(resolution)) {
     return {};
   }
@@ -182,8 +182,8 @@ std::optional<std::vector<uint8_t>> Stream::getColorImage(int resolution) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::optional<int> Stream::getTextureId(int resolution) {
-  assert(mSampleType == SampleType::eOpenGL);
+std::optional<std::pair<int, GLsync>> Stream::getTextureId(int resolution) {
+  assert(mSampleType == SampleType::eTexId);
   if (!getSample(resolution)) {
     return {};
   }
@@ -198,7 +198,16 @@ std::optional<int> Stream::getTextureId(int resolution) {
   }
 
   GstGLMemory* glmem = (GstGLMemory*)mem;
-  return glmem->tex_id;
+
+  GstGLSyncMeta* sync = gst_buffer_get_gl_sync_meta(buf);
+  if (!sync) {
+    buf  = gst_buffer_make_writable(buf);
+    sync = gst_buffer_add_gl_sync_meta(glmem->mem.context, buf);
+  }
+  gst_gl_sync_meta_set_sync_point(sync, glmem->mem.context);
+
+  return std::make_pair<int, GLsync>(
+      (int)glmem->tex_id, (GLsync)gst_buffer_get_gl_sync_meta(buf)->data);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

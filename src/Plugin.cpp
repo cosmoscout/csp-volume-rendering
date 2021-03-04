@@ -663,14 +663,13 @@ void Plugin::receiveFrame() {
     return;
   }
 
-  if (renderedImage.mType == SampleType::eImageData) {
-    mRenderingFrame.mColorImage          = std::get<std::vector<uint8_t>>(renderedImage.mColorData);
-    mRenderingFrame.mDepthImage          = std::get<std::vector<float>>(renderedImage.mDepthData);
-    mRenderingFrame.mModelViewProjection = renderedImage.mMVP;
-    // mRenderedFrames.push_back(mRenderingFrame);
+  mRenderingFrame.mType                = renderedImage.mType;
+  mRenderingFrame.mColorImage          = renderedImage.mColorData;
+  mRenderingFrame.mDepthImage          = renderedImage.mDepthData;
+  mRenderingFrame.mModelViewProjection = renderedImage.mMVP;
+  // mRenderedFrames.push_back(mRenderingFrame);
 
-    displayFrame(mRenderingFrame);
-  }
+  displayFrame(mRenderingFrame);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -712,10 +711,23 @@ void Plugin::displayFrame(Frame& frame, DisplayMode displayMode) {
   cs::utils::FrameTimings::ScopedTimer timer("Display volume frame");
 
   std::shared_ptr<DisplayNode> displayNode = mDisplayNodes.find(displayMode)->second;
-  displayNode->setTexture(frame.mColorImage, frame.mResolution, frame.mResolution);
-  displayNode->setDepthTexture(frame.mDepthImage, frame.mResolution, frame.mResolution);
   displayNode->setTransform(glm::toMat4(glm::toQuat(frame.mCameraTransform)));
   displayNode->setMVPMatrix(frame.mModelViewProjection);
+
+  switch (frame.mType) {
+  case SampleType::eImageData:
+    displayNode->setTexture(
+        std::get<std::vector<uint8_t>>(frame.mColorImage), frame.mResolution, frame.mResolution);
+    displayNode->setDepthTexture(
+        std::get<std::vector<float>>(frame.mDepthImage), frame.mResolution, frame.mResolution);
+    break;
+  case SampleType::eTexId:
+    auto texId = std::get<std::pair<int, GLsync>>(frame.mColorImage);
+    displayNode->setTexture(texId.first, texId.second);
+    displayNode->setDepthTexture(std::vector<float>(frame.mResolution * frame.mResolution),
+        frame.mResolution, frame.mResolution);
+    break;
+  }
 
   mDisplayedFrame = frame;
 }

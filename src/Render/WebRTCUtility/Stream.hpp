@@ -17,6 +17,8 @@
 #define GST_USE_UNSTABLE_API
 #include <gst/webrtc/webrtc.h>
 
+#include <GL/glew.h>
+
 #include <array>
 #include <optional>
 #include <string>
@@ -57,9 +59,9 @@ class Stream {
   Stream(SampleType type);
   ~Stream();
 
-  void                                sendMessage(std::string const& message);
-  std::optional<std::vector<uint8_t>> getColorImage(int resolution);
-  std::optional<int>                  getTextureId(int resolution);
+  void                                  sendMessage(std::string const& message);
+  std::optional<std::vector<uint8_t>>   getColorImage(int resolution);
+  std::optional<std::pair<int, GLsync>> getTextureId(int resolution);
 
  private:
   enum class PeerCallState { eUnknown = 0, eNegotiating, eStarted, eError };

@@ -66,7 +66,7 @@ Renderer::RenderedImage WebRTCRenderer::getFrameImpl(
   result.mMVP       = getOSPRayMVP(512., cameraTransform);
   result.mValid     = true;
   return result;*/
-  std::optional<int> texId = mStream.getTextureId(parameters.mResolution);
+  std::optional<std::pair<int, GLsync>> texId = mStream.getTextureId(parameters.mResolution);
 
   if (!texId.has_value()) {
     RenderedImage failed;

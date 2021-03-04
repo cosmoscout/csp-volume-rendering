@@ -47,7 +47,7 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   /// Set the color image that should be displayed.
   /// The color data should be given as an array of rgba values (8 bit per channel).
   void setTexture(std::vector<uint8_t>& texture, int width, int height);
-  void setTexture(uint8_t* texture, int width, int height);
+  void setTexture(int textureId, GLsync sync);
   /// Set the depth information for displaying the image.
   /// The depth data should be given as an array of z-positions in clip space per pixel.
   void setDepthTexture(std::vector<float>& texture, int width, int height);
