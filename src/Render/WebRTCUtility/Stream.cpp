@@ -133,14 +133,12 @@ std::unique_ptr<GstCaps, GstCapsDeleter> Stream::setCaps(int resolution, SampleT
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool Stream::getSample(int resolution) {
+std::unique_ptr<GstSample, GstSampleDeleter> Stream::getSample(int resolution) {
   if (!mAppSink) {
-    return false;
+    return {};
   }
 
-  if (++mSampleIndex >= mSampleCount) {
-    mSampleIndex = 0;
-  }
+  std::unique_ptr<GstSample, GstSampleDeleter> sample;
 
   if (resolution != mResolution) {
     auto caps = setCaps(resolution, mSampleType);
@@ -148,27 +146,29 @@ bool Stream::getSample(int resolution) {
     // Drop samples with incorrect resolution
     GstCaps* sampleCaps;
     do {
-      GstSample* sample = NULL;
-      g_signal_emit_by_name(mAppSink.get(), "pull-sample", &sample, NULL);
-      mSamples[mSampleIndex].reset(sample);
-      sampleCaps = gst_sample_get_caps(sample);
+      GstSample* s = NULL;
+      g_signal_emit_by_name(mAppSink.get(), "pull-sample", &s, NULL);
+      sample.reset(s);
+      sampleCaps = gst_sample_get_caps(sample.get());
     } while (!gst_caps_is_subset(sampleCaps, caps.get()));
   } else {
-    GstSample* sample = NULL;
-    g_signal_emit_by_name(mAppSink.get(), "pull-sample", &sample, NULL);
-    mSamples[mSampleIndex].reset(sample);
+    GstSample* s = NULL;
+    g_signal_emit_by_name(mAppSink.get(), "pull-sample", &s, NULL);
+    sample.reset(s);
   }
-  return true;
+  return sample;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::optional<std::vector<uint8_t>> Stream::getColorImage(int resolution) {
   assert(mSampleType == SampleType::eImageData);
-  if (!getSample(resolution)) {
+  auto sample = getSample(resolution);
+  if (!sample) {
     return {};
   }
-  GstBuffer* buf = gst_sample_get_buffer(mSamples[mSampleIndex].get());
+
+  GstBuffer* buf = gst_sample_get_buffer(sample.get());
   if (!buf) {
     return {};
   }
@@ -182,22 +182,28 @@ std::optional<std::vector<uint8_t>> Stream::getColorImage(int resolution) {
 
 std::optional<std::pair<int, GLsync>> Stream::getTextureId(int resolution) {
   assert(mSampleType == SampleType::eTexId);
-  if (!getSample(resolution)) {
+  auto sample = getSample(resolution);
+  if (!sample) {
     return {};
   }
-  GstBuffer* buf = gst_sample_get_buffer(mSamples[mSampleIndex].get());
+
+  GstBuffer* buf = gst_sample_get_buffer(sample.get());
   if (!buf) {
     return {};
   }
 
+  if (++mFrameIndex >= mFrameCount) {
+    mFrameIndex = 0;
+  }
+
   GstVideoFrame* frame = g_new0(GstVideoFrame, 1);
   GstVideoInfo   info;
-  gst_video_info_from_caps(&info, gst_sample_get_caps(mSamples[mSampleIndex].get()));
+  gst_video_info_from_caps(&info, gst_sample_get_caps(sample.get()));
   if (!gst_video_frame_map(frame, &info, buf, (GstMapFlags)(GST_MAP_READ | GST_MAP_GL))) {
     logger().error("Failed to map video frame");
     return {};
   }
-  gst_video_frame_unmap(frame);
+  mFrames[mFrameIndex].reset(frame);
 
   GstMemory* mem = gst_buffer_peek_memory(buf, 0);
   if (!gst_is_gl_memory(mem)) {

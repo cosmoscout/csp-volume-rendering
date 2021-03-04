@@ -40,6 +40,12 @@ struct GstObjectDeleter {
   }
 };
 
+struct GstVideoFrameDeleter {
+  inline void operator()(GstVideoFrame* p) {
+    gst_video_frame_unmap(p);
+  }
+};
+
 struct GstSampleDeleter {
   inline void operator()(GstSample* p) {
     gst_sample_unref(p);
@@ -90,8 +96,8 @@ class Stream {
 
   gboolean startPipeline();
 
-  std::unique_ptr<GstCaps, GstCapsDeleter> setCaps(int resolution, SampleType type);
-  bool                                     getSample(int resolution);
+  std::unique_ptr<GstCaps, GstCapsDeleter>     setCaps(int resolution, SampleType type);
+  std::unique_ptr<GstSample, GstSampleDeleter> getSample(int resolution);
 
   cs::utils::Signal<> const& onUncurrentRequired() const;
   cs::utils::Signal<> const& onUncurrentRelease() const;
@@ -112,9 +118,9 @@ class Stream {
   std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>     mAppSink;
   std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>     mCapsFilter;
 
-  static constexpr int                                                   mSampleCount = 5;
-  int                                                                    mSampleIndex = 0;
-  std::array<std::unique_ptr<GstSample, GstSampleDeleter>, mSampleCount> mSamples;
+  static constexpr int                                                          mFrameCount = 10;
+  int                                                                           mFrameIndex = 0;
+  std::array<std::unique_ptr<GstVideoFrame, GstVideoFrameDeleter>, mFrameCount> mFrames;
 
   int              mResolution = 1;
   const SampleType mSampleType;
