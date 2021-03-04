@@ -13,8 +13,6 @@
 
 #include <Windows.h>
 
-#include <gst/gl/gl.h>
-
 #include <sstream>
 
 namespace {
@@ -212,8 +210,6 @@ std::optional<std::pair<int, GLsync>> Stream::getTextureId(int resolution) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::thread t;
-
 void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
   switch (GST_MESSAGE_TYPE(msg)) {
   case GST_MESSAGE_NEED_CONTEXT: {
@@ -228,6 +224,7 @@ void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
     if (g_strcmp0(context_type, GST_GL_DISPLAY_CONTEXT_TYPE) == 0) {
       if (!gl_display) {
         gl_display = gst_gl_display_new();
+        g_signal_connect(gl_display, "create-context", G_CALLBACK(Stream::onCreateContext), pThis);
       }
 
       context = gst_context_new(GST_GL_DISPLAY_CONTEXT_TYPE, TRUE);
@@ -244,10 +241,6 @@ void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
       gst_structure_set(s, "context", GST_TYPE_GL_CONTEXT, gst_gl_context, NULL);
 
       gst_element_set_context(GST_ELEMENT(msg->src), context);
-      t = std::thread([]() {
-        std::this_thread::sleep_for(std::chrono::seconds(2));
-        Plugin::mOnUncurrentRelease.emit();
-      });
     }
     if (context) {
       gst_context_unref(context);
@@ -404,6 +397,28 @@ void Stream::onIncomingDecodebinStream(GstElement* decodebin, GstPad* pad, Strea
   } else {
     logger().warn("Unknown pad '{}', ignoring!", GST_PAD_NAME(pad));
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+GstGLContext* Stream::onCreateContext(
+    GstGLDisplay* display, GstGLContext* otherContext, Stream* pThis) {
+  GError* error = NULL;
+
+  GstGLContext* newContext = gst_gl_context_new(display);
+  if (!newContext) {
+    logger().error("Failed to create GL context!");
+    return NULL;
+  }
+
+  if (gst_gl_context_create(newContext, otherContext, &error)) {
+    Plugin::mOnUncurrentRelease.emit();
+    return newContext;
+  }
+
+  logger().error("Failed to share GL context!");
+  gst_object_unref(newContext);
+  return NULL;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

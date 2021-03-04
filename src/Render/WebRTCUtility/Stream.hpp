@@ -11,6 +11,7 @@
 #include "DataChannel.hpp"
 #include "SignallingServer.hpp"
 
+#include <gst/gl/gl.h>
 #include <gst/gst.h>
 #include <gst/sdp/sdp.h>
 
@@ -78,6 +79,9 @@ class Stream {
 
   static void onIncomingStream(GstElement* webrtc, GstPad* pad, Stream* pThis);
   static void onIncomingDecodebinStream(GstElement* decodebin, GstPad* pad, Stream* pThis);
+
+  static GstGLContext* onCreateContext(
+      GstGLDisplay* display, GstGLContext* otherContext, Stream* pThis);
 
   void onOfferReceived(GstSDPMessage* sdp);
   void onAnswerReceived(GstSDPMessage* sdp);
