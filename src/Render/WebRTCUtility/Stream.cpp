@@ -496,7 +496,7 @@ void Stream::handleVideoStream(GstPad* pad) {
     break;
   case SampleType::eTexId:
     binString = "queue ! videoconvert ! videoscale add-borders=false ! glupload "
-                "! capsfilter caps=video/x-raw(memory:GLMemory) name=capsfilter "
+                "! capsfilter caps-change-mode=delayed name=capsfilter "
                 "! appsink drop=true max-buffers=1 name=framecapture";
     break;
   }
