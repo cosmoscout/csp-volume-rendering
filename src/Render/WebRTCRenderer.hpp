@@ -37,7 +37,8 @@ class WebRTCRenderer : public Renderer {
 
   glm::mat4 getOSPRayMVP(float volumeHeight, glm::mat4 observerTransform);
 
-  webrtc::Stream mStream;
+  const SampleType mType;
+  webrtc::Stream   mStream;
 };
 
 } // namespace csp::volumerendering
