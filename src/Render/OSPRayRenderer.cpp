@@ -84,6 +84,7 @@ Renderer::RenderedImage OSPRayRenderer::getFrameImpl(
     Camera                   camera = getCamera(volume.mHeight, cameraTransform);
     ospray::cpp::FrameBuffer frame  = renderFrame(world, camera.mOsprayCamera, parameters);
     renderedImage                   = extractImageData(frame, camera, volume.mHeight, parameters);
+    renderedImage.mType             = SampleType::eImageData;
     renderedImage.mValid            = !mRenderingCancelled;
   } catch (const std::exception&) { renderedImage.mValid = false; }
   return renderedImage;
