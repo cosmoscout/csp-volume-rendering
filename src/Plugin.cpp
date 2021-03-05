@@ -276,8 +276,8 @@ void Plugin::onLoad() {
     break;
   }
 
-  mRenderer = std::make_unique<WebRTCRenderer>(mDataManager, mPluginSettings.mVolumeStructure.get(),
-      mPluginSettings.mVolumeShape.get(), mGuiManager);
+  mRenderer = std::make_unique<WebRTCRenderer>(
+      mDataManager, mPluginSettings.mVolumeStructure.get(), mPluginSettings.mVolumeShape.get());
 
   // If the volume representations already exist, remove them from the solar system
   for (auto const& node : mDisplayNodes) {
