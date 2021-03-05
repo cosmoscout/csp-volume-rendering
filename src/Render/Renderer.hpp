@@ -14,8 +14,11 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
+#include <GL/glew.h>
+
 #include <future>
 #include <string>
+#include <variant>
 
 namespace csp::volumerendering {
 
@@ -30,10 +33,13 @@ class Renderer {
  public:
   /// A RenderedImage object contains all relevant information on a rendered image.
   struct RenderedImage {
-    /// Contains the color values of the image as RGBA values.
-    std::vector<uint8_t> mColorData;
-    /// Contains the depth values of the image as float values in the range [-1,1].
-    std::vector<float> mDepthData;
+    SampleType mType;
+    /// Either contains the color values of the image as an array of RGBA values or contains the
+    /// texture id of an OpenGL texture containing the image.
+    std::variant<std::vector<uint8_t>, std::pair<int, GLsync>> mColorData;
+    /// Either Contains the depth values of the image as float values in the range [-1,1] or
+    /// contains the texture id of an OpenGL texture containing the image.
+    std::variant<std::vector<float>, std::pair<int, GLsync>> mDepthData;
     /// Contains the model-view-projection matrix used by the renderer.
     glm::mat4 mMVP;
     /// Specifies, whether the other fields of this object contain valid information (true),

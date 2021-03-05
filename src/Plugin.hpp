@@ -28,6 +28,9 @@ namespace csp::volumerendering {
 
 class Plugin : public cs::core::PluginBase {
  public:
+  static cs::utils::Signal<> mOnUncurrentRequired;
+  static cs::utils::Signal<> mOnUncurrentRelease;
+
   struct Settings {
     // Data settings
     cs::utils::Property<std::string>     mVolumeDataPath;
@@ -67,11 +70,13 @@ class Plugin : public cs::core::PluginBase {
 
  private:
   struct Frame {
-    glm::mat4            mCameraTransform;
-    glm::mat4            mModelViewProjection;
-    int                  mResolution;
-    std::vector<uint8_t> mColorImage;
-    std::vector<float>   mDepthImage;
+    glm::mat4 mCameraTransform;
+    glm::mat4 mModelViewProjection;
+    int       mResolution;
+
+    SampleType                                                 mType;
+    std::variant<std::vector<uint8_t>, std::pair<int, GLsync>> mColorImage;
+    std::variant<std::vector<float>, std::pair<int, GLsync>>   mDepthImage;
 
     bool operator==(const Frame& other);
   };

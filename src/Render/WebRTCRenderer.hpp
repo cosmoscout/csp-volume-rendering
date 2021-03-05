@@ -23,8 +23,8 @@ namespace csp::volumerendering {
 
 class WebRTCRenderer : public Renderer {
  public:
-  WebRTCRenderer(std::shared_ptr<DataManager> dataManager, VolumeStructure structure,
-      VolumeShape shape, std::shared_ptr<cs::core::GuiManager> guiManager);
+  WebRTCRenderer(
+      std::shared_ptr<DataManager> dataManager, VolumeStructure structure, VolumeShape shape);
   ~WebRTCRenderer();
 
   float getProgress() override;
@@ -37,7 +37,8 @@ class WebRTCRenderer : public Renderer {
 
   glm::mat4 getOSPRayMVP(float volumeHeight, glm::mat4 observerTransform);
 
-  webrtc::Stream mStream;
+  const SampleType mType;
+  webrtc::Stream   mStream;
 };
 
 } // namespace csp::volumerendering

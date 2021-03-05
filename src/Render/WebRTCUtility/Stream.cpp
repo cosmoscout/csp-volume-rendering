@@ -6,7 +6,12 @@
 
 #include "Stream.hpp"
 
+#include "../../Plugin.hpp"
+
+#include "../../Enums.hpp"
 #include "../../logger.hpp"
+
+#include <Windows.h>
 
 #include <sstream>
 
@@ -40,8 +45,10 @@ namespace csp::volumerendering::webrtc {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Stream::Stream()
-    : mSignallingServer(std::make_unique<SignallingServer>("ws://127.0.0.1:57778/ws")) {
+Stream::Stream(SampleType type)
+    : mSignallingServer(std::make_unique<SignallingServer>("ws://127.0.0.1:57778/ws"))
+    , mGlContext((guintptr)wglGetCurrentContext())
+    , mSampleType(std::move(type)) {
   GError* error = NULL;
 
   if (!gst_init_check(nullptr, nullptr, &error) || !check_plugins()) {
@@ -106,33 +113,62 @@ void Stream::sendMessage(std::string const& message) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::optional<std::vector<uint8_t>> Stream::getSample(int resolution) {
+std::unique_ptr<GstCaps, GstCapsDeleter> Stream::setCaps(int resolution, SampleType type) {
+  std::string videoType;
+  switch (type) {
+  case SampleType::eImageData:
+    videoType = "video/x-raw";
+    break;
+  case SampleType::eTexId:
+    videoType = "video/x-raw(memory:GLMemory)";
+    break;
+  }
+  std::stringstream capsStr;
+  capsStr << videoType << ",format=RGBA,width=" << resolution << ",height=" << resolution;
+  GstCaps* caps = gst_caps_from_string(capsStr.str().c_str());
+  g_object_set(mCapsFilter.get(), "caps", caps, NULL);
+  mResolution = resolution;
+  return std::unique_ptr<GstCaps, GstCapsDeleter>(caps);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::unique_ptr<GstSample, GstSampleDeleter> Stream::getSample(int resolution) {
   if (!mAppSink) {
     return {};
   }
-  GstSample* sample = NULL;
+
+  std::unique_ptr<GstSample, GstSampleDeleter> sample;
+
   if (resolution != mResolution) {
-    mResolution = resolution;
-    std::stringstream capsStr;
-    capsStr << "video/x-raw,format=RGBA,width=" << mResolution << ",height=" << mResolution;
-    GstCaps* caps = gst_caps_from_string(capsStr.str().c_str());
-    g_object_set(mCapsFilter.get(), "caps", caps, NULL);
-    gst_caps_unref(caps);
+    auto caps = setCaps(resolution, mSampleType);
 
     // Drop samples with incorrect resolution
     GstCaps* sampleCaps;
     do {
-      if (sample) {
-        gst_sample_unref(sample);
-      }
-      g_signal_emit_by_name(mAppSink.get(), "pull-sample", &sample, NULL);
-      sampleCaps = gst_sample_get_caps(sample);
-    } while (!gst_caps_is_subset(sampleCaps, caps));
+      GstSample* s = NULL;
+      g_signal_emit_by_name(mAppSink.get(), "pull-sample", &s, NULL);
+      sample.reset(s);
+      sampleCaps = gst_sample_get_caps(sample.get());
+    } while (!gst_caps_is_subset(sampleCaps, caps.get()));
   } else {
-    g_signal_emit_by_name(mAppSink.get(), "pull-sample", &sample, NULL);
+    GstSample* s = NULL;
+    g_signal_emit_by_name(mAppSink.get(), "pull-sample", &s, NULL);
+    sample.reset(s);
   }
-  GstBuffer* buf = gst_sample_get_buffer(sample);
-  gst_sample_unref(sample);
+  return sample;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::optional<std::vector<uint8_t>> Stream::getColorImage(int resolution) {
+  assert(mSampleType == SampleType::eImageData);
+  auto sample = getSample(resolution);
+  if (!sample) {
+    return {};
+  }
+
+  GstBuffer* buf = gst_sample_get_buffer(sample.get());
   if (!buf) {
     return {};
   }
@@ -140,6 +176,95 @@ std::optional<std::vector<uint8_t>> Stream::getSample(int resolution) {
   std::vector<uint8_t> image(resolution * resolution * 4);
   gst_buffer_extract(buf, 0, image.data(), resolution * resolution * 4);
   return image;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::optional<std::pair<int, GLsync>> Stream::getTextureId(int resolution) {
+  assert(mSampleType == SampleType::eTexId);
+  auto sample = getSample(resolution);
+  if (!sample) {
+    return {};
+  }
+
+  GstBuffer* buf = gst_sample_get_buffer(sample.get());
+  if (!buf) {
+    return {};
+  }
+
+  if (++mFrameIndex >= mFrameCount) {
+    mFrameIndex = 0;
+  }
+
+  GstVideoFrame* frame = g_new0(GstVideoFrame, 1);
+  GstVideoInfo   info;
+  gst_video_info_from_caps(&info, gst_sample_get_caps(sample.get()));
+  if (!gst_video_frame_map(frame, &info, buf, (GstMapFlags)(GST_MAP_READ | GST_MAP_GL))) {
+    logger().error("Failed to map video frame");
+    return {};
+  }
+  mFrames[mFrameIndex].reset(frame);
+
+  GstMemory* mem = gst_buffer_peek_memory(buf, 0);
+  if (!gst_is_gl_memory(mem)) {
+    return {};
+  }
+  GstGLMemory* glmem = (GstGLMemory*)mem;
+
+  GstGLSyncMeta* sync = gst_buffer_get_gl_sync_meta(buf);
+  if (!sync) {
+    buf  = gst_buffer_make_writable(buf);
+    sync = gst_buffer_add_gl_sync_meta(glmem->mem.context, buf);
+  }
+  gst_gl_sync_meta_set_sync_point(sync, glmem->mem.context);
+
+  return std::make_pair<int, GLsync>(
+      (int)glmem->tex_id, (GLsync)gst_buffer_get_gl_sync_meta(buf)->data);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
+  switch (GST_MESSAGE_TYPE(msg)) {
+  case GST_MESSAGE_NEED_CONTEXT: {
+    const gchar* context_type;
+    GstContext*  context = NULL;
+
+    static GstGLDisplay* gl_display = NULL;
+
+    gst_message_parse_context_type(msg, &context_type);
+    logger().trace("Got need context {}", context_type);
+
+    if (g_strcmp0(context_type, GST_GL_DISPLAY_CONTEXT_TYPE) == 0) {
+      if (!gl_display) {
+        gl_display = gst_gl_display_new();
+        g_signal_connect(gl_display, "create-context", G_CALLBACK(Stream::onCreateContext), pThis);
+      }
+
+      context = gst_context_new(GST_GL_DISPLAY_CONTEXT_TYPE, TRUE);
+      gst_context_set_gl_display(context, gl_display);
+
+      gst_element_set_context(GST_ELEMENT(msg->src), context);
+    } else if (g_strcmp0(context_type, "gst.gl.app_context") == 0) {
+      Plugin::mOnUncurrentRequired.emit();
+      GstGLContext* gst_gl_context = gst_gl_context_new_wrapped(
+          gl_display, pThis->mGlContext, GST_GL_PLATFORM_WGL, GST_GL_API_OPENGL3);
+
+      context         = gst_context_new("gst.gl.app_context", TRUE);
+      GstStructure* s = gst_context_writable_structure(context);
+      gst_structure_set(s, "context", GST_TYPE_GL_CONTEXT, gst_gl_context, NULL);
+
+      gst_element_set_context(GST_ELEMENT(msg->src), context);
+    }
+    if (context) {
+      gst_context_unref(context);
+    }
+    break;
+  }
+  default: {
+    break;
+  }
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -290,6 +415,28 @@ void Stream::onIncomingDecodebinStream(GstElement* decodebin, GstPad* pad, Strea
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+GstGLContext* Stream::onCreateContext(
+    GstGLDisplay* display, GstGLContext* otherContext, Stream* pThis) {
+  GError* error = NULL;
+
+  GstGLContext* newContext = gst_gl_context_new(display);
+  if (!newContext) {
+    logger().error("Failed to create GL context!");
+    return NULL;
+  }
+
+  if (gst_gl_context_create(newContext, otherContext, &error)) {
+    Plugin::mOnUncurrentRelease.emit();
+    return newContext;
+  }
+
+  logger().error("Failed to share GL context!");
+  gst_object_unref(newContext);
+  return NULL;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void Stream::onOfferReceived(GstSDPMessage* sdp) {
   GstWebRTCSessionDescription* offer =
       gst_webrtc_session_description_new(GST_WEBRTC_SDP_TYPE_OFFER, sdp);
@@ -340,23 +487,33 @@ void Stream::handleVideoStream(GstPad* pad) {
 
   logger().trace("Trying to handle video stream.");
 
-  GstElement* bin = gst_parse_bin_from_description(
-      "queue ! videoconvert ! videoscale add-borders=false ! capsfilter "
-      "caps=video/x-raw,format=RGBA,width=512,height=512 name=capsfilter ! "
-      "appsink drop=true max-buffers=1 name=framecapture",
-      TRUE, &error);
+  std::string binString;
+  switch (mSampleType) {
+  case SampleType::eImageData:
+    binString = "queue ! videoconvert ! videoscale add-borders=false "
+                "! capsfilter name=capsfilter "
+                "! appsink drop=true max-buffers=1 name=framecapture";
+    break;
+  case SampleType::eTexId:
+    binString = "queue ! videoconvert ! videoscale add-borders=false ! glupload "
+                "! capsfilter caps-change-mode=delayed name=capsfilter "
+                "! appsink drop=true max-buffers=1 name=framecapture";
+    break;
+  }
+
+  GstElement* bin = gst_parse_bin_from_description(binString.c_str(), TRUE, &error);
   if (error) {
     logger().error("Failed to parse launch: {}!", error->message);
     g_error_free(error);
     return;
   }
 
-  mAppSink = std::unique_ptr<GstElement, std::function<void(GstElement*)>>(
-      gst_bin_get_by_name(GST_BIN(bin), "framecapture"),
-      [](GstElement* element) { gst_object_unref(element); });
-  mCapsFilter = std::unique_ptr<GstElement, std::function<void(GstElement*)>>(
-      gst_bin_get_by_name(GST_BIN(bin), "capsfilter"),
-      [](GstElement* element) { gst_object_unref(element); });
+  mAppSink = std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>(
+      gst_bin_get_by_name(GST_BIN(bin), "framecapture"));
+  mCapsFilter = std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>(
+      gst_bin_get_by_name(GST_BIN(bin), "capsfilter"));
+
+  setCaps(mResolution, mSampleType);
 
   gst_bin_add_many(GST_BIN(mPipeline.get()), bin, NULL);
   gst_element_sync_state_with_parent(bin);
@@ -377,8 +534,12 @@ gboolean Stream::startPipeline() {
       });
   g_assert_nonnull(mPipeline.get());
 
-  mWebrtcBin = std::unique_ptr<GstElement, std::function<void(GstElement*)>>(
-      gst_element_factory_make("webrtcbin", "sendrecv"), [](GstElement*) {});
+  GstBus* bus = gst_pipeline_get_bus(GST_PIPELINE(mPipeline.get()));
+  gst_bus_enable_sync_message_emission(bus);
+  g_signal_connect(bus, "sync-message", G_CALLBACK(Stream::onBusSyncMessage), this);
+
+  mWebrtcBin = std::unique_ptr<GstElement, NoDeleter<GstElement>>(
+      gst_element_factory_make("webrtcbin", "sendrecv"));
   g_assert_nonnull(mWebrtcBin.get());
   g_object_set(mWebrtcBin.get(), "bundle-policy", GST_WEBRTC_BUNDLE_POLICY_MAX_BUNDLE, NULL);
   g_object_set(mWebrtcBin.get(), "stun-server", "stun://stun.l.google.com:19302", NULL);
@@ -423,6 +584,18 @@ gboolean Stream::startPipeline() {
   }
 
   return TRUE;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+cs::utils::Signal<> const& Stream::onUncurrentRequired() const {
+  return mOnUncurrentRequired;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+cs::utils::Signal<> const& Stream::onUncurrentRelease() const {
+  return mOnUncurrentRelease;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

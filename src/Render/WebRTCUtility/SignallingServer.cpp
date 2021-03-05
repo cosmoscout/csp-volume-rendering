@@ -155,7 +155,7 @@ void SignallingServer::onServerConnected(
 
 void SignallingServer::onServerClosed(SoupSession* session, SignallingServer* pThis) {
   logger().trace("Server connection closed.");
-  std::lock_guard(pThis->mClosedMutex);
+  std::lock_guard lock(pThis->mClosedMutex);
   pThis->mIsClosed = true;
   pThis->mClosedCV.notify_all();
 }

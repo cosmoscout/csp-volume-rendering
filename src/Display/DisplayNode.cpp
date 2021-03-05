@@ -61,8 +61,9 @@ void DisplayNode::setTexture(std::vector<uint8_t>& texture, int width, int heigh
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void DisplayNode::setTexture(uint8_t* texture, int width, int height) {
-  mTexture.UploadTexture(width, height, texture, false, GL_RGBA);
+void DisplayNode::setTexture(int textureId, GLsync sync) {
+  mTexture = VistaTexture(GL_TEXTURE_2D, textureId);
+  glWaitSync(sync, 0, GL_TIMEOUT_IGNORED);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
