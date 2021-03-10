@@ -486,23 +486,44 @@ void Stream::sendSdpToPeer(GstWebRTCSessionDescription* desc) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+std::mutex mutex;
+
 void Stream::handleVideoStream(GstPad* pad) {
-  GError* error = NULL;
+  std::lock_guard lock(mutex);
+  GError*         error = NULL;
 
   logger().trace("Trying to handle video stream.");
 
   std::string binString;
-  switch (mSampleType) {
-  case SampleType::eImageData:
-    binString = "queue ! videoconvert ! videoscale add-borders=false "
-                "! capsfilter name=capsfilter "
-                "! appsink drop=true max-buffers=1 name=framecapture";
-    break;
-  case SampleType::eTexId:
-    binString = "queue ! videoconvert ! videoscale add-borders=false ! glupload "
-                "! capsfilter caps-change-mode=delayed name=capsfilter "
-                "! appsink drop=true max-buffers=1 name=framecapture";
-    break;
+  if (!mAppSink) {
+    switch (mSampleType) {
+    case SampleType::eImageData:
+      binString = "queue ! videoconvert ! videoscale add-borders=false "
+                  "! capsfilter name=capsfilter "
+                  "! appsink drop=true max-buffers=1 name=framecapture";
+      break;
+    case SampleType::eTexId:
+      binString = "queue ! videoconvert ! videoscale add-borders=false ! glupload "
+                  "! capsfilter caps-change-mode=delayed name=capsfilter "
+                  "! appsink drop=true max-buffers=1 name=framecapture";
+      break;
+    }
+  } else {
+    binString       = "queue ! videoconvert ! autovideosink";
+    GstElement* bin = gst_parse_bin_from_description(binString.c_str(), TRUE, &error);
+    if (error) {
+      logger().error("Failed to parse launch: {}!", error->message);
+      g_error_free(error);
+      return;
+    }
+
+    gst_bin_add_many(GST_BIN(mPipeline.get()), bin, NULL);
+    gst_element_sync_state_with_parent(bin);
+
+    GstPad*          binpad = gst_element_get_static_pad(bin, "sink");
+    GstPadLinkReturn ret    = gst_pad_link(pad, binpad);
+    g_assert_cmphex(ret, ==, GST_PAD_LINK_OK);
+    return;
   }
 
   GstElement* bin = gst_parse_bin_from_description(binString.c_str(), TRUE, &error);
@@ -544,7 +565,7 @@ gboolean Stream::startPipeline() {
 
   gst_element_sync_state_with_parent(mWebrtcBin.get());
 
-  {
+  for (int i = 0; i < 2; i++) {
     std::unique_ptr<GstCaps, GstCapsDeleter> caps(
         gst_caps_from_string("application/x-rtp,media=video,encoding-name=VP8,payload=96"));
     GstWebRTCRTPTransceiver* transceiverPtr = NULL;
