@@ -110,9 +110,7 @@ Stream::~Stream() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Stream::sendMessage(std::string const& message) {
-  if (mSendChannel) {
-    mSendChannel->send(message);
-  } else if (mReceiveChannel) {
+  if (mReceiveChannel) {
     mReceiveChannel->send(message);
   }
 }
@@ -583,10 +581,6 @@ gboolean Stream::startPipeline() {
       G_CALLBACK(Stream::onIceGatheringStateNotify), this);
 
   gst_element_set_state(mPipeline.get(), GST_STATE_READY);
-
-  try {
-    mSendChannel = std::make_unique<DataChannel>(mWebrtcBin.get());
-  } catch (std::exception const& e) { logger().warn(e.what()); }
 
   g_signal_connect(mWebrtcBin.get(), "on-data-channel", G_CALLBACK(Stream::onDataChannel), this);
   // Incoming streams will be exposed via this signal

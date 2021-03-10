@@ -103,7 +103,6 @@ class Stream {
   cs::utils::Signal<> const& onUncurrentRelease() const;
 
   std::unique_ptr<SignallingServer> mSignallingServer;
-  std::unique_ptr<DataChannel>      mSendChannel;
   std::unique_ptr<DataChannel>      mReceiveChannel;
 
   PeerCallState mState = PeerCallState::eUnknown;
