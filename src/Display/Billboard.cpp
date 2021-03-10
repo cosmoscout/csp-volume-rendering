@@ -14,7 +14,9 @@
 #include "../../../../src/cs-utils/FrameTimings.hpp"
 #include "../../../../src/cs-utils/utils.hpp"
 
+#ifdef _WIN32
 #include <Windows.h>
+#endif
 
 #include <VistaKernelOpenSGExt/VistaOpenSGMaterialTools.h>
 #include <VistaMath/VistaBoundingBox.h>
@@ -76,6 +78,7 @@ bool Billboard::Do() {
     doUncurrent = !mContextCurrentShouldBe;
   }
   if (doUncurrent) {
+#ifdef _WIN32
     HDC   dc   = wglGetCurrentDC();
     HGLRC glrc = wglGetCurrentContext();
 
@@ -93,6 +96,7 @@ bool Billboard::Do() {
     wglMakeCurrent(dc, glrc);
 
     mContextCurrentIs = true;
+#endif
   }
 
   cs::utils::FrameTimings::ScopedTimer timer("Volume Rendering");

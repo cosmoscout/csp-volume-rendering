@@ -11,7 +11,9 @@
 #include "../../Enums.hpp"
 #include "../../logger.hpp"
 
+#ifdef _WIN32
 #include <Windows.h>
+#endif
 
 #include <sstream>
 
@@ -47,7 +49,11 @@ namespace csp::volumerendering::webrtc {
 
 Stream::Stream(std::string signallingUrl, SampleType type)
     : mSignallingServer(std::make_unique<SignallingServer>(std::move(signallingUrl)))
+#ifdef _WIN32
     , mGlContext((guintptr)wglGetCurrentContext())
+#else
+    , mGlContext(NULL)
+#endif
     , mSampleType(std::move(type)) {
   GError* error = NULL;
 
@@ -236,6 +242,7 @@ void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
     logger().trace("Got need context {}", context_type);
 
     if (g_strcmp0(context_type, GST_GL_DISPLAY_CONTEXT_TYPE) == 0) {
+#ifdef _WIN32
       if (!gl_display) {
         gl_display = gst_gl_display_new();
         g_signal_connect(gl_display, "create-context", G_CALLBACK(Stream::onCreateContext), pThis);
@@ -245,7 +252,11 @@ void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
       gst_context_set_gl_display(context, gl_display);
 
       gst_element_set_context(GST_ELEMENT(msg->src), context);
+#else
+      logger().warn("Setting OpenGL display is currently only supported on Windows.");
+#endif
     } else if (g_strcmp0(context_type, "gst.gl.app_context") == 0) {
+#ifdef _WIN32
       Plugin::mOnUncurrentRequired.emit();
       GstGLContext* gst_gl_context = gst_gl_context_new_wrapped(
           gl_display, pThis->mGlContext, GST_GL_PLATFORM_WGL, GST_GL_API_OPENGL3);
@@ -255,7 +266,11 @@ void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
       gst_structure_set(s, "context", GST_TYPE_GL_CONTEXT, gst_gl_context, NULL);
 
       gst_element_set_context(GST_ELEMENT(msg->src), context);
+#else
+      logger().warn("Setting OpenGL context is currently only supported on Windows.");
+#endif
     }
+
     if (context) {
       gst_context_unref(context);
     }
