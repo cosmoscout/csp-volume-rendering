@@ -12,6 +12,8 @@
 
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <nlohmann/json.hpp>
+
 namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,6 +58,12 @@ void WebRTCRenderer::cancelRendering() {
 
 Renderer::RenderedImage WebRTCRenderer::getFrameImpl(
     glm::mat4 cameraTransform, Parameters parameters, DataManager::State dataState) {
+  nlohmann::json j;
+  for (int i = 0; i < 4; i++) {
+    j["camera"][i] = cameraTransform[i];
+  }
+  mStream.sendMessage(j.dump());
+
   switch (mType) {
   case SampleType::eImageData: {
     std::optional<std::vector<uint8_t>> image = mStream.getColorImage(parameters.mResolution);
