@@ -63,7 +63,7 @@ namespace csp::volumerendering::webrtc {
 
 class Stream {
  public:
-  Stream(SampleType type);
+  Stream(std::string signallingUrl, SampleType type);
   ~Stream();
 
   void                                  sendMessage(std::string const& message);

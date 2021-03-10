@@ -118,6 +118,9 @@ void from_json(nlohmann::json const& j, Plugin::Settings& o) {
   cs::core::Settings::deserialize(j, "position", o.mPosition);
   cs::core::Settings::deserialize(j, "scale", o.mScale);
   cs::core::Settings::deserialize(j, "rotation", o.mRotation);
+
+  // WebRTCRenderer settings
+  cs::core::Settings::deserialize(j, "signallingUrl", o.mSignallingUrl);
 }
 
 void to_json(nlohmann::json& j, Plugin::Settings const& o) {
@@ -151,6 +154,9 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
   cs::core::Settings::serialize(j, "position", o.mPosition);
   cs::core::Settings::serialize(j, "scale", o.mScale);
   cs::core::Settings::serialize(j, "rotation", o.mRotation);
+
+  // WebRTCRenderer settings
+  cs::core::Settings::serialize(j, "signallingUrl", o.mSignallingUrl);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -276,8 +282,8 @@ void Plugin::onLoad() {
     break;
   }
 
-  mRenderer = std::make_unique<WebRTCRenderer>(
-      mDataManager, mPluginSettings.mVolumeStructure.get(), mPluginSettings.mVolumeShape.get());
+  mRenderer = std::make_unique<WebRTCRenderer>(mDataManager, mPluginSettings.mVolumeStructure.get(),
+      mPluginSettings.mVolumeShape.get(), mPluginSettings.mSignallingUrl.get());
 
   // If the volume representations already exist, remove them from the solar system
   for (auto const& node : mDisplayNodes) {

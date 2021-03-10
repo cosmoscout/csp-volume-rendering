@@ -45,8 +45,8 @@ namespace csp::volumerendering::webrtc {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Stream::Stream(SampleType type)
-    : mSignallingServer(std::make_unique<SignallingServer>("ws://127.0.0.1:57778/ws"))
+Stream::Stream(std::string signallingUrl, SampleType type)
+    : mSignallingServer(std::make_unique<SignallingServer>(std::move(signallingUrl)))
     , mGlContext((guintptr)wglGetCurrentContext())
     , mSampleType(std::move(type)) {
   GError* error = NULL;

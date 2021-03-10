@@ -16,11 +16,11 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-WebRTCRenderer::WebRTCRenderer(
-    std::shared_ptr<DataManager> dataManager, VolumeStructure structure, VolumeShape shape)
+WebRTCRenderer::WebRTCRenderer(std::shared_ptr<DataManager> dataManager, VolumeStructure structure,
+    VolumeShape shape, std::string signallingUrl)
     : Renderer(dataManager, structure, shape)
     , mType(SampleType::eTexId)
-    , mStream(mType) {
+    , mStream(std::move(signallingUrl), mType) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

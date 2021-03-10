@@ -23,8 +23,8 @@ namespace csp::volumerendering {
 
 class WebRTCRenderer : public Renderer {
  public:
-  WebRTCRenderer(
-      std::shared_ptr<DataManager> dataManager, VolumeStructure structure, VolumeShape shape);
+  WebRTCRenderer(std::shared_ptr<DataManager> dataManager, VolumeStructure structure,
+      VolumeShape shape, std::string signallingUrl);
   ~WebRTCRenderer();
 
   float getProgress() override;
