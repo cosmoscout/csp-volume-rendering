@@ -17,7 +17,7 @@ DataChannel::DataChannel(GstElement* webrtc) {
   g_signal_emit_by_name(webrtc, "create-data-channel", "channel", NULL, &channel);
   if (channel) {
     logger().trace("Created data channel.");
-    mChannel = std::unique_ptr<GObject, std::function<void(GObject*)>>(channel, [](GObject*) {});
+    mChannel.reset(channel);
     connectSignals();
   } else {
     throw std::runtime_error("Could not create data channel, is usrsctp available?");
@@ -27,7 +27,7 @@ DataChannel::DataChannel(GstElement* webrtc) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 DataChannel::DataChannel(GObject* channel) {
-  mChannel = std::unique_ptr<GObject, std::function<void(GObject*)>>(channel, [](GObject*) {});
+  mChannel.reset(channel);
   connectSignals();
 }
 

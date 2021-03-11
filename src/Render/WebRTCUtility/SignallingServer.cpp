@@ -6,6 +6,8 @@
 
 #include "SignallingServer.hpp"
 
+#include "GstDeleters.hpp"
+
 #include "../../../../src/cs-utils/logger.hpp"
 #include "../../logger.hpp"
 
@@ -35,10 +37,10 @@ SignallingServer::SignallingServer(std::string const& url) {
   SoupSession* session = soup_session_new_with_options(SOUP_SESSION_SSL_STRICT, false,
       SOUP_SESSION_SSL_USE_SYSTEM_CA_FILE, TRUE, SOUP_SESSION_HTTPS_ALIASES, https_aliases, NULL);
 
-  SoupLogger* soupLogger = soup_logger_new(SOUP_LOGGER_LOG_MINIMAL, -1);
-  soup_logger_set_printer(soupLogger, soupLoggerPrinter, NULL, NULL);
-  soup_session_add_feature(session, SOUP_SESSION_FEATURE(soupLogger));
-  g_object_unref(soupLogger);
+  std::unique_ptr<SoupLogger, GObjectDeleter<SoupLogger>> soupLogger(
+      soup_logger_new(SOUP_LOGGER_LOG_MINIMAL, -1));
+  soup_logger_set_printer(soupLogger.get(), soupLoggerPrinter, NULL, NULL);
+  soup_session_add_feature(session, SOUP_SESSION_FEATURE(soupLogger.get()));
 
   SoupMessage* message = soup_message_new(SOUP_METHOD_GET, url.c_str());
 

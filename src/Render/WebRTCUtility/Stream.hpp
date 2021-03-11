@@ -9,6 +9,7 @@
 
 #include "../../Enums.hpp"
 #include "DataChannel.hpp"
+#include "GstDeleters.hpp"
 #include "SignallingServer.hpp"
 
 #include <gst/gl/gl.h>
@@ -26,39 +27,6 @@
 #include <thread>
 #include <vector>
 
-namespace {
-template <typename T>
-struct NoDeleter {
-  inline void operator()(T* p) {
-  }
-};
-
-template <typename T>
-struct GstObjectDeleter {
-  inline void operator()(T* p) {
-    gst_object_unref(p);
-  }
-};
-
-struct GstVideoFrameDeleter {
-  inline void operator()(GstVideoFrame* p) {
-    gst_video_frame_unmap(p);
-  }
-};
-
-struct GstSampleDeleter {
-  inline void operator()(GstSample* p) {
-    gst_sample_unref(p);
-  }
-};
-
-struct GstCapsDeleter {
-  inline void operator()(GstCaps* p) {
-    gst_caps_unref(p);
-  }
-};
-} // namespace
-
 namespace csp::volumerendering::webrtc {
 
 class Stream {
@@ -75,9 +43,9 @@ class Stream {
 
   static void onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis);
 
-  static void onOfferSet(GstPromise* promise, Stream* pThis);
-  static void onAnswerCreated(GstPromise* promise, Stream* pThis);
-  static void onOfferCreated(GstPromise* promise, Stream* pThis);
+  static void onOfferSet(GstPromise* promisePtr, Stream* pThis);
+  static void onAnswerCreated(GstPromise* promisePtr, Stream* pThis);
+  static void onOfferCreated(GstPromise* promisePtr, Stream* pThis);
   static void onNegotiationNeeded(GstElement* element, Stream* pThis);
   static void onIceCandidate(GstElement* webrtc, guint mlineindex, gchar* candidate, Stream* pThis);
   static void onIceGatheringStateNotify(GstElement* webrtcbin, GParamSpec* pspec, Stream* pThis);
@@ -109,13 +77,13 @@ class Stream {
 
   bool mCreateOffer = false;
 
-  std::unique_ptr<GMainLoop, std::function<void(GMainLoop*)>> mMainLoop;
-  std::thread                                                 mMainLoopThread;
+  std::unique_ptr<GMainLoop, GMainLoopDeleter> mMainLoop;
+  std::thread                                  mMainLoopThread;
 
-  std::unique_ptr<GstElement, std::function<void(GstElement*)>> mPipeline;
-  std::unique_ptr<GstElement, NoDeleter<GstElement>>            mWebrtcBin;
-  std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>     mAppSink;
-  std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>     mCapsFilter;
+  std::unique_ptr<GstElement, GstPipelineDeleter>           mPipeline;
+  std::unique_ptr<GstElement, NoDeleter<GstElement>>        mWebrtcBin;
+  std::unique_ptr<GstElement, GstObjectDeleter<GstElement>> mAppSink;
+  std::unique_ptr<GstElement, GstObjectDeleter<GstElement>> mCapsFilter;
 
   static constexpr int                                                          mFrameCount = 10;
   int                                                                           mFrameIndex = 0;

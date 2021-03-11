@@ -17,12 +17,15 @@
 
 #include <sstream>
 
+namespace csp::volumerendering::webrtc {
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 namespace {
 
 gboolean check_plugins() {
   guint        i;
   gboolean     ret;
-  GstPlugin*   plugin;
   GstRegistry* registry;
   const gchar* needed[] = {"opus", "vpx", "nice", "webrtc", "dtls", "srtp", "rtpmanager",
       "videoconvert", "coreelements", "app", "videoscale", NULL};
@@ -30,20 +33,18 @@ gboolean check_plugins() {
   registry = gst_registry_get();
   ret      = TRUE;
   for (i = 0; i < g_strv_length((gchar**)needed); i++) {
-    plugin = gst_registry_find_plugin(registry, needed[i]);
+    std::unique_ptr<GstPlugin, GstObjectDeleter<GstPlugin>> plugin(
+        gst_registry_find_plugin(registry, needed[i]));
     if (!plugin) {
       csp::volumerendering::logger().error("Required gstreamer plugin '{}' not found!", needed[i]);
       ret = FALSE;
       continue;
     }
-    gst_object_unref(plugin);
   }
   return ret;
 }
 
 } // namespace
-
-namespace csp::volumerendering::webrtc {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -89,11 +90,7 @@ Stream::Stream(std::string signallingUrl, SampleType type)
     g_signal_emit_by_name(mWebrtcBin.get(), "add-ice-candidate", spdmLineIndex, text.c_str());
   });
 
-  mMainLoop = std::unique_ptr<GMainLoop, std::function<void(GMainLoop*)>>(
-      g_main_loop_new(NULL, FALSE), [](GMainLoop* loop) {
-        g_main_loop_quit(loop);
-        g_main_loop_unref(loop);
-      });
+  mMainLoop.reset(g_main_loop_new(NULL, FALSE));
 
   mMainLoopThread = std::thread([this]() { g_main_loop_run(mMainLoop.get()); });
 }
@@ -129,10 +126,10 @@ std::unique_ptr<GstCaps, GstCapsDeleter> Stream::setCaps(int resolution, SampleT
   }
   std::stringstream capsStr;
   capsStr << videoType << ",format=RGBA,width=" << resolution << ",height=" << resolution;
-  GstCaps* caps = gst_caps_from_string(capsStr.str().c_str());
-  g_object_set(mCapsFilter.get(), "caps", caps, NULL);
+  std::unique_ptr<GstCaps, GstCapsDeleter> caps(gst_caps_from_string(capsStr.str().c_str()));
+  g_object_set(mCapsFilter.get(), "caps", caps.get(), NULL);
   mResolution = resolution;
-  return std::unique_ptr<GstCaps, GstCapsDeleter>(caps);
+  return caps;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -231,8 +228,8 @@ std::optional<std::pair<int, GLsync>> Stream::getTextureId(int resolution) {
 void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
   switch (GST_MESSAGE_TYPE(msg)) {
   case GST_MESSAGE_NEED_CONTEXT: {
-    const gchar* context_type;
-    GstContext*  context = NULL;
+    const gchar*                                   context_type;
+    std::unique_ptr<GstContext, GstContextDeleter> context;
 
     static GstGLDisplay* gl_display = NULL;
 
@@ -246,10 +243,10 @@ void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
         g_signal_connect(gl_display, "create-context", G_CALLBACK(Stream::onCreateContext), pThis);
       }
 
-      context = gst_context_new(GST_GL_DISPLAY_CONTEXT_TYPE, TRUE);
-      gst_context_set_gl_display(context, gl_display);
+      context.reset(gst_context_new(GST_GL_DISPLAY_CONTEXT_TYPE, TRUE));
+      gst_context_set_gl_display(context.get(), gl_display);
 
-      gst_element_set_context(GST_ELEMENT(msg->src), context);
+      gst_element_set_context(GST_ELEMENT(msg->src), context.get());
 #else
       logger().warn("Setting OpenGL display is currently only supported on Windows.");
 #endif
@@ -259,18 +256,14 @@ void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
       GstGLContext* gst_gl_context = gst_gl_context_new_wrapped(
           gl_display, pThis->mGlContext, GST_GL_PLATFORM_WGL, GST_GL_API_OPENGL3);
 
-      context         = gst_context_new("gst.gl.app_context", TRUE);
-      GstStructure* s = gst_context_writable_structure(context);
+      context.reset(gst_context_new("gst.gl.app_context", TRUE));
+      GstStructure* s = gst_context_writable_structure(context.get());
       gst_structure_set(s, "context", GST_TYPE_GL_CONTEXT, gst_gl_context, NULL);
 
-      gst_element_set_context(GST_ELEMENT(msg->src), context);
+      gst_element_set_context(GST_ELEMENT(msg->src), context.get());
 #else
       logger().warn("Setting OpenGL context is currently only supported on Windows.");
 #endif
-    }
-
-    if (context) {
-      gst_context_unref(context);
     }
     break;
   }
@@ -282,31 +275,30 @@ void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Stream::onOfferSet(GstPromise* promise, Stream* pThis) {
-  gst_promise_unref(promise);
-  promise = gst_promise_new_with_change_func(
-      reinterpret_cast<GstPromiseChangeFunc>(&Stream::onAnswerCreated), pThis, NULL);
-  g_signal_emit_by_name(pThis->mWebrtcBin.get(), "create-answer", NULL, promise);
+void Stream::onOfferSet(GstPromise* promisePtr, Stream* pThis) {
+  std::unique_ptr<GstPromise, GstPromiseDeleter> promise(promisePtr);
+  promise.reset(gst_promise_new_with_change_func(
+      reinterpret_cast<GstPromiseChangeFunc>(&Stream::onAnswerCreated), pThis, NULL));
+  g_signal_emit_by_name(pThis->mWebrtcBin.get(), "create-answer", NULL, promise.release());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Stream::onAnswerCreated(GstPromise* promise, Stream* pThis) {
-  GstWebRTCSessionDescription* answer = NULL;
-  const GstStructure*          reply;
+void Stream::onAnswerCreated(GstPromise* promisePtr, Stream* pThis) {
+  std::unique_ptr<GstPromise, GstPromiseDeleter> promise(promisePtr);
+  GstWebRTCSessionDescription*                   answer = NULL;
+  const GstStructure*                            reply;
 
   g_assert_cmphex(
       static_cast<guint64>(pThis->mState), ==, static_cast<guint64>(PeerCallState::eNegotiating));
 
-  g_assert_cmphex(gst_promise_wait(promise), ==, GST_PROMISE_RESULT_REPLIED);
-  reply = gst_promise_get_reply(promise);
+  g_assert_cmphex(gst_promise_wait(promise.get()), ==, GST_PROMISE_RESULT_REPLIED);
+  reply = gst_promise_get_reply(promise.get());
   gst_structure_get(reply, "answer", GST_TYPE_WEBRTC_SESSION_DESCRIPTION, &answer, NULL);
-  gst_promise_unref(promise);
 
-  promise = gst_promise_new();
-  g_signal_emit_by_name(pThis->mWebrtcBin.get(), "set-local-description", answer, promise);
-  gst_promise_interrupt(promise);
-  gst_promise_unref(promise);
+  promise.reset(gst_promise_new());
+  g_signal_emit_by_name(pThis->mWebrtcBin.get(), "set-local-description", answer, promise.get());
+  gst_promise_interrupt(promise.get());
 
   pThis->sendSdpToPeer(answer);
   gst_webrtc_session_description_free(answer);
@@ -314,21 +306,20 @@ void Stream::onAnswerCreated(GstPromise* promise, Stream* pThis) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Stream::onOfferCreated(GstPromise* promise, Stream* pThis) {
-  GstWebRTCSessionDescription* offer = NULL;
+void Stream::onOfferCreated(GstPromise* promisePtr, Stream* pThis) {
+  std::unique_ptr<GstPromise, GstPromiseDeleter> promise(promisePtr);
+  GstWebRTCSessionDescription*                   offer = NULL;
 
   g_assert_cmphex(
       static_cast<guint64>(pThis->mState), ==, static_cast<guint64>(PeerCallState::eNegotiating));
 
-  g_assert_cmphex(gst_promise_wait(promise), ==, GST_PROMISE_RESULT_REPLIED);
-  const GstStructure* reply = gst_promise_get_reply(promise);
+  g_assert_cmphex(gst_promise_wait(promise.get()), ==, GST_PROMISE_RESULT_REPLIED);
+  const GstStructure* reply = gst_promise_get_reply(promise.get());
   gst_structure_get(reply, "offer", GST_TYPE_WEBRTC_SESSION_DESCRIPTION, &offer, NULL);
-  gst_promise_unref(promise);
 
-  promise = gst_promise_new();
-  g_signal_emit_by_name(pThis->mWebrtcBin.get(), "set-local-description", offer, promise);
-  gst_promise_interrupt(promise);
-  gst_promise_unref(promise);
+  promise.reset(gst_promise_new());
+  g_signal_emit_by_name(pThis->mWebrtcBin.get(), "set-local-description", offer, promise.get());
+  gst_promise_interrupt(promise.get());
 
   // Send offer to peer
   pThis->sendSdpToPeer(offer);
@@ -341,9 +332,9 @@ void Stream::onNegotiationNeeded(GstElement* element, Stream* pThis) {
   pThis->mState = PeerCallState::eNegotiating;
 
   if (pThis->mCreateOffer) {
-    GstPromise* promise = gst_promise_new_with_change_func(
-        reinterpret_cast<GstPromiseChangeFunc>(&Stream::onOfferCreated), pThis, NULL);
-    g_signal_emit_by_name(pThis->mWebrtcBin.get(), "create-offer", NULL, promise);
+    std::unique_ptr<GstPromise, GstPromiseDeleter> promise(gst_promise_new_with_change_func(
+        reinterpret_cast<GstPromiseChangeFunc>(&Stream::onOfferCreated), pThis, NULL));
+    g_signal_emit_by_name(pThis->mWebrtcBin.get(), "create-offer", NULL, promise.release());
   }
 }
 
@@ -390,7 +381,6 @@ void Stream::onDataChannel(GstElement* webrtc, GObject* data_channel, Stream* pT
 
 void Stream::onIncomingStream(GstElement* webrtc, GstPad* pad, Stream* pThis) {
   GstElement* decodebin;
-  GstPad*     sinkpad;
 
   if (GST_PAD_DIRECTION(pad) != GST_PAD_SRC)
     return;
@@ -400,9 +390,9 @@ void Stream::onIncomingStream(GstElement* webrtc, GstPad* pad, Stream* pThis) {
   gst_bin_add(GST_BIN(pThis->mPipeline.get()), decodebin);
   gst_element_sync_state_with_parent(decodebin);
 
-  sinkpad = gst_element_get_static_pad(decodebin, "sink");
-  gst_pad_link(pad, sinkpad);
-  gst_object_unref(sinkpad);
+  std::unique_ptr<GstPad, GstObjectDeleter<GstPad>> sinkpad(
+      gst_element_get_static_pad(decodebin, "sink"));
+  gst_pad_link(pad, sinkpad.get());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -430,21 +420,20 @@ void Stream::onIncomingDecodebinStream(GstElement* decodebin, GstPad* pad, Strea
 
 GstGLContext* Stream::onCreateContext(
     GstGLDisplay* display, GstGLContext* otherContext, Stream* pThis) {
-  GError* error = NULL;
-
-  GstGLContext* newContext = gst_gl_context_new(display);
+  std::unique_ptr<GstGLContext, GstObjectDeleter<GstGLContext>> newContext(
+      gst_gl_context_new(display));
   if (!newContext) {
     logger().error("Failed to create GL context!");
     return NULL;
   }
 
-  if (gst_gl_context_create(newContext, otherContext, &error)) {
+  GError* error = NULL;
+  if (gst_gl_context_create(newContext.get(), otherContext, &error)) {
     Plugin::mOnUncurrentRelease.emit();
-    return newContext;
+    return newContext.release();
   }
 
   logger().error("Failed to share GL context!");
-  gst_object_unref(newContext);
   return NULL;
 }
 
@@ -457,11 +446,11 @@ void Stream::onOfferReceived(GstSDPMessage* sdp) {
 
   // Set remote description on our pipeline
   {
-    GstPromise* promise = gst_promise_new_with_change_func(
-        reinterpret_cast<GstPromiseChangeFunc>(&Stream::onOfferSet), this, NULL);
-    g_signal_emit_by_name(mWebrtcBin.get(), "set-remote-description", offer, promise);
+    std::unique_ptr<GstPromise, GstPromiseDeleter> promise(gst_promise_new_with_change_func(
+        reinterpret_cast<GstPromiseChangeFunc>(&Stream::onOfferSet), this, NULL));
+    g_signal_emit_by_name(mWebrtcBin.get(), "set-remote-description", offer, promise.release());
+    gst_webrtc_session_description_free(offer);
   }
-  gst_webrtc_session_description_free(offer);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -473,10 +462,9 @@ void Stream::onAnswerReceived(GstSDPMessage* sdp) {
 
   // Set remote description on our pipeline
   {
-    GstPromise* promise = gst_promise_new();
-    g_signal_emit_by_name(mWebrtcBin.get(), "set-remote-description", answer, promise);
-    gst_promise_interrupt(promise);
-    gst_promise_unref(promise);
+    std::unique_ptr<GstPromise, GstPromiseDeleter> promise(gst_promise_new());
+    g_signal_emit_by_name(mWebrtcBin.get(), "set-remote-description", answer, promise.get());
+    gst_promise_interrupt(promise.get());
   }
   mState = PeerCallState::eStarted;
 }
@@ -521,10 +509,8 @@ void Stream::handleVideoStream(GstPad* pad) {
     return;
   }
 
-  mAppSink = std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>(
-      gst_bin_get_by_name(GST_BIN(bin), "framecapture"));
-  mCapsFilter = std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>(
-      gst_bin_get_by_name(GST_BIN(bin), "capsfilter"));
+  mAppSink.reset(gst_bin_get_by_name(GST_BIN(bin), "framecapture"));
+  mCapsFilter.reset(gst_bin_get_by_name(GST_BIN(bin), "capsfilter"));
 
   setCaps(mResolution, mSampleType);
 
@@ -539,20 +525,14 @@ void Stream::handleVideoStream(GstPad* pad) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 gboolean Stream::startPipeline() {
-  mPipeline = std::unique_ptr<GstElement, std::function<void(GstElement*)>>(
-      gst_pipeline_new("pipeline"), [](GstElement* pipeline) {
-        gst_element_set_state(GST_ELEMENT(pipeline), GST_STATE_NULL);
-        logger().trace("Pipeline stopped.");
-        gst_object_unref(pipeline);
-      });
+  mPipeline.reset(gst_pipeline_new("pipeline"));
   g_assert_nonnull(mPipeline.get());
 
   GstBus* bus = gst_pipeline_get_bus(GST_PIPELINE(mPipeline.get()));
   gst_bus_enable_sync_message_emission(bus);
   g_signal_connect(bus, "sync-message", G_CALLBACK(Stream::onBusSyncMessage), this);
 
-  mWebrtcBin = std::unique_ptr<GstElement, NoDeleter<GstElement>>(
-      gst_element_factory_make("webrtcbin", "sendrecv"));
+  mWebrtcBin.reset(gst_element_factory_make("webrtcbin", "sendrecv"));
   g_assert_nonnull(mWebrtcBin.get());
   g_object_set(mWebrtcBin.get(), "bundle-policy", GST_WEBRTC_BUNDLE_POLICY_MAX_BUNDLE, NULL);
   g_object_set(mWebrtcBin.get(), "stun-server", "stun://stun.l.google.com:19302", NULL);
@@ -561,13 +541,15 @@ gboolean Stream::startPipeline() {
 
   gst_element_sync_state_with_parent(mWebrtcBin.get());
 
-  GstWebRTCRTPTransceiver* transceiver;
-  GstCaps*                 caps =
-      gst_caps_from_string("application/x-rtp,media=video,encoding-name=VP8,payload=96");
-  g_signal_emit_by_name(mWebrtcBin.get(), "add-transceiver",
-      GST_WEBRTC_RTP_TRANSCEIVER_DIRECTION_RECVONLY, caps, &transceiver);
-  gst_caps_unref(caps);
-  gst_object_unref(transceiver);
+  {
+    std::unique_ptr<GstCaps, GstCapsDeleter> caps(
+        gst_caps_from_string("application/x-rtp,media=video,encoding-name=VP8,payload=96"));
+    GstWebRTCRTPTransceiver* transceiverPtr = NULL;
+    g_signal_emit_by_name(mWebrtcBin.get(), "add-transceiver",
+        GST_WEBRTC_RTP_TRANSCEIVER_DIRECTION_RECVONLY, caps.get(), &transceiverPtr);
+    std::unique_ptr<GstWebRTCRTPTransceiver, GstObjectDeleter<GstWebRTCRTPTransceiver>> transceiver(
+        transceiverPtr);
+  }
 
   // This is the gstwebrtc entry point where we create the offer and so on.
   // It will be called when the pipeline goes to PLAYING.

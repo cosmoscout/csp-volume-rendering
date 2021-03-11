@@ -7,6 +7,8 @@
 #ifndef CSP_VOLUME_RENDERING_DATACHANNEL_HPP
 #define CSP_VOLUME_RENDERING_DATACHANNEL_HPP
 
+#include "GstDeleters.hpp"
+
 #include <gst/gst.h>
 
 #include <functional>
@@ -29,7 +31,7 @@ class DataChannel {
 
   void connectSignals();
 
-  std::unique_ptr<GObject, std::function<void(GObject*)>> mChannel;
+  std::unique_ptr<GObject, NoDeleter<GObject>> mChannel;
 };
 
 } // namespace csp::volumerendering::webrtc
