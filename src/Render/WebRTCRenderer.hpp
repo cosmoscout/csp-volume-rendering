@@ -27,6 +27,8 @@ class WebRTCRenderer : public Renderer {
       VolumeShape shape, std::string signallingUrl);
   ~WebRTCRenderer();
 
+  void update() override;
+
   float getProgress() override;
   void  preloadData(DataManager::State state) override;
   void  cancelRendering() override;
@@ -39,6 +41,14 @@ class WebRTCRenderer : public Renderer {
 
   const SampleType mType;
   webrtc::Stream   mStream;
+
+  std::mutex                     mUncurrentRequiredMutex;
+  std::mutex                     mUncurrentReleaseMutex;
+  std::mutex                     mUncurrentDoneMutex;
+  std::condition_variable        mUncurrentRequiredCV;
+  std::condition_variable        mUncurrentReleaseCV;
+  bool                           mContextCurrentIs       = true;
+  bool                           mContextCurrentShouldBe = true;
 };
 
 } // namespace csp::volumerendering

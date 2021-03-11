@@ -51,9 +51,6 @@ EXPORT_FN void destroy(cs::core::PluginBase* pluginBase) {
 
 namespace csp::volumerendering {
 
-cs::utils::Signal<> Plugin::mOnUncurrentRequired;
-cs::utils::Signal<> Plugin::mOnUncurrentRelease;
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 NLOHMANN_JSON_SERIALIZE_ENUM(VolumeFileType, {
@@ -222,6 +219,8 @@ void Plugin::deInit() {
 
 void Plugin::update() {
   mNextFrame.mCameraTransform = getCurrentCameraTransform();
+
+  mRenderer->update();
 
   switch (mRenderState) {
   case RenderState::eWaitForData:

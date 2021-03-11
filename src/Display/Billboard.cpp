@@ -14,10 +14,6 @@
 #include "../../../../src/cs-utils/FrameTimings.hpp"
 #include "../../../../src/cs-utils/utils.hpp"
 
-#ifdef _WIN32
-#include <Windows.h>
-#endif
-
 #include <VistaKernelOpenSGExt/VistaOpenSGMaterialTools.h>
 #include <VistaMath/VistaBoundingBox.h>
 #include <VistaOGLExt/VistaOGLUtils.h>
@@ -25,14 +21,6 @@
 #include <utility>
 
 namespace csp::volumerendering {
-
-std::mutex              mUncurrentRequiredMutex;
-std::mutex              mUncurrentReleaseMutex;
-std::mutex              mUncurrentDoneMutex;
-std::condition_variable mUncurrentRequiredCV;
-std::condition_variable mUncurrentReleaseCV;
-bool                    mContextCurrentIs       = true;
-bool                    mContextCurrentShouldBe = true;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -45,24 +33,6 @@ Billboard::Billboard(
     : DisplayNode(shape, settings, anchor, GRID_RESOLUTION) {
   pDepthValues.connectAndTouch(
       [this](std::vector<float> depthValues) { createBuffers(depthValues); });
-
-  Plugin::mOnUncurrentRequired.connect([]() {
-    {
-      std::lock_guard lock(mUncurrentRequiredMutex);
-      mContextCurrentShouldBe = false;
-    }
-    {
-      std::unique_lock<std::mutex> lock(mUncurrentDoneMutex);
-      while (mContextCurrentIs) {
-        mUncurrentRequiredCV.wait(lock);
-      }
-    }
-  });
-  Plugin::mOnUncurrentRelease.connect([]() {
-    std::lock_guard lock(mUncurrentReleaseMutex);
-    mContextCurrentShouldBe = true;
-    mUncurrentReleaseCV.notify_all();
-  });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -70,33 +40,6 @@ Billboard::Billboard(
 bool Billboard::Do() {
   if (!mEnabled || !getIsInExistence() || !pVisible.get()) {
     return true;
-  }
-
-  bool doUncurrent = false;
-  {
-    std::lock_guard lock(mUncurrentRequiredMutex);
-    doUncurrent = !mContextCurrentShouldBe;
-  }
-  if (doUncurrent) {
-#ifdef _WIN32
-    HDC   dc   = wglGetCurrentDC();
-    HGLRC glrc = wglGetCurrentContext();
-
-    // uncurrent
-    wglMakeCurrent(NULL, NULL);
-
-    mContextCurrentIs = false;
-    mUncurrentRequiredCV.notify_all();
-    std::unique_lock<std::mutex> lock(mUncurrentReleaseMutex);
-    while (!mContextCurrentShouldBe) {
-      mUncurrentReleaseCV.wait(lock);
-    }
-
-    // current
-    wglMakeCurrent(dc, glrc);
-
-    mContextCurrentIs = true;
-#endif
   }
 
   cs::utils::FrameTimings::ScopedTimer timer("Volume Rendering");

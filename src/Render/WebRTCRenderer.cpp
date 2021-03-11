@@ -10,6 +10,10 @@
 
 #include "../../../../src/cs-utils/convert.hpp"
 
+#ifdef _WIN32
+#include <Windows.h>
+#endif
+
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <nlohmann/json.hpp>
@@ -27,11 +31,60 @@ WebRTCRenderer::WebRTCRenderer(std::shared_ptr<DataManager> dataManager, VolumeS
     , mType(SampleType::eImageData)
 #endif
     , mStream(std::move(signallingUrl), mType) {
+  mStream.onUncurrentRequired().connect([this]() {
+    {
+      std::lock_guard lock(mUncurrentRequiredMutex);
+      mContextCurrentShouldBe = false;
+    }
+    {
+      std::unique_lock<std::mutex> lock(mUncurrentDoneMutex);
+      while (mContextCurrentIs) {
+        mUncurrentRequiredCV.wait(lock);
+      }
+    }
+  });
+  mStream.onUncurrentRelease().connect([this]() {
+    std::lock_guard lock(mUncurrentReleaseMutex);
+    mContextCurrentShouldBe = true;
+    mUncurrentReleaseCV.notify_all();
+  });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-WebRTCRenderer::~WebRTCRenderer(){};
+WebRTCRenderer::~WebRTCRenderer() {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void WebRTCRenderer::update() {
+  bool doUncurrent = false;
+  {
+    std::lock_guard lock(mUncurrentRequiredMutex);
+    doUncurrent = !mContextCurrentShouldBe;
+  }
+  if (doUncurrent) {
+#ifdef _WIN32
+    HDC   dc   = wglGetCurrentDC();
+    HGLRC glrc = wglGetCurrentContext();
+
+    // uncurrent
+    wglMakeCurrent(NULL, NULL);
+
+    mContextCurrentIs = false;
+    mUncurrentRequiredCV.notify_all();
+    std::unique_lock<std::mutex> lock(mUncurrentReleaseMutex);
+    while (!mContextCurrentShouldBe) {
+      mUncurrentReleaseCV.wait(lock);
+    }
+
+    // current
+    wglMakeCurrent(dc, glrc);
+
+    mContextCurrentIs = true;
+#endif
+  }
+};
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 

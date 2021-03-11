@@ -28,9 +28,6 @@ namespace csp::volumerendering {
 
 class Plugin : public cs::core::PluginBase {
  public:
-  static cs::utils::Signal<> mOnUncurrentRequired;
-  static cs::utils::Signal<> mOnUncurrentRelease;
-
   struct Settings {
     // Data settings
     cs::utils::Property<std::string>     mVolumeDataPath;

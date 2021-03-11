@@ -82,6 +82,8 @@ class Renderer {
   /// Sets the strength of the light of the sun.
   void setSunStrength(float strength);
 
+  virtual void update(){};
+
   /// Starts asynchronously rendering an image of the volume for the given camera perspective.
   /// The rendering process will use all parameters set before calling this method
   /// and will not be influenced by any later changes to the parameters.

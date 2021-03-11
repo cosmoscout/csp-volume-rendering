@@ -252,7 +252,7 @@ void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
 #endif
     } else if (g_strcmp0(context_type, "gst.gl.app_context") == 0) {
 #ifdef _WIN32
-      Plugin::mOnUncurrentRequired.emit();
+      pThis->mOnUncurrentRequired.emit();
       GstGLContext* gst_gl_context = gst_gl_context_new_wrapped(
           gl_display, pThis->mGlContext, GST_GL_PLATFORM_WGL, GST_GL_API_OPENGL3);
 
@@ -429,7 +429,7 @@ GstGLContext* Stream::onCreateContext(
 
   GError* error = NULL;
   if (gst_gl_context_create(newContext.get(), otherContext, &error)) {
-    Plugin::mOnUncurrentRelease.emit();
+    pThis->mOnUncurrentRelease.emit();
     return newContext.release();
   }
 

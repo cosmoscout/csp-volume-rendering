@@ -38,6 +38,9 @@ class Stream {
   std::optional<std::vector<uint8_t>>   getColorImage(int resolution);
   std::optional<std::pair<int, GLsync>> getTextureId(int resolution);
 
+  cs::utils::Signal<> const& onUncurrentRequired() const;
+  cs::utils::Signal<> const& onUncurrentRelease() const;
+
  private:
   enum class PeerCallState { eUnknown = 0, eNegotiating, eStarted, eError };
 
@@ -66,9 +69,6 @@ class Stream {
 
   std::unique_ptr<GstCaps, GstCapsDeleter>     setCaps(int resolution, SampleType type);
   std::unique_ptr<GstSample, GstSampleDeleter> getSample(int resolution);
-
-  cs::utils::Signal<> const& onUncurrentRequired() const;
-  cs::utils::Signal<> const& onUncurrentRelease() const;
 
   std::unique_ptr<SignallingServer> mSignallingServer;
   std::unique_ptr<DataChannel>      mReceiveChannel;
