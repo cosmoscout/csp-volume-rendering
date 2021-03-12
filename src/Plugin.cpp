@@ -212,6 +212,12 @@ void Plugin::deInit() {
   mAllSettings->mGraphics.pEnableLighting.disconnect(mLightingConnection);
   mAllSettings->mGraphics.pAmbientBrightness.disconnect(mAmbientConnection);
 
+  mGuiManager->getGui()->callJavascript(
+      "CosmoScout.gui.unregisterCss", "css/csp-volume-rendering.css");
+  mGuiManager->removePluginTab("Volume Rendering");
+
+  mRenderer.reset();
+
   logger().info("Unloading done.");
 }
 

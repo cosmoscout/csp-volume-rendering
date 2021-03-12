@@ -31,7 +31,7 @@ WebRTCRenderer::WebRTCRenderer(std::shared_ptr<DataManager> dataManager, VolumeS
     , mType(SampleType::eImageData)
 #endif
     , mStream(std::move(signallingUrl), mType) {
-  mStream.onUncurrentRequired().connect([this]() {
+  mUncurrentRequiredSignal = mStream.onUncurrentRequired().connect([this]() {
     {
       std::lock_guard lock(mUncurrentRequiredMutex);
       mContextCurrentShouldBe = false;
@@ -43,7 +43,7 @@ WebRTCRenderer::WebRTCRenderer(std::shared_ptr<DataManager> dataManager, VolumeS
       }
     }
   });
-  mStream.onUncurrentRelease().connect([this]() {
+  mUncurrentReleaseSignal  = mStream.onUncurrentRelease().connect([this]() {
     std::lock_guard lock(mUncurrentReleaseMutex);
     mContextCurrentShouldBe = true;
     mUncurrentReleaseCV.notify_all();
@@ -53,6 +53,8 @@ WebRTCRenderer::WebRTCRenderer(std::shared_ptr<DataManager> dataManager, VolumeS
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 WebRTCRenderer::~WebRTCRenderer() {
+  mStream.onUncurrentRequired().disconnect(mUncurrentRequiredSignal);
+  mStream.onUncurrentRelease().disconnect(mUncurrentReleaseSignal);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

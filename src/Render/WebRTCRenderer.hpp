@@ -42,13 +42,15 @@ class WebRTCRenderer : public Renderer {
   const SampleType mType;
   webrtc::Stream   mStream;
 
-  std::mutex                     mUncurrentRequiredMutex;
-  std::mutex                     mUncurrentReleaseMutex;
-  std::mutex                     mUncurrentDoneMutex;
-  std::condition_variable        mUncurrentRequiredCV;
-  std::condition_variable        mUncurrentReleaseCV;
-  bool                           mContextCurrentIs       = true;
-  bool                           mContextCurrentShouldBe = true;
+  int                     mUncurrentRequiredSignal = -1;
+  int                     mUncurrentReleaseSignal  = -1;
+  std::mutex              mUncurrentRequiredMutex;
+  std::mutex              mUncurrentReleaseMutex;
+  std::mutex              mUncurrentDoneMutex;
+  std::condition_variable mUncurrentRequiredCV;
+  std::condition_variable mUncurrentReleaseCV;
+  bool                    mContextCurrentIs       = true;
+  bool                    mContextCurrentShouldBe = true;
 };
 
 } // namespace csp::volumerendering

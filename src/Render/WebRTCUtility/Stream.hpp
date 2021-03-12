@@ -92,7 +92,9 @@ class Stream {
   int              mResolution = 1;
   const SampleType mSampleType;
 
-  guintptr            mGlContext;
+  std::unique_ptr<GstGLDisplay, GstObjectDeleter<GstGLDisplay>> mGlDisplay;
+  guintptr                                                      mGlContext;
+
   cs::utils::Signal<> mOnUncurrentRequired;
   cs::utils::Signal<> mOnUncurrentRelease;
 };

@@ -58,8 +58,12 @@ Stream::Stream(std::string signallingUrl, SampleType type)
     , mSampleType(std::move(type)) {
   GError* error = NULL;
 
-  if (!gst_init_check(nullptr, nullptr, &error) || !check_plugins()) {
-    throw std::runtime_error("Could not initialize GStreamer");
+  static bool initialized = false;
+  if (!initialized) {
+    if (!gst_init_check(nullptr, nullptr, &error) || !check_plugins()) {
+      throw std::runtime_error("Could not initialize GStreamer");
+    }
+    initialized = true;
   }
 
   mSignallingServer->onConnected().connect([this]() {
@@ -231,20 +235,19 @@ void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
     const gchar*                                   context_type;
     std::unique_ptr<GstContext, GstContextDeleter> context;
 
-    static GstGLDisplay* gl_display = NULL;
-
     gst_message_parse_context_type(msg, &context_type);
     logger().trace("Got need context {}", context_type);
 
     if (g_strcmp0(context_type, GST_GL_DISPLAY_CONTEXT_TYPE) == 0) {
 #ifdef _WIN32
-      if (!gl_display) {
-        gl_display = gst_gl_display_new();
-        g_signal_connect(gl_display, "create-context", G_CALLBACK(Stream::onCreateContext), pThis);
+      if (!pThis->mGlDisplay) {
+        pThis->mGlDisplay.reset(gst_gl_display_new());
+        g_signal_connect(
+            pThis->mGlDisplay.get(), "create-context", G_CALLBACK(Stream::onCreateContext), pThis);
       }
 
       context.reset(gst_context_new(GST_GL_DISPLAY_CONTEXT_TYPE, TRUE));
-      gst_context_set_gl_display(context.get(), gl_display);
+      gst_context_set_gl_display(context.get(), pThis->mGlDisplay.get());
 
       gst_element_set_context(GST_ELEMENT(msg->src), context.get());
 #else
@@ -254,7 +257,7 @@ void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
 #ifdef _WIN32
       pThis->mOnUncurrentRequired.emit();
       GstGLContext* gst_gl_context = gst_gl_context_new_wrapped(
-          gl_display, pThis->mGlContext, GST_GL_PLATFORM_WGL, GST_GL_API_OPENGL3);
+          pThis->mGlDisplay.get(), pThis->mGlContext, GST_GL_PLATFORM_WGL, GST_GL_API_OPENGL3);
 
       context.reset(gst_context_new("gst.gl.app_context", TRUE));
       GstStructure* s = gst_context_writable_structure(context.get());
