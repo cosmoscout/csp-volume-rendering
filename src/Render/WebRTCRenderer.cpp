@@ -113,11 +113,8 @@ void WebRTCRenderer::cancelRendering() {
 
 Renderer::RenderedImage WebRTCRenderer::getFrameImpl(
     glm::mat4 cameraTransform, Parameters parameters, DataManager::State dataState) {
-  nlohmann::json j;
-  for (int i = 0; i < 4; i++) {
-    j["camera"][i] = cameraTransform[i];
-  }
-  mStream.sendMessage(j.dump());
+  auto camera = getOSPRayCamera(512., cameraTransform);
+  mStream.sendMessage(camera.first);
 
   switch (mType) {
   case SampleType::eImageData: {
@@ -133,7 +130,7 @@ Renderer::RenderedImage WebRTCRenderer::getFrameImpl(
     result.mType      = SampleType::eImageData;
     result.mColorData = std::move(image.value());
     result.mDepthData = std::vector<float>(parameters.mResolution * parameters.mResolution);
-    result.mMVP       = getOSPRayMVP(512., cameraTransform);
+    result.mMVP       = camera.second;
     result.mValid     = true;
     return result;
     break;
@@ -150,7 +147,7 @@ Renderer::RenderedImage WebRTCRenderer::getFrameImpl(
     RenderedImage result;
     result.mType      = SampleType::eTexId;
     result.mColorData = texId.value();
-    result.mMVP       = getOSPRayMVP(512., cameraTransform);
+    result.mMVP       = camera.second;
     result.mValid     = true;
     return result;
     break;
@@ -166,7 +163,8 @@ Renderer::RenderedImage WebRTCRenderer::getFrameImpl(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-glm::mat4 WebRTCRenderer::getOSPRayMVP(float volumeHeight, glm::mat4 observerTransform) {
+std::pair<std::string, glm::mat4> WebRTCRenderer::getOSPRayCamera(
+    float volumeHeight, glm::mat4 observerTransform) {
   // Scale observer transform according to the size of the volume
   observerTransform[3] =
       observerTransform[3] * glm::vec4(volumeHeight, volumeHeight, volumeHeight, 1);
@@ -220,6 +218,23 @@ glm::mat4 WebRTCRenderer::getOSPRayMVP(float volumeHeight, glm::mat4 observerTra
     upAngle    = fovRad / 2;
   }
 
+  // Get edges of volume in image space coordinates
+  float leftPercent  = 0.5f + tan(leftAngle) / (2 * tan(fovRad / 2));
+  float rightPercent = 0.5f + tan(rightAngle) / (2 * tan(fovRad / 2));
+  float downPercent  = 0.5f + tan(downAngle) / (2 * tan(fovRad / 2));
+  float upPercent    = 0.5f + tan(upAngle) / (2 * tan(fovRad / 2));
+
+  glm::vec2 camImageStartOsp{leftPercent, downPercent};
+  glm::vec2 camImageEndOsp{rightPercent, upPercent};
+
+  nlohmann::json j;
+  j["position"]   = camPos;
+  j["up"]         = camUp;
+  j["direction"]  = camDir;
+  j["fovy"]       = fov;
+  j["imageStart"] = camImageStartOsp;
+  j["imageEnd"]   = camImageEndOsp;
+
   glm::mat4 view =
       glm::translate(glm::mat4(1.f), -glm::vec3(camXLen, camYLen, -camZLen) / volumeHeight);
 
@@ -241,7 +256,7 @@ glm::mat4 WebRTCRenderer::getOSPRayMVP(float volumeHeight, glm::mat4 observerTra
   projection[2][3] = -1;
   projection[3][2] = -2 * farClip * nearClip / (farClip - nearClip);
 
-  return projection * view;
+  return std::make_pair(j.dump(), projection * view);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
