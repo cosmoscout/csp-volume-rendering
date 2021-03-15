@@ -388,7 +388,19 @@ void Stream::onIncomingStream(GstElement* webrtc, GstPad* pad, Stream* pThis) {
   if (GST_PAD_DIRECTION(pad) != GST_PAD_SRC)
     return;
 
+  std::string padName(gst_pad_get_name(pad));
+  StreamType  type;
+  if (padName == "src_0") {
+    type = StreamType::eColor;
+  } else if (padName == "src_1") {
+    type = StreamType::eAlpha;
+  }
+
   decodebin = gst_element_factory_make("decodebin", NULL);
+  {
+    std::lock_guard lock(pThis->mDecodersMutex);
+    pThis->mDecoders.try_emplace(type, decodebin);
+  }
   g_signal_connect(decodebin, "pad-added", G_CALLBACK(Stream::onIncomingDecodebinStream), pThis);
   gst_bin_add(GST_BIN(pThis->mPipeline.get()), decodebin);
   gst_element_sync_state_with_parent(decodebin);

@@ -43,6 +43,7 @@ class Stream {
 
  private:
   enum class PeerCallState { eUnknown = 0, eNegotiating, eStarted, eError };
+  enum class StreamType { eColor, eAlpha };
 
   static void onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis);
 
@@ -80,10 +81,15 @@ class Stream {
   std::unique_ptr<GMainLoop, GMainLoopDeleter> mMainLoop;
   std::thread                                  mMainLoopThread;
 
-  std::unique_ptr<GstElement, GstPipelineDeleter>           mPipeline;
-  std::unique_ptr<GstElement, NoDeleter<GstElement>>        mWebrtcBin;
-  std::unique_ptr<GstElement, GstObjectDeleter<GstElement>> mAppSink;
-  std::unique_ptr<GstElement, GstObjectDeleter<GstElement>> mCapsFilter;
+  std::unique_ptr<GstElement, GstPipelineDeleter>                          mPipeline;
+  std::unique_ptr<GstElement, NoDeleter<GstElement>>                       mWebrtcBin;
+  std::map<StreamType, std::unique_ptr<GstElement, NoDeleter<GstElement>>> mDecoders;
+  std::map<StreamType, std::unique_ptr<GstPad, NoDeleter<GstPad>>>         mPads;
+  std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>                mAppSink;
+  std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>                mCapsFilter;
+
+  std::mutex mDecodersMutex;
+  std::mutex mPadsMutex;
 
   static constexpr int                                                          mFrameCount = 10;
   int                                                                           mFrameIndex = 0;
