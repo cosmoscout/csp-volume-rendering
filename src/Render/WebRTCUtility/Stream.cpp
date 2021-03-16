@@ -139,8 +139,11 @@ std::unique_ptr<GstCaps, GstCapsDeleter> Stream::setCaps(int resolution, SampleT
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::unique_ptr<GstSample, GstSampleDeleter> Stream::getSample(int resolution) {
-  if (!mAppSink) {
-    return {};
+  {
+    std::lock_guard lock(mElementsMutex);
+    if (!mAppSink) {
+      return {};
+    }
   }
 
   std::unique_ptr<GstSample, GstSampleDeleter> sample;
@@ -154,12 +157,19 @@ std::unique_ptr<GstSample, GstSampleDeleter> Stream::getSample(int resolution) {
       GstSample* s = NULL;
       g_signal_emit_by_name(mAppSink.get(), "pull-sample", &s, NULL);
       sample.reset(s);
+      if (!sample) {
+        break;
+      }
       sampleCaps = gst_sample_get_caps(sample.get());
     } while (!gst_caps_is_subset(sampleCaps, caps.get()));
   } else {
     GstSample* s = NULL;
     g_signal_emit_by_name(mAppSink.get(), "pull-sample", &s, NULL);
     sample.reset(s);
+  }
+  if (!sample) {
+    // Pipeline stopped
+    return {};
   }
   return sample;
 }
@@ -240,14 +250,14 @@ void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
 
     if (g_strcmp0(context_type, GST_GL_DISPLAY_CONTEXT_TYPE) == 0) {
 #ifdef _WIN32
-      if (!pThis->mGlDisplay) {
-        pThis->mGlDisplay.reset(gst_gl_display_new());
-        g_signal_connect(
-            pThis->mGlDisplay.get(), "create-context", G_CALLBACK(Stream::onCreateContext), pThis);
+      if (!pThis->mGstGLDisplay) {
+        pThis->mGstGLDisplay.reset(gst_gl_display_new());
+        g_signal_connect(pThis->mGstGLDisplay.get(), "create-context",
+            G_CALLBACK(Stream::onCreateContext), pThis);
       }
 
       context.reset(gst_context_new(GST_GL_DISPLAY_CONTEXT_TYPE, TRUE));
-      gst_context_set_gl_display(context.get(), pThis->mGlDisplay.get());
+      gst_context_set_gl_display(context.get(), pThis->mGstGLDisplay.get());
 
       gst_element_set_context(GST_ELEMENT(msg->src), context.get());
 #else
@@ -255,13 +265,15 @@ void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
 #endif
     } else if (g_strcmp0(context_type, "gst.gl.app_context") == 0) {
 #ifdef _WIN32
-      pThis->mOnUncurrentRequired.emit();
-      GstGLContext* gst_gl_context = gst_gl_context_new_wrapped(
-          pThis->mGlDisplay.get(), pThis->mGlContext, GST_GL_PLATFORM_WGL, GST_GL_API_OPENGL3);
+      if (!pThis->mGstGLContext) {
+        pThis->mOnUncurrentRequired.emit();
+        pThis->mGstGLContext.reset(gst_gl_context_new_wrapped(pThis->mGstGLDisplay.get(),
+            pThis->mGlContext, GST_GL_PLATFORM_WGL, GST_GL_API_OPENGL3));
+      }
 
       context.reset(gst_context_new("gst.gl.app_context", TRUE));
       GstStructure* s = gst_context_writable_structure(context.get());
-      gst_structure_set(s, "context", GST_TYPE_GL_CONTEXT, gst_gl_context, NULL);
+      gst_structure_set(s, "context", GST_TYPE_GL_CONTEXT, pThis->mGstGLContext.get(), NULL);
 
       gst_element_set_context(GST_ELEMENT(msg->src), context.get());
 #else
@@ -425,7 +437,15 @@ void Stream::onIncomingDecodebinStream(GstElement* decodebin, GstPad* pad, Strea
   name = gst_structure_get_name(gst_caps_get_structure(caps, 0));
 
   if (g_str_has_prefix(name, "video")) {
-    pThis->handleVideoStream(pad);
+    StreamType type;
+    {
+      std::lock_guard lock(pThis->mDecodersMutex);
+      type = std::find_if(
+          pThis->mDecoders.begin(), pThis->mDecoders.end(), [decodebin](auto const& decoder) {
+            return decoder.second.get() == decodebin;
+          })->first;
+    }
+    pThis->handleVideoStream(pad, type);
   } else {
     logger().warn("Unknown pad '{}', ignoring!", GST_PAD_NAME(pad));
   }
@@ -498,44 +518,74 @@ void Stream::sendSdpToPeer(GstWebRTCSessionDescription* desc) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::mutex mutex;
-
-void Stream::handleVideoStream(GstPad* pad) {
-  std::lock_guard lock(mutex);
+void Stream::handleVideoStream(GstPad* pad, StreamType type) {
+  std::lock_guard lock(mElementsMutex);
   GError*         error = NULL;
 
-  logger().trace("Trying to handle video stream.");
-
-  std::string binString;
-  if (!mAppSink) {
+  if (!mVideoMixer) {
+    logger().trace("Creating mixer and appsink");
+    std::string binString;
     switch (mSampleType) {
     case SampleType::eImageData:
-      binString = "queue ! videoconvert ! videoscale add-borders=false "
+      binString = "videomixer name=mixer "
+                  "! videoscale add-borders=false "
                   "! capsfilter name=capsfilter "
                   "! appsink drop=true max-buffers=1 name=framecapture";
       break;
     case SampleType::eTexId:
-      binString = "queue ! videoconvert ! videoscale add-borders=false ! glupload "
-                  "! capsfilter caps-change-mode=delayed name=capsfilter "
+      binString = "input-selector name=mixer "
+                  "! capsfilter name=capsfilter caps-change-mode=delayed "
                   "! appsink drop=true max-buffers=1 name=framecapture";
       break;
     }
-  } else {
-    binString       = "queue ! videoconvert ! autovideosink";
-    GstElement* bin = gst_parse_bin_from_description(binString.c_str(), TRUE, &error);
+
+    mEndBin.reset(gst_parse_bin_from_description(binString.c_str(), TRUE, &error));
     if (error) {
       logger().error("Failed to parse launch: {}!", error->message);
       g_error_free(error);
       return;
     }
+    gst_element_set_name(mEndBin.get(), "bin_sink");
 
-    gst_bin_add_many(GST_BIN(mPipeline.get()), bin, NULL);
-    gst_element_sync_state_with_parent(bin);
+    mVideoMixer.reset(gst_bin_get_by_name(GST_BIN(mEndBin.get()), "mixer"));
+    mCapsFilter.reset(gst_bin_get_by_name(GST_BIN(mEndBin.get()), "capsfilter"));
+    mAppSink.reset(gst_bin_get_by_name(GST_BIN(mEndBin.get()), "framecapture"));
 
-    GstPad*          binpad = gst_element_get_static_pad(bin, "sink");
-    GstPadLinkReturn ret    = gst_pad_link(pad, binpad);
-    g_assert_cmphex(ret, ==, GST_PAD_LINK_OK);
-    return;
+    setCaps(mResolution, mSampleType);
+
+    gst_bin_add(GST_BIN(mPipeline.get()), mEndBin.get());
+    gst_element_sync_state_with_parent(mEndBin.get());
+  }
+
+  logger().trace("Trying to handle video stream.");
+
+  std::string binString;
+  if (type == StreamType::eColor) {
+    switch (mSampleType) {
+    case SampleType::eImageData:
+      binString = "queue ! videoconvert";
+      break;
+    case SampleType::eTexId:
+      binString = "queue "
+                  "! videoconvert "
+                  "! videoscale add-borders=false "
+                  "! glupload ";
+      break;
+    }
+  }
+  if (type == StreamType::eAlpha) {
+    switch (mSampleType) {
+    case SampleType::eImageData:
+      binString = "queue ! videoconvert";
+      break;
+    case SampleType::eTexId:
+      binString = "queue "
+                  "! videoconvert "
+                  "! videoscale add-borders=false "
+                  "! glupload ";
+                  //"! glalpha method=green ";
+      break;
+    }
   }
 
   GstElement* bin = gst_parse_bin_from_description(binString.c_str(), TRUE, &error);
@@ -544,18 +594,43 @@ void Stream::handleVideoStream(GstPad* pad) {
     g_error_free(error);
     return;
   }
+  switch (type) {
+  case StreamType::eColor:
+    gst_element_set_name(bin, "bin_color");
+    break;
+  case StreamType::eAlpha:
+    gst_element_set_name(bin, "bin_alpha");
+    break;
+  }
 
-  mAppSink.reset(gst_bin_get_by_name(GST_BIN(bin), "framecapture"));
-  mCapsFilter.reset(gst_bin_get_by_name(GST_BIN(bin), "capsfilter"));
-
-  setCaps(mResolution, mSampleType);
-
-  gst_bin_add_many(GST_BIN(mPipeline.get()), bin, NULL);
+  gst_bin_add(GST_BIN(mPipeline.get()), bin);
   gst_element_sync_state_with_parent(bin);
 
-  GstPad*          binpad = gst_element_get_static_pad(bin, "sink");
-  GstPadLinkReturn ret    = gst_pad_link(pad, binpad);
+  GstPad*          binSink = gst_element_get_static_pad(bin, "sink");
+  GstPad*          binSrc  = gst_element_get_static_pad(bin, "src");
+  GstPadLinkReturn ret;
+  ret = gst_pad_link(pad, binSink);
   g_assert_cmphex(ret, ==, GST_PAD_LINK_OK);
+
+  std::string mixerSinkName;
+  switch (type) {
+  case StreamType::eColor:
+    mixerSinkName = "sink_color";
+    break;
+  case StreamType::eAlpha:
+    mixerSinkName = "sink_alpha";
+    break;
+  }
+  GstPad* mixerSink = gst_element_get_request_pad(mVideoMixer.get(), "sink_%u");
+  if (type == StreamType::eAlpha) {
+    g_object_set(mVideoMixer.get(), "active-pad", mixerSink, NULL);
+  }
+  GstPad* ghostSink = gst_ghost_pad_new(mixerSinkName.c_str(), mixerSink);
+  gst_element_add_pad(mEndBin.get(), ghostSink);
+
+  ret = gst_pad_link(binSrc, ghostSink);
+  g_assert_cmphex(ret, ==, GST_PAD_LINK_OK);
+  return;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

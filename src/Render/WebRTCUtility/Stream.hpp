@@ -64,7 +64,7 @@ class Stream {
   void onOfferReceived(GstSDPMessage* sdp);
   void onAnswerReceived(GstSDPMessage* sdp);
   void sendSdpToPeer(GstWebRTCSessionDescription* desc);
-  void handleVideoStream(GstPad* pad);
+  void handleVideoStream(GstPad* pad, StreamType type);
 
   gboolean startPipeline();
 
@@ -84,12 +84,13 @@ class Stream {
   std::unique_ptr<GstElement, GstPipelineDeleter>                          mPipeline;
   std::unique_ptr<GstElement, NoDeleter<GstElement>>                       mWebrtcBin;
   std::map<StreamType, std::unique_ptr<GstElement, NoDeleter<GstElement>>> mDecoders;
-  std::map<StreamType, std::unique_ptr<GstPad, NoDeleter<GstPad>>>         mPads;
+  std::unique_ptr<GstElement, NoDeleter<GstElement>>                       mEndBin;
+  std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>                mVideoMixer;
   std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>                mAppSink;
   std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>                mCapsFilter;
 
   std::mutex mDecodersMutex;
-  std::mutex mPadsMutex;
+  std::mutex mElementsMutex;
 
   static constexpr int                                                          mFrameCount = 10;
   int                                                                           mFrameIndex = 0;
@@ -98,7 +99,8 @@ class Stream {
   int              mResolution = 1;
   const SampleType mSampleType;
 
-  std::unique_ptr<GstGLDisplay, GstObjectDeleter<GstGLDisplay>> mGlDisplay;
+  std::unique_ptr<GstGLDisplay, GstObjectDeleter<GstGLDisplay>> mGstGLDisplay;
+  std::unique_ptr<GstGLContext, GstObjectDeleter<GstGLContext>> mGstGLContext;
   guintptr                                                      mGlContext;
 
   cs::utils::Signal<> mOnUncurrentRequired;
