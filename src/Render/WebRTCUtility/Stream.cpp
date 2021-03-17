@@ -44,6 +44,36 @@ gboolean check_plugins() {
   return ret;
 }
 
+const char* ALPHA_FRAGMENT = R"(
+#version 330
+varying vec2 v_texcoord;
+uniform sampler2D tex;
+uniform float time;
+uniform float width;
+uniform float height;
+
+#define from_rgb_bt601_offset vec3(0.0625, 0.5, 0.5)
+#define from_rgb_bt601_ycoeff vec3( 0.2578125, 0.50390625, 0.09765625)
+#define from_rgb_bt601_ucoeff vec3(-0.1484375,-0.28906250, 0.43750000)
+#define from_rgb_bt601_vcoeff vec3( 0.4375000,-0.36718750,-0.07031250)
+
+vec3 rgb_to_yuv (vec3 val) {
+  vec3 yuv;
+  yuv.r = dot(val.rgb, from_rgb_bt601_ycoeff);
+  yuv.g = dot(val.rgb, from_rgb_bt601_ucoeff);
+  yuv.b = dot(val.rgb, from_rgb_bt601_vcoeff);
+  yuv += from_rgb_bt601_offset;
+  return yuv;
+}
+
+void main () {
+  vec3 rgb = vec3(texture2D(tex, v_texcoord));
+  vec3 yuv = rgb_to_yuv(rgb);
+  vec4 color = vec4(1, 1, 1, 1 - rgb.g);
+  gl_FragColor = color;
+}
+)";
+
 } // namespace
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -582,8 +612,9 @@ void Stream::handleVideoStream(GstPad* pad, StreamType type) {
       binString = "queue "
                   "! videoconvert "
                   "! videoscale add-borders=false "
-                  "! glupload ";
-                  //"! glalpha method=green ";
+                  "! glupload "
+                  "! glshader fragment=\"{SHADER}\" ";
+      cs::utils::replaceString(binString, "{SHADER}", ALPHA_FRAGMENT);
       break;
     }
   }
