@@ -159,7 +159,8 @@ std::unique_ptr<GstCaps, GstCapsDeleter> Stream::setCaps(int resolution, SampleT
     break;
   }
   std::stringstream capsStr;
-  capsStr << videoType << ",format=RGBA,width=" << resolution << ",height=" << resolution;
+  capsStr << videoType << ",framerate=30/1,format=RGBA,width=" << resolution
+          << ",height=" << resolution;
   std::unique_ptr<GstCaps, GstCapsDeleter> caps(gst_caps_from_string(capsStr.str().c_str()));
   g_object_set(mCapsFilter.get(), "caps", caps.get(), NULL);
   mResolution = resolution;
@@ -563,9 +564,9 @@ void Stream::handleVideoStream(GstPad* pad, StreamType type) {
                   "! appsink drop=true max-buffers=1 name=framecapture";
       break;
     case SampleType::eTexId:
-      binString = "input-selector name=mixer "
+      binString = "glvideomixerelement name=mixer "
                   "! capsfilter name=capsfilter caps-change-mode=delayed "
-                  "! appsink drop=true max-buffers=1 name=framecapture";
+                  "! appsink name=framecapture drop=true max-buffers=1 ";
       break;
     }
 
@@ -597,9 +598,8 @@ void Stream::handleVideoStream(GstPad* pad, StreamType type) {
       break;
     case SampleType::eTexId:
       binString = "queue "
-                  "! videoconvert "
-                  "! videoscale add-borders=false "
-                  "! glupload ";
+                  "! glupload "
+                  "! glcolorconvert ";
       break;
     }
   }
@@ -610,9 +610,8 @@ void Stream::handleVideoStream(GstPad* pad, StreamType type) {
       break;
     case SampleType::eTexId:
       binString = "queue "
-                  "! videoconvert "
-                  "! videoscale add-borders=false "
                   "! glupload "
+                  "! glcolorconvert "
                   "! glshader fragment=\"{SHADER}\" ";
       cs::utils::replaceString(binString, "{SHADER}", ALPHA_FRAGMENT);
       break;
@@ -653,8 +652,19 @@ void Stream::handleVideoStream(GstPad* pad, StreamType type) {
     break;
   }
   GstPad* mixerSink = gst_element_get_request_pad(mVideoMixer.get(), "sink_%u");
-  if (type == StreamType::eAlpha) {
-    g_object_set(mVideoMixer.get(), "active-pad", mixerSink, NULL);
+  switch (type) {
+  case StreamType::eColor:
+    g_object_set(mixerSink, "blend-function-dst-alpha", GL_ONE, NULL);
+    g_object_set(mixerSink, "blend-function-src-alpha", GL_ZERO, NULL);
+    g_object_set(mixerSink, "blend-function-dst-rgb", GL_ZERO, NULL);
+    g_object_set(mixerSink, "blend-function-src-rgb", GL_ONE, NULL);
+    break;
+  case StreamType::eAlpha:
+    g_object_set(mixerSink, "blend-function-dst-alpha", GL_ZERO, NULL);
+    g_object_set(mixerSink, "blend-function-src-alpha", GL_ONE, NULL);
+    g_object_set(mixerSink, "blend-function-dst-rgb", GL_ONE, NULL);
+    g_object_set(mixerSink, "blend-function-src-rgb", GL_ZERO, NULL);
+    break;
   }
   GstPad* ghostSink = gst_ghost_pad_new(mixerSinkName.c_str(), mixerSink);
   gst_element_add_pad(mEndBin.get(), ghostSink);
