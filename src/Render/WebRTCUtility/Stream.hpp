@@ -92,9 +92,12 @@ class Stream {
   std::mutex mDecodersMutex;
   std::mutex mElementsMutex;
 
-  static constexpr int                                                          mFrameCount = 10;
-  int                                                                           mFrameIndex = 0;
-  std::array<std::unique_ptr<GstVideoFrame, GstVideoFrameDeleter>, mFrameCount> mFrames;
+  static constexpr int                                                  mFrameCount = 2;
+  int                                                                   mFrameIndex = 0;
+  std::array<GstVideoFrame, mFrameCount>                                mFrames;
+  std::array<bool, mFrameCount>                                         mFrameMapped;
+  std::array<std::unique_ptr<GstSample, GstSampleDeleter>, mFrameCount> mSamples;
+  std::array<std::unique_ptr<GstBuffer, GstBufferDeleter>, mFrameCount> mBuffers;
 
   int              mResolution = 1;
   const SampleType mSampleType;

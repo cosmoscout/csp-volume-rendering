@@ -11,6 +11,8 @@
 #include "../../Enums.hpp"
 #include "../../logger.hpp"
 
+#include <gst/app/gstappsink.h>
+
 #ifdef _WIN32
 #include <Windows.h>
 #endif
@@ -86,6 +88,8 @@ Stream::Stream(std::string signallingUrl, SampleType type)
     , mGlContext(NULL)
 #endif
     , mSampleType(std::move(type)) {
+  mFrameMapped.fill(false);
+
   GError* error = NULL;
 
   static bool initialized = false;
@@ -185,18 +189,14 @@ std::unique_ptr<GstSample, GstSampleDeleter> Stream::getSample(int resolution) {
     // Drop samples with incorrect resolution
     GstCaps* sampleCaps;
     do {
-      GstSample* s = NULL;
-      g_signal_emit_by_name(mAppSink.get(), "pull-sample", &s, NULL);
-      sample.reset(s);
+      sample.reset(gst_app_sink_pull_sample(GST_APP_SINK_CAST(mAppSink.get())));
       if (!sample) {
         break;
       }
       sampleCaps = gst_sample_get_caps(sample.get());
     } while (!gst_caps_is_subset(sampleCaps, caps.get()));
   } else {
-    GstSample* s = NULL;
-    g_signal_emit_by_name(mAppSink.get(), "pull-sample", &s, NULL);
-    sample.reset(s);
+    sample.reset(gst_app_sink_pull_sample(GST_APP_SINK_CAST(mAppSink.get())));
   }
   if (!sample) {
     // Pipeline stopped
@@ -228,28 +228,35 @@ std::optional<std::vector<uint8_t>> Stream::getColorImage(int resolution) {
 
 std::optional<std::pair<int, GLsync>> Stream::getTextureId(int resolution) {
   assert(mSampleType == SampleType::eTexId);
-  auto sample = getSample(resolution);
-  if (!sample) {
-    return {};
+  {
+    auto sample = getSample(resolution);
+    if (!sample) {
+      return {};
+    }
+
+    if (mFrameMapped[mFrameIndex]) {
+      gst_video_frame_unmap(&mFrames[mFrameIndex]);
+    }
+    if (++mFrameIndex >= mFrameCount) {
+      mFrameIndex = 0;
+    }
+
+    mSamples[mFrameIndex].swap(sample);
   }
 
-  GstBuffer* buf = gst_sample_get_buffer(sample.get());
+  GstBuffer* buf = gst_sample_get_buffer(mSamples[mFrameIndex].get());
   if (!buf) {
     return {};
   }
-
-  if (++mFrameIndex >= mFrameCount) {
-    mFrameIndex = 0;
-  }
-
-  GstVideoFrame* frame = g_new0(GstVideoFrame, 1);
-  GstVideoInfo   info;
-  gst_video_info_from_caps(&info, gst_sample_get_caps(sample.get()));
-  if (!gst_video_frame_map(frame, &info, buf, (GstMapFlags)(GST_MAP_READ | GST_MAP_GL))) {
-    logger().error("Failed to map video frame");
+  GstVideoInfo info;
+  gst_video_info_from_caps(&info, gst_sample_get_caps(mSamples[mFrameIndex].get()));
+  if (!gst_video_frame_map(
+          &mFrames[mFrameIndex], &info, buf, (GstMapFlags)(GST_MAP_READ | GST_MAP_GL))) {
+    logger().warn("Failed to map video frame");
+    mFrameMapped[mFrameIndex] = false;
     return {};
   }
-  mFrames[mFrameIndex].reset(frame);
+  mFrameMapped[mFrameIndex] = true;
 
   GstMemory* mem = gst_buffer_peek_memory(buf, 0);
   if (!gst_is_gl_memory(mem)) {
@@ -259,13 +266,12 @@ std::optional<std::pair<int, GLsync>> Stream::getTextureId(int resolution) {
 
   GstGLSyncMeta* sync = gst_buffer_get_gl_sync_meta(buf);
   if (!sync) {
-    buf  = gst_buffer_make_writable(buf);
-    sync = gst_buffer_add_gl_sync_meta(glmem->mem.context, buf);
+    logger().warn("Current GstBuffer has no GstGLSyncMeta!");
+    return {};
   }
   gst_gl_sync_meta_set_sync_point(sync, glmem->mem.context);
 
-  return std::make_pair<int, GLsync>(
-      (int)glmem->tex_id, (GLsync)gst_buffer_get_gl_sync_meta(buf)->data);
+  return std::make_pair<int, GLsync>((int)glmem->tex_id, (GLsync)sync->data);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -564,7 +570,11 @@ void Stream::handleVideoStream(GstPad* pad, StreamType type) {
                   "! appsink drop=true max-buffers=1 name=framecapture";
       break;
     case SampleType::eTexId:
+      // Color conversion is done so that a GstGLSyncMeta is added to the buffers
       binString = "glvideomixerelement name=mixer "
+                  "! glcolorconvert "
+                  "! video/x-raw(memory:GLMemory),format=BGRA "
+                  "! glcolorconvert "
                   "! capsfilter name=capsfilter caps-change-mode=delayed "
                   "! appsink name=framecapture drop=true max-buffers=1 ";
       break;

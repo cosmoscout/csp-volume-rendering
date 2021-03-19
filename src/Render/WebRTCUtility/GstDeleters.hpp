@@ -44,15 +44,15 @@ struct GstPromiseDeleter {
   }
 };
 
-struct GstVideoFrameDeleter {
-  inline void operator()(GstVideoFrame* p) {
-    gst_video_frame_unmap(p);
-  }
-};
-
 struct GstSampleDeleter {
   inline void operator()(GstSample* p) {
     gst_sample_unref(p);
+  }
+};
+
+struct GstBufferDeleter {
+  inline void operator()(GstBuffer* p) {
+    gst_buffer_unref(p);
   }
 };
 

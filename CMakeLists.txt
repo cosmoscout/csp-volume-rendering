@@ -81,6 +81,7 @@ pkg_check_modules(GST        REQUIRED IMPORTED_TARGET gstreamer-1.0)
 pkg_check_modules(GST_WEBRTC REQUIRED IMPORTED_TARGET gstreamer-webrtc-1.0)
 pkg_check_modules(GST_SDP    REQUIRED IMPORTED_TARGET gstreamer-sdp-1.0)
 pkg_check_modules(GST_GL     REQUIRED IMPORTED_TARGET gstreamer-gl-1.0)
+pkg_check_modules(GST_APP    REQUIRED IMPORTED_TARGET gstreamer-app-1.0)
 
 # build plugin -------------------------------------------------------------------------------------
 
@@ -106,6 +107,7 @@ target_link_libraries(csp-volume-rendering
     PkgConfig::GST_WEBRTC
     PkgConfig::GST_SDP
     PkgConfig::GST_GL
+    PkgConfig::GST_APP
 )
 
 target_include_directories(csp-volume-rendering
