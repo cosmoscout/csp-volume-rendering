@@ -40,7 +40,6 @@ class WebRTCRenderer : public Renderer {
   std::pair<std::string, glm::mat4> getOSPRayCamera(
       float volumeHeight, glm::mat4 observerTransform);
 
-  const SampleType mType;
   webrtc::Stream   mStream;
 
   int                     mUncurrentRequiredSignal = -1;

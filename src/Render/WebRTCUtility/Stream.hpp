@@ -31,11 +31,10 @@ namespace csp::volumerendering::webrtc {
 
 class Stream {
  public:
-  Stream(std::string signallingUrl, SampleType type);
+  Stream(std::string signallingUrl);
   ~Stream();
 
   void                                  sendMessage(std::string const& message);
-  std::optional<std::vector<uint8_t>>   getColorImage(int resolution);
   std::optional<std::pair<int, GLsync>> getTextureId(int resolution);
 
   cs::utils::Signal<> const& onUncurrentRequired() const;
@@ -68,7 +67,7 @@ class Stream {
 
   gboolean startPipeline();
 
-  GstPointer<GstCaps>   setCaps(int resolution, SampleType type);
+  GstPointer<GstCaps>   setCaps(int resolution);
   GstPointer<GstSample> getSample(int resolution);
 
   std::unique_ptr<SignallingServer> mSignallingServer;
@@ -99,8 +98,7 @@ class Stream {
   std::array<GstPointer<GstSample>, mFrameCount> mSamples;
   std::array<GstPointer<GstBuffer>, mFrameCount> mBuffers;
 
-  int              mResolution = 1;
-  const SampleType mSampleType;
+  int mResolution = 1;
 
   GstPointer<GstGLDisplay> mGstGLDisplay;
   GstPointer<GstGLContext> mGstGLContext;

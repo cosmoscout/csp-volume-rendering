@@ -79,14 +79,13 @@ void main () {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Stream::Stream(std::string signallingUrl, SampleType type)
+Stream::Stream(std::string signallingUrl)
     : mSignallingServer(std::make_unique<SignallingServer>(std::move(signallingUrl)))
 #ifdef _WIN32
-    , mGlContext((guintptr)wglGetCurrentContext())
+    , mGlContext((guintptr)wglGetCurrentContext()) {
 #else
-    , mGlContext(NULL)
+    , mGlContext(NULL) {
 #endif
-    , mSampleType(std::move(type)) {
   mFrameMapped.fill(false);
 
   GError* error = NULL;
@@ -151,18 +150,10 @@ void Stream::sendMessage(std::string const& message) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-GstPointer<GstCaps> Stream::setCaps(int resolution, SampleType type) {
-  std::string videoType;
-  switch (type) {
-  case SampleType::eImageData:
-    videoType = "video/x-raw";
-    break;
-  case SampleType::eTexId:
-    videoType = "video/x-raw(memory:GLMemory)";
-    break;
-  }
+GstPointer<GstCaps> Stream::setCaps(int resolution) {
   std::stringstream capsStr;
-  capsStr << videoType << ",format=RGBA,width=" << resolution << ",height=" << resolution;
+  capsStr << "video/x-raw(memory:GLMemory),format=RGBA,width=" << resolution
+          << ",height=" << resolution;
   GstPointer<GstCaps> caps(gst_caps_from_string(capsStr.str().c_str()));
   g_object_set(mCapsFilter.get(), "caps", caps.get(), NULL);
   mResolution = resolution;
@@ -182,7 +173,7 @@ GstPointer<GstSample> Stream::getSample(int resolution) {
   GstPointer<GstSample> sample;
 
   if (resolution != mResolution) {
-    auto caps = setCaps(resolution, mSampleType);
+    auto caps = setCaps(resolution);
 
     // Drop samples with incorrect resolution
     GstCaps* sampleCaps;
@@ -205,27 +196,7 @@ GstPointer<GstSample> Stream::getSample(int resolution) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::optional<std::vector<uint8_t>> Stream::getColorImage(int resolution) {
-  assert(mSampleType == SampleType::eImageData);
-  auto sample = getSample(resolution);
-  if (!sample) {
-    return {};
-  }
-
-  GstBuffer* buf = gst_sample_get_buffer(sample.get());
-  if (!buf) {
-    return {};
-  }
-
-  std::vector<uint8_t> image(resolution * resolution * 4);
-  gst_buffer_extract(buf, 0, image.data(), resolution * resolution * 4);
-  return image;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 std::optional<std::pair<int, GLsync>> Stream::getTextureId(int resolution) {
-  assert(mSampleType == SampleType::eTexId);
   {
     auto sample = getSample(resolution);
     if (!sample) {
@@ -557,24 +528,13 @@ void Stream::handleVideoStream(GstPad* pad, StreamType type) {
 
   if (!mVideoMixer) {
     logger().trace("Creating mixer and appsink");
-    std::string binString;
-    switch (mSampleType) {
-    case SampleType::eImageData:
-      binString = "videomixer name=mixer "
-                  "! videoscale add-borders=false "
-                  "! capsfilter name=capsfilter "
-                  "! appsink drop=true max-buffers=1 name=framecapture";
-      break;
-    case SampleType::eTexId:
-      // Color conversion is done so that a GstGLSyncMeta is added to the buffers
-      binString = "glvideomixerelement name=mixer "
-                  "! glcolorconvert "
-                  "! video/x-raw(memory:GLMemory),format=BGRA "
-                  "! glcolorconvert "
-                  "! capsfilter name=capsfilter caps-change-mode=delayed "
-                  "! appsink name=framecapture drop=true max-buffers=1 ";
-      break;
-    }
+    // Color conversion is done so that a GstGLSyncMeta is added to the buffers
+    std::string binString = "glvideomixerelement name=mixer "
+                            "! glcolorconvert "
+                            "! video/x-raw(memory:GLMemory),format=BGRA "
+                            "! glcolorconvert "
+                            "! capsfilter name=capsfilter caps-change-mode=delayed "
+                            "! appsink name=framecapture drop=true max-buffers=1 ";
 
     mEndBin.reset(GST_ELEMENT(
         gst_object_ref_sink(gst_parse_bin_from_description(binString.c_str(), TRUE, &error))));
@@ -589,7 +549,7 @@ void Stream::handleVideoStream(GstPad* pad, StreamType type) {
     mCapsFilter.reset(gst_bin_get_by_name(GST_BIN(mEndBin.get()), "capsfilter"));
     mAppSink.reset(gst_bin_get_by_name(GST_BIN(mEndBin.get()), "framecapture"));
 
-    setCaps(mResolution, mSampleType);
+    setCaps(mResolution);
 
     gst_bin_add(GST_BIN(mPipeline.get()), mEndBin.get());
     gst_element_sync_state_with_parent(mEndBin.get());
@@ -598,31 +558,19 @@ void Stream::handleVideoStream(GstPad* pad, StreamType type) {
   logger().trace("Trying to handle video stream.");
 
   std::string binString;
-  if (type == StreamType::eColor) {
-    switch (mSampleType) {
-    case SampleType::eImageData:
-      binString = "queue ! videoconvert";
-      break;
-    case SampleType::eTexId:
-      binString = "queue "
-                  "! glupload "
-                  "! glcolorconvert ";
-      break;
-    }
-  }
-  if (type == StreamType::eAlpha) {
-    switch (mSampleType) {
-    case SampleType::eImageData:
-      binString = "queue ! videoconvert";
-      break;
-    case SampleType::eTexId:
-      binString = "queue "
-                  "! glupload "
-                  "! glcolorconvert "
-                  "! glshader fragment=\"{SHADER}\" ";
-      cs::utils::replaceString(binString, "{SHADER}", ALPHA_FRAGMENT);
-      break;
-    }
+  switch (type) {
+  case StreamType::eColor:
+    binString = "queue "
+                "! glupload "
+                "! glcolorconvert ";
+    break;
+  case StreamType::eAlpha:
+    binString = "queue "
+                "! glupload "
+                "! glcolorconvert "
+                "! glshader fragment=\"{SHADER}\" ";
+    cs::utils::replaceString(binString, "{SHADER}", ALPHA_FRAGMENT);
+    break;
   }
 
   GstElement* bin = gst_parse_bin_from_description(binString.c_str(), TRUE, &error);

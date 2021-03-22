@@ -25,12 +25,7 @@ namespace csp::volumerendering {
 WebRTCRenderer::WebRTCRenderer(std::shared_ptr<DataManager> dataManager, VolumeStructure structure,
     VolumeShape shape, std::string signallingUrl)
     : Renderer(dataManager, structure, shape)
-#ifdef _WIN32
-    , mType(SampleType::eTexId)
-#else
-    , mType(SampleType::eImageData)
-#endif
-    , mStream(std::move(signallingUrl), mType) {
+    , mStream(std::move(signallingUrl)) {
   mUncurrentRequiredSignal = mStream.onUncurrentRequired().connect([this]() {
     {
       std::lock_guard lock(mUncurrentRequiredMutex);
@@ -116,49 +111,20 @@ Renderer::RenderedImage WebRTCRenderer::getFrameImpl(
   auto camera = getOSPRayCamera(512., cameraTransform);
   mStream.sendMessage(camera.first);
 
-  switch (mType) {
-  case SampleType::eImageData: {
-    std::optional<std::vector<uint8_t>> image = mStream.getColorImage(parameters.mResolution);
+  std::optional<std::pair<int, GLsync>> texId = mStream.getTextureId(parameters.mResolution);
 
-    if (!image.has_value()) {
-      RenderedImage failed;
-      failed.mValid = false;
-      return failed;
-    }
-
-    RenderedImage result;
-    result.mType      = SampleType::eImageData;
-    result.mColorData = std::move(image.value());
-    result.mDepthData = std::vector<float>(parameters.mResolution * parameters.mResolution);
-    result.mMVP       = camera.second;
-    result.mValid     = true;
-    return result;
-    break;
-  }
-  case SampleType::eTexId: {
-    std::optional<std::pair<int, GLsync>> texId = mStream.getTextureId(parameters.mResolution);
-
-    if (!texId.has_value()) {
-      RenderedImage failed;
-      failed.mValid = false;
-      return failed;
-    }
-
-    RenderedImage result;
-    result.mType      = SampleType::eTexId;
-    result.mColorData = texId.value();
-    result.mMVP       = camera.second;
-    result.mValid     = true;
-    return result;
-    break;
-  }
-  default: {
+  if (!texId.has_value()) {
     RenderedImage failed;
     failed.mValid = false;
     return failed;
-    break;
   }
-  }
+
+  RenderedImage result;
+  result.mType      = SampleType::eTexId;
+  result.mColorData = texId.value();
+  result.mMVP       = camera.second;
+  result.mValid     = true;
+  return result;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
