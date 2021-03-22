@@ -81,13 +81,13 @@ class Stream {
   GPointer<GMainLoop> mMainLoop;
   std::thread         mMainLoopThread;
 
-  GstPointer<GstPipeline>                                                  mPipeline;
-  std::unique_ptr<GstElement, NoDeleter<GstElement>>                       mWebrtcBin;
-  std::map<StreamType, std::unique_ptr<GstElement, NoDeleter<GstElement>>> mDecoders;
-  std::unique_ptr<GstElement, NoDeleter<GstElement>>                       mEndBin;
-  GstPointer<GstElement>                                                   mVideoMixer;
-  GstPointer<GstElement>                                                   mAppSink;
-  GstPointer<GstElement>                                                   mCapsFilter;
+  GstPointer<GstPipeline>                      mPipeline;
+  GstPointer<GstElement>                       mWebrtcBin;
+  std::map<StreamType, GstPointer<GstElement>> mDecoders;
+  GstPointer<GstElement>                       mEndBin;
+  GstPointer<GstElement>                       mVideoMixer;
+  GstPointer<GstElement>                       mAppSink;
+  GstPointer<GstElement>                       mCapsFilter;
 
   std::mutex mDecodersMutex;
   std::mutex mElementsMutex;

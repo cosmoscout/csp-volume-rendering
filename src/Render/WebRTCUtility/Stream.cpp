@@ -430,8 +430,6 @@ void Stream::onDataChannel(GstElement* webrtc, GstWebRTCDataChannel* data_channe
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Stream::onIncomingStream(GstElement* webrtc, GstPad* pad, Stream* pThis) {
-  GstElement* decodebin;
-
   if (GST_PAD_DIRECTION(pad) != GST_PAD_SRC)
     return;
 
@@ -443,16 +441,18 @@ void Stream::onIncomingStream(GstElement* webrtc, GstPad* pad, Stream* pThis) {
     type = StreamType::eAlpha;
   }
 
-  decodebin = gst_element_factory_make("decodebin", NULL);
+  GstPointer<GstElement> decodebin(
+      GST_ELEMENT(gst_object_ref_sink(gst_element_factory_make("decodebin", NULL))));
+  g_signal_connect(
+      decodebin.get(), "pad-added", G_CALLBACK(Stream::onIncomingDecodebinStream), pThis);
+  gst_bin_add(GST_BIN(pThis->mPipeline.get()), decodebin.get());
+  gst_element_sync_state_with_parent(decodebin.get());
+
+  GstPointer<GstPad> sinkpad(gst_element_get_static_pad(decodebin.get(), "sink"));
   {
     std::lock_guard lock(pThis->mDecodersMutex);
-    pThis->mDecoders.try_emplace(type, decodebin);
+    pThis->mDecoders.insert_or_assign(type, std::move(decodebin));
   }
-  g_signal_connect(decodebin, "pad-added", G_CALLBACK(Stream::onIncomingDecodebinStream), pThis);
-  gst_bin_add(GST_BIN(pThis->mPipeline.get()), decodebin);
-  gst_element_sync_state_with_parent(decodebin);
-
-  GstPointer<GstPad> sinkpad(gst_element_get_static_pad(decodebin, "sink"));
   gst_pad_link(pad, sinkpad.get());
 }
 
@@ -576,7 +576,8 @@ void Stream::handleVideoStream(GstPad* pad, StreamType type) {
       break;
     }
 
-    mEndBin.reset(gst_parse_bin_from_description(binString.c_str(), TRUE, &error));
+    mEndBin.reset(GST_ELEMENT(
+        gst_object_ref_sink(gst_parse_bin_from_description(binString.c_str(), TRUE, &error))));
     if (error) {
       logger().error("Failed to parse launch: {}!", error->message);
       g_error_free(error);
@@ -692,7 +693,8 @@ gboolean Stream::startPipeline() {
   gst_bus_enable_sync_message_emission(bus);
   g_signal_connect(bus, "sync-message", G_CALLBACK(Stream::onBusSyncMessage), this);
 
-  mWebrtcBin.reset(gst_element_factory_make("webrtcbin", "sendrecv"));
+  mWebrtcBin.reset(
+      GST_ELEMENT(gst_object_ref_sink(gst_element_factory_make("webrtcbin", "sendrecv"))));
   g_assert_nonnull(mWebrtcBin.get());
   g_object_set(mWebrtcBin.get(), "bundle-policy", GST_WEBRTC_BUNDLE_POLICY_MAX_BUNDLE, NULL);
   g_object_set(mWebrtcBin.get(), "stun-server", "stun://stun.l.google.com:19302", NULL);

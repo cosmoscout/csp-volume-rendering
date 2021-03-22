@@ -15,12 +15,6 @@
 namespace csp::volumerendering::webrtc {
 
 template <typename T>
-struct NoDeleter {
-  inline void operator()(T* p) {
-  }
-};
-
-template <typename T>
 struct GstObjectDeleter {
   inline void operator()(T* p) {
     gst_object_unref(p);
