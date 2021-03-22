@@ -10,6 +10,8 @@
 #include "GstDeleters.hpp"
 
 #include <gst/gst.h>
+#define GST_USE_UNSTABLE_API
+#include <gst/webrtc/datachannel.h>
 
 #include <functional>
 #include <string>
@@ -19,7 +21,7 @@ namespace csp::volumerendering::webrtc {
 class DataChannel {
  public:
   DataChannel(GstElement* webrtc);
-  DataChannel(GObject* channel);
+  DataChannel(GstWebRTCDataChannel* channel);
 
   void send(std::string data);
 
@@ -31,7 +33,7 @@ class DataChannel {
 
   void connectSignals();
 
-  std::unique_ptr<GObject, NoDeleter<GObject>> mChannel;
+  GstPointer<GstWebRTCDataChannel> mChannel;
 };
 
 } // namespace csp::volumerendering::webrtc

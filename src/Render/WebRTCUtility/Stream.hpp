@@ -53,7 +53,7 @@ class Stream {
   static void onNegotiationNeeded(GstElement* element, Stream* pThis);
   static void onIceCandidate(GstElement* webrtc, guint mlineindex, gchar* candidate, Stream* pThis);
   static void onIceGatheringStateNotify(GstElement* webrtcbin, GParamSpec* pspec, Stream* pThis);
-  static void onDataChannel(GstElement* webrtc, GObject* data_channel, Stream* pThis);
+  static void onDataChannel(GstElement* webrtc, GstWebRTCDataChannel* data_channel, Stream* pThis);
 
   static void onIncomingStream(GstElement* webrtc, GstPad* pad, Stream* pThis);
   static void onIncomingDecodebinStream(GstElement* decodebin, GstPad* pad, Stream* pThis);
@@ -68,8 +68,8 @@ class Stream {
 
   gboolean startPipeline();
 
-  std::unique_ptr<GstCaps, GstCapsDeleter>     setCaps(int resolution, SampleType type);
-  std::unique_ptr<GstSample, GstSampleDeleter> getSample(int resolution);
+  GstPointer<GstCaps>   setCaps(int resolution, SampleType type);
+  GstPointer<GstSample> getSample(int resolution);
 
   std::unique_ptr<SignallingServer> mSignallingServer;
   std::unique_ptr<DataChannel>      mReceiveChannel;
@@ -78,33 +78,33 @@ class Stream {
 
   bool mCreateOffer = false;
 
-  std::unique_ptr<GMainLoop, GMainLoopDeleter> mMainLoop;
-  std::thread                                  mMainLoopThread;
+  GPointer<GMainLoop> mMainLoop;
+  std::thread         mMainLoopThread;
 
-  std::unique_ptr<GstElement, GstPipelineDeleter>                          mPipeline;
+  GstPointer<GstPipeline>                                                  mPipeline;
   std::unique_ptr<GstElement, NoDeleter<GstElement>>                       mWebrtcBin;
   std::map<StreamType, std::unique_ptr<GstElement, NoDeleter<GstElement>>> mDecoders;
   std::unique_ptr<GstElement, NoDeleter<GstElement>>                       mEndBin;
-  std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>                mVideoMixer;
-  std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>                mAppSink;
-  std::unique_ptr<GstElement, GstObjectDeleter<GstElement>>                mCapsFilter;
+  GstPointer<GstElement>                                                   mVideoMixer;
+  GstPointer<GstElement>                                                   mAppSink;
+  GstPointer<GstElement>                                                   mCapsFilter;
 
   std::mutex mDecodersMutex;
   std::mutex mElementsMutex;
 
-  static constexpr int                                                  mFrameCount = 2;
-  int                                                                   mFrameIndex = 0;
-  std::array<GstVideoFrame, mFrameCount>                                mFrames;
-  std::array<bool, mFrameCount>                                         mFrameMapped;
-  std::array<std::unique_ptr<GstSample, GstSampleDeleter>, mFrameCount> mSamples;
-  std::array<std::unique_ptr<GstBuffer, GstBufferDeleter>, mFrameCount> mBuffers;
+  static constexpr int                           mFrameCount = 2;
+  int                                            mFrameIndex = 0;
+  std::array<GstVideoFrame, mFrameCount>         mFrames;
+  std::array<bool, mFrameCount>                  mFrameMapped;
+  std::array<GstPointer<GstSample>, mFrameCount> mSamples;
+  std::array<GstPointer<GstBuffer>, mFrameCount> mBuffers;
 
   int              mResolution = 1;
   const SampleType mSampleType;
 
-  std::unique_ptr<GstGLDisplay, GstObjectDeleter<GstGLDisplay>> mGstGLDisplay;
-  std::unique_ptr<GstGLContext, GstObjectDeleter<GstGLContext>> mGstGLContext;
-  guintptr                                                      mGlContext;
+  GstPointer<GstGLDisplay> mGstGLDisplay;
+  GstPointer<GstGLContext> mGstGLContext;
+  guintptr                 mGlContext;
 
   cs::utils::Signal<> mOnUncurrentRequired;
   cs::utils::Signal<> mOnUncurrentRelease;

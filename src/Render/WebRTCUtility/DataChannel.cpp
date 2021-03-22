@@ -13,7 +13,7 @@ namespace csp::volumerendering::webrtc {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 DataChannel::DataChannel(GstElement* webrtc) {
-  GObject* channel;
+  GstWebRTCDataChannel* channel;
   g_signal_emit_by_name(webrtc, "create-data-channel", "channel", NULL, &channel);
   if (channel) {
     logger().trace("Created data channel.");
@@ -26,7 +26,7 @@ DataChannel::DataChannel(GstElement* webrtc) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-DataChannel::DataChannel(GObject* channel) {
+DataChannel::DataChannel(GstWebRTCDataChannel* channel) {
   mChannel.reset(channel);
   connectSignals();
 }

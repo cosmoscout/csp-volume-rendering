@@ -35,8 +35,7 @@ gboolean check_plugins() {
   registry = gst_registry_get();
   ret      = TRUE;
   for (i = 0; i < g_strv_length((gchar**)needed); i++) {
-    std::unique_ptr<GstPlugin, GstObjectDeleter<GstPlugin>> plugin(
-        gst_registry_find_plugin(registry, needed[i]));
+    GstPointer<GstPlugin> plugin(gst_registry_find_plugin(registry, needed[i]));
     if (!plugin) {
       csp::volumerendering::logger().error("Required gstreamer plugin '{}' not found!", needed[i]);
       ret = FALSE;
@@ -71,7 +70,7 @@ vec3 rgb_to_yuv (vec3 val) {
 void main () {
   vec3 rgb = vec3(texture2D(tex, v_texcoord));
   vec3 yuv = rgb_to_yuv(rgb);
-  vec4 color = vec4(1, 1, 1, 1 - rgb.g);
+  vec4 color = vec4(rgb.r, rgb.g, rgb.b, 1 - rgb.g);
   gl_FragColor = color;
 }
 )";
@@ -152,7 +151,7 @@ void Stream::sendMessage(std::string const& message) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::unique_ptr<GstCaps, GstCapsDeleter> Stream::setCaps(int resolution, SampleType type) {
+GstPointer<GstCaps> Stream::setCaps(int resolution, SampleType type) {
   std::string videoType;
   switch (type) {
   case SampleType::eImageData:
@@ -163,9 +162,8 @@ std::unique_ptr<GstCaps, GstCapsDeleter> Stream::setCaps(int resolution, SampleT
     break;
   }
   std::stringstream capsStr;
-  capsStr << videoType << ",framerate=30/1,format=RGBA,width=" << resolution
-          << ",height=" << resolution;
-  std::unique_ptr<GstCaps, GstCapsDeleter> caps(gst_caps_from_string(capsStr.str().c_str()));
+  capsStr << videoType << ",format=RGBA,width=" << resolution << ",height=" << resolution;
+  GstPointer<GstCaps> caps(gst_caps_from_string(capsStr.str().c_str()));
   g_object_set(mCapsFilter.get(), "caps", caps.get(), NULL);
   mResolution = resolution;
   return caps;
@@ -173,7 +171,7 @@ std::unique_ptr<GstCaps, GstCapsDeleter> Stream::setCaps(int resolution, SampleT
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::unique_ptr<GstSample, GstSampleDeleter> Stream::getSample(int resolution) {
+GstPointer<GstSample> Stream::getSample(int resolution) {
   {
     std::lock_guard lock(mElementsMutex);
     if (!mAppSink) {
@@ -181,7 +179,7 @@ std::unique_ptr<GstSample, GstSampleDeleter> Stream::getSample(int resolution) {
     }
   }
 
-  std::unique_ptr<GstSample, GstSampleDeleter> sample;
+  GstPointer<GstSample> sample;
 
   if (resolution != mResolution) {
     auto caps = setCaps(resolution, mSampleType);
@@ -189,14 +187,14 @@ std::unique_ptr<GstSample, GstSampleDeleter> Stream::getSample(int resolution) {
     // Drop samples with incorrect resolution
     GstCaps* sampleCaps;
     do {
-      sample.reset(gst_app_sink_pull_sample(GST_APP_SINK_CAST(mAppSink.get())));
+      sample.reset(gst_app_sink_pull_sample(GST_APP_SINK(mAppSink.get())));
       if (!sample) {
         break;
       }
       sampleCaps = gst_sample_get_caps(sample.get());
     } while (!gst_caps_is_subset(sampleCaps, caps.get()));
   } else {
-    sample.reset(gst_app_sink_pull_sample(GST_APP_SINK_CAST(mAppSink.get())));
+    sample.reset(gst_app_sink_pull_sample(GST_APP_SINK(mAppSink.get())));
   }
   if (!sample) {
     // Pipeline stopped
@@ -279,8 +277,8 @@ std::optional<std::pair<int, GLsync>> Stream::getTextureId(int resolution) {
 void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
   switch (GST_MESSAGE_TYPE(msg)) {
   case GST_MESSAGE_NEED_CONTEXT: {
-    const gchar*                                   context_type;
-    std::unique_ptr<GstContext, GstContextDeleter> context;
+    const gchar*           context_type;
+    GstPointer<GstContext> context;
 
     gst_message_parse_context_type(msg, &context_type);
     logger().trace("Got need context {}", context_type);
@@ -328,7 +326,7 @@ void Stream::onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Stream::onOfferSet(GstPromise* promisePtr, Stream* pThis) {
-  std::unique_ptr<GstPromise, GstPromiseDeleter> promise(promisePtr);
+  GstPointer<GstPromise> promise(promisePtr);
   promise.reset(gst_promise_new_with_change_func(
       reinterpret_cast<GstPromiseChangeFunc>(&Stream::onAnswerCreated), pThis, NULL));
   g_signal_emit_by_name(pThis->mWebrtcBin.get(), "create-answer", NULL, promise.release());
@@ -337,9 +335,9 @@ void Stream::onOfferSet(GstPromise* promisePtr, Stream* pThis) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Stream::onAnswerCreated(GstPromise* promisePtr, Stream* pThis) {
-  std::unique_ptr<GstPromise, GstPromiseDeleter> promise(promisePtr);
-  GstWebRTCSessionDescription*                   answer = NULL;
-  const GstStructure*                            reply;
+  GstPointer<GstPromise>       promise(promisePtr);
+  GstWebRTCSessionDescription* answer = NULL;
+  const GstStructure*          reply;
 
   g_assert_cmphex(
       static_cast<guint64>(pThis->mState), ==, static_cast<guint64>(PeerCallState::eNegotiating));
@@ -359,8 +357,8 @@ void Stream::onAnswerCreated(GstPromise* promisePtr, Stream* pThis) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Stream::onOfferCreated(GstPromise* promisePtr, Stream* pThis) {
-  std::unique_ptr<GstPromise, GstPromiseDeleter> promise(promisePtr);
-  GstWebRTCSessionDescription*                   offer = NULL;
+  GstPointer<GstPromise>       promise(promisePtr);
+  GstWebRTCSessionDescription* offer = NULL;
 
   g_assert_cmphex(
       static_cast<guint64>(pThis->mState), ==, static_cast<guint64>(PeerCallState::eNegotiating));
@@ -384,7 +382,7 @@ void Stream::onNegotiationNeeded(GstElement* element, Stream* pThis) {
   pThis->mState = PeerCallState::eNegotiating;
 
   if (pThis->mCreateOffer) {
-    std::unique_ptr<GstPromise, GstPromiseDeleter> promise(gst_promise_new_with_change_func(
+    GstPointer<GstPromise> promise(gst_promise_new_with_change_func(
         reinterpret_cast<GstPromiseChangeFunc>(&Stream::onOfferCreated), pThis, NULL));
     g_signal_emit_by_name(pThis->mWebrtcBin.get(), "create-offer", NULL, promise.release());
   }
@@ -425,7 +423,7 @@ void Stream::onIceGatheringStateNotify(GstElement* webrtcbin, GParamSpec* pspec,
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Stream::onDataChannel(GstElement* webrtc, GObject* data_channel, Stream* pThis) {
+void Stream::onDataChannel(GstElement* webrtc, GstWebRTCDataChannel* data_channel, Stream* pThis) {
   pThis->mReceiveChannel = std::make_unique<DataChannel>(data_channel);
 }
 
@@ -454,8 +452,7 @@ void Stream::onIncomingStream(GstElement* webrtc, GstPad* pad, Stream* pThis) {
   gst_bin_add(GST_BIN(pThis->mPipeline.get()), decodebin);
   gst_element_sync_state_with_parent(decodebin);
 
-  std::unique_ptr<GstPad, GstObjectDeleter<GstPad>> sinkpad(
-      gst_element_get_static_pad(decodebin, "sink"));
+  GstPointer<GstPad> sinkpad(gst_element_get_static_pad(decodebin, "sink"));
   gst_pad_link(pad, sinkpad.get());
 }
 
@@ -492,8 +489,7 @@ void Stream::onIncomingDecodebinStream(GstElement* decodebin, GstPad* pad, Strea
 
 GstGLContext* Stream::onCreateContext(
     GstGLDisplay* display, GstGLContext* otherContext, Stream* pThis) {
-  std::unique_ptr<GstGLContext, GstObjectDeleter<GstGLContext>> newContext(
-      gst_gl_context_new(display));
+  GstPointer<GstGLContext> newContext(gst_gl_context_new(display));
   if (!newContext) {
     logger().error("Failed to create GL context!");
     return NULL;
@@ -518,7 +514,7 @@ void Stream::onOfferReceived(GstSDPMessage* sdp) {
 
   // Set remote description on our pipeline
   {
-    std::unique_ptr<GstPromise, GstPromiseDeleter> promise(gst_promise_new_with_change_func(
+    GstPointer<GstPromise> promise(gst_promise_new_with_change_func(
         reinterpret_cast<GstPromiseChangeFunc>(&Stream::onOfferSet), this, NULL));
     g_signal_emit_by_name(mWebrtcBin.get(), "set-remote-description", offer, promise.release());
     gst_webrtc_session_description_free(offer);
@@ -534,7 +530,7 @@ void Stream::onAnswerReceived(GstSDPMessage* sdp) {
 
   // Set remote description on our pipeline
   {
-    std::unique_ptr<GstPromise, GstPromiseDeleter> promise(gst_promise_new());
+    GstPointer<GstPromise> promise(gst_promise_new());
     g_signal_emit_by_name(mWebrtcBin.get(), "set-remote-description", answer, promise.get());
     gst_promise_interrupt(promise.get());
   }
@@ -666,12 +662,14 @@ void Stream::handleVideoStream(GstPad* pad, StreamType type) {
   case StreamType::eColor:
     g_object_set(mixerSink, "blend-function-dst-alpha", GL_ONE, NULL);
     g_object_set(mixerSink, "blend-function-src-alpha", GL_ZERO, NULL);
+
     g_object_set(mixerSink, "blend-function-dst-rgb", GL_ZERO, NULL);
     g_object_set(mixerSink, "blend-function-src-rgb", GL_ONE, NULL);
     break;
   case StreamType::eAlpha:
     g_object_set(mixerSink, "blend-function-dst-alpha", GL_ZERO, NULL);
     g_object_set(mixerSink, "blend-function-src-alpha", GL_ONE, NULL);
+
     g_object_set(mixerSink, "blend-function-dst-rgb", GL_ONE, NULL);
     g_object_set(mixerSink, "blend-function-src-rgb", GL_ZERO, NULL);
     break;
@@ -687,10 +685,10 @@ void Stream::handleVideoStream(GstPad* pad, StreamType type) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 gboolean Stream::startPipeline() {
-  mPipeline.reset(gst_pipeline_new("pipeline"));
+  mPipeline.reset(GST_PIPELINE(gst_pipeline_new("pipeline")));
   g_assert_nonnull(mPipeline.get());
 
-  GstBus* bus = gst_pipeline_get_bus(GST_PIPELINE(mPipeline.get()));
+  GstBus* bus = gst_pipeline_get_bus(mPipeline.get());
   gst_bus_enable_sync_message_emission(bus);
   g_signal_connect(bus, "sync-message", G_CALLBACK(Stream::onBusSyncMessage), this);
 
@@ -704,13 +702,12 @@ gboolean Stream::startPipeline() {
   gst_element_sync_state_with_parent(mWebrtcBin.get());
 
   for (int i = 0; i < 2; i++) {
-    std::unique_ptr<GstCaps, GstCapsDeleter> caps(
+    GstPointer<GstCaps> caps(
         gst_caps_from_string("application/x-rtp,media=video,encoding-name=VP8,payload=96"));
     GstWebRTCRTPTransceiver* transceiverPtr = NULL;
     g_signal_emit_by_name(mWebrtcBin.get(), "add-transceiver",
         GST_WEBRTC_RTP_TRANSCEIVER_DIRECTION_RECVONLY, caps.get(), &transceiverPtr);
-    std::unique_ptr<GstWebRTCRTPTransceiver, GstObjectDeleter<GstWebRTCRTPTransceiver>> transceiver(
-        transceiverPtr);
+    GstPointer<GstWebRTCRTPTransceiver> transceiver(transceiverPtr);
   }
 
   // This is the gstwebrtc entry point where we create the offer and so on.
@@ -724,7 +721,7 @@ gboolean Stream::startPipeline() {
   g_signal_connect(mWebrtcBin.get(), "notify::ice-gathering-state",
       G_CALLBACK(Stream::onIceGatheringStateNotify), this);
 
-  gst_element_set_state(mPipeline.get(), GST_STATE_READY);
+  gst_element_set_state(GST_ELEMENT(mPipeline.get()), GST_STATE_READY);
 
   g_signal_connect(mWebrtcBin.get(), "on-data-channel", G_CALLBACK(Stream::onDataChannel), this);
   // Incoming streams will be exposed via this signal
