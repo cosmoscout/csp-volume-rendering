@@ -8,6 +8,7 @@
 #define CSP_VOLUME_RENDERING_STREAM_HPP
 
 #include "../../Enums.hpp"
+#include "Connection.hpp"
 #include "DataChannel.hpp"
 #include "GstDeleters.hpp"
 #include "SignallingServer.hpp"
@@ -41,47 +42,27 @@ class Stream {
   cs::utils::Signal<> const& onUncurrentRelease() const;
 
  private:
-  enum class PeerCallState { eUnknown = 0, eNegotiating, eStarted, eError };
   enum class StreamType { eColor, eAlpha };
 
-  static void onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis);
-
-  static void onOfferSet(GstPromise* promisePtr, Stream* pThis);
-  static void onAnswerCreated(GstPromise* promisePtr, Stream* pThis);
-  static void onOfferCreated(GstPromise* promisePtr, Stream* pThis);
-  static void onNegotiationNeeded(GstElement* element, Stream* pThis);
-  static void onIceCandidate(GstElement* webrtc, guint mlineindex, gchar* candidate, Stream* pThis);
-  static void onIceGatheringStateNotify(GstElement* webrtcbin, GParamSpec* pspec, Stream* pThis);
-  static void onDataChannel(GstElement* webrtc, GstWebRTCDataChannel* data_channel, Stream* pThis);
-
-  static void onIncomingStream(GstElement* webrtc, GstPad* pad, Stream* pThis);
-  static void onIncomingDecodebinStream(GstElement* decodebin, GstPad* pad, Stream* pThis);
-
+  static void          onBusSyncMessage(GstBus* bus, GstMessage* msg, Stream* pThis);
+  static void          onIncomingDecodebinStream(GstElement* decodebin, GstPad* pad, Stream* pThis);
   static GstGLContext* onCreateContext(
       GstGLDisplay* display, GstGLContext* otherContext, Stream* pThis);
 
-  void onOfferReceived(GstSDPMessage* sdp);
-  void onAnswerReceived(GstSDPMessage* sdp);
-  void sendSdpToPeer(GstWebRTCSessionDescription* desc);
-  void handleVideoStream(GstPad* pad, StreamType type);
-
-  gboolean startPipeline();
+  void startPipeline(GstPointer<GstElement> const& webrtcbin);
+  void handleEncodedStream(std::shared_ptr<GstPad> pad);
+  void handleDecodedStream(GstPad* pad, StreamType type);
 
   GstPointer<GstCaps>   setCaps(int resolution);
   GstPointer<GstSample> getSample(int resolution);
 
-  std::unique_ptr<SignallingServer> mSignallingServer;
-  std::unique_ptr<DataChannel>      mReceiveChannel;
-
-  PeerCallState mState = PeerCallState::eUnknown;
-
-  bool mCreateOffer = false;
+  std::unique_ptr<Connection>  mWebrtcConnection;
+  std::shared_ptr<DataChannel> mReceiveChannel;
 
   GPointer<GMainLoop> mMainLoop;
   std::thread         mMainLoopThread;
 
   GstPointer<GstPipeline>                      mPipeline;
-  GstPointer<GstElement>                       mWebrtcBin;
   std::map<StreamType, GstPointer<GstElement>> mDecoders;
   GstPointer<GstElement>                       mEndBin;
   GstPointer<GstElement>                       mVideoMixer;
