@@ -56,7 +56,8 @@ void initOSPRay() {
   }
 
   OSPDevice dev = ospGetCurrentDevice();
-  ospDeviceSetErrorCallback(dev,
+  ospDeviceSetErrorCallback(
+      dev,
       [](void* userData, OSPError e, const char* errorDetails) {
         osprayLogger().error(errorDetails);
       },
@@ -111,16 +112,15 @@ ospray::cpp::Volume createOSPRayVolumeUnstructured(vtkSmartPointer<vtkUnstructur
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ospray::cpp::Volume createOSPRayVolumeStructured(vtkSmartPointer<vtkStructuredPoints> vtkVolume) {
-  double origin[3];
-  vtkVolume->GetOrigin(origin);
   double spacing[3];
   vtkVolume->GetSpacing(spacing);
   int dimensions[3];
   vtkVolume->GetDimensions(dimensions);
-
+  double origin[3];
   for (int i = 0; i < 3; i++) {
-    origin[i] = -vtkVolume->GetBounds()[i * 2 + 1] / 2;
+    origin[i] = -(vtkVolume->GetBounds()[i * 2 + 1] - vtkVolume->GetBounds()[i * 2]) / 2;
   }
+
   ospray::cpp::Volume volume("structuredRegular");
   volume.setParam(
       "gridOrigin", rkcommon::math::vec3f{(float)origin[0], (float)origin[1], (float)origin[2]});
