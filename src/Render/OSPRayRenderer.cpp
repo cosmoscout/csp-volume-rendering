@@ -186,8 +186,28 @@ ospray::cpp::World OSPRayRenderer::getWorld(const Volume& volume, const Paramete
   volumetricModel.setParam("gradientShadingScale", parameters.mShading ? 1.f : 0.f);
   volumetricModel.commit();
 
+  ospray::cpp::Geometry core("sphere");
+  core.setParam("sphere.position", ospray::cpp::Data(rkcommon::math::vec3f(0, 0, 0)));
+  core.setParam("radius", 1.25f);
+  core.commit();
+
+  ospray::cpp::GeometricModel coreModel(core);
+  //coreModel.setParam("color", rkcommon::math::vec4f(0.35f, 0.15f, 0.09f, 1.f));
+  coreModel.setParam("color", rkcommon::math::vec4f(1.f, 1.f, 0.25f, 1.f));
+  coreModel.commit();
+
+  ospray::cpp::Geometry clipPlane("plane");
+  clipPlane.setParam("plane.coefficients", ospray::cpp::Data(rkcommon::math::vec4f(0, 0, -1, 0)));
+  clipPlane.commit();
+
+  ospray::cpp::GeometricModel clipModel(clipPlane);
+  clipModel.commit();
+
   ospray::cpp::Group group;
   group.setParam("volume", ospray::cpp::Data(volumetricModel));
+  group.setParam("geometry", ospray::cpp::Data(coreModel));
+  // group.setParam("clippingGeometry", ospray::cpp::Data(clipModel));
+
   if (parameters.mDepthMode == DepthMode::eIsosurface) {
     ospray::cpp::Geometry isosurface("isosurface");
     isosurface.setParam("isovalue", 0.8f);
@@ -344,7 +364,7 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
 
 ospray::cpp::FrameBuffer OSPRayRenderer::renderFrame(
     ospray::cpp::World& world, ospray::cpp::Camera& camera, const Parameters& parameters) {
-  ospray::cpp::Renderer renderer("volume_depth");
+  ospray::cpp::Renderer renderer("scivis");
   renderer.setParam("aoSamples", 0);
   renderer.setParam("shadows", false);
   renderer.setParam("volumeSamplingRate", parameters.mSamplingRate);
