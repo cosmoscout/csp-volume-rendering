@@ -206,20 +206,24 @@ ospray::cpp::World OSPRayRenderer::getWorld(const Volume& volume, const Paramete
   ospray::cpp::Instance instance(group);
   instance.commit();
 
+  std::vector<ospray::cpp::Light> lights;
+
   ospray::cpp::Light light("ambient");
-  light.setParam("intensity", parameters.mAmbientLight);
+  light.setParam("intensity", parameters.mShading ? parameters.mAmbientLight : 1);
   light.setParam("color", rkcommon::math::vec3f(1, 1, 1));
   light.commit();
+  lights.push_back(light);
 
-  ospray::cpp::Light sun("distant");
-  sun.setParam("intensity", parameters.mSunStrength);
-  sun.setParam("color", rkcommon::math::vec3f(1, 1, 1));
-  sun.setParam("direction", rkcommon::math::vec3f{parameters.mSunDirection[0],
-                                parameters.mSunDirection[1], parameters.mSunDirection[2]});
-  sun.setParam("angularDiameter", .53f);
-  sun.commit();
-
-  std::vector<ospray::cpp::Light> lights{light, sun};
+  if (parameters.mShading) {
+    ospray::cpp::Light sun("distant");
+    sun.setParam("intensity", parameters.mSunStrength);
+    sun.setParam("color", rkcommon::math::vec3f(1, 1, 1));
+    sun.setParam("direction", rkcommon::math::vec3f{-parameters.mSunDirection[0],
+                                  -parameters.mSunDirection[1], -parameters.mSunDirection[2]});
+    sun.setParam("angularDiameter", .53f);
+    sun.commit();
+    lights.push_back(sun);
+  }
 
   ospray::cpp::World world;
   world.setParam("instance", ospray::cpp::Data(instance));
