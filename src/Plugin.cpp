@@ -57,11 +57,13 @@ NLOHMANN_JSON_SERIALIZE_ENUM(VolumeFileType, {
                                                  {VolumeFileType::eVtk, "vtk"},
                                              })
 
-NLOHMANN_JSON_SERIALIZE_ENUM(VolumeStructure, {
-                                                  {VolumeStructure::eInvalid, nullptr},
-                                                  {VolumeStructure::eStructured, "structured"},
-                                                  {VolumeStructure::eUnstructured, "unstructured"},
-                                              })
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    VolumeStructure, {
+                         {VolumeStructure::eInvalid, nullptr},
+                         {VolumeStructure::eStructured, "structured"},
+                         {VolumeStructure::eStructuredSpherical, "structuredSpherical"},
+                         {VolumeStructure::eUnstructured, "unstructured"},
+                     })
 
 NLOHMANN_JSON_SERIALIZE_ENUM(VolumeShape, {
                                               {VolumeShape::eInvalid, nullptr},
@@ -426,14 +428,14 @@ void Plugin::registerUICallbacks() {
 
 void Plugin::connectSettings() {
   // Connect to data manager properties
-  mDataManager->pScalars.connectAndTouch([this](std::vector<std::string> scalars) {
-    for (std::string scalar : scalars) {
-      mGuiManager->getGui()->callJavascript(
-          "CosmoScout.gui.addDropdownValue", "volumeRendering.setScalar", scalar, scalar, false);
+  mDataManager->pScalars.connectAndTouch([this](std::vector<Scalar> scalars) {
+    for (Scalar scalar : scalars) {
+      mGuiManager->getGui()->callJavascript("CosmoScout.gui.addDropdownValue",
+          "volumeRendering.setScalar", scalar.getId(), scalar.mName, false);
     }
     if (scalars.size() > 0) {
       mGuiManager->getGui()->callJavascript(
-          "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", scalars[0]);
+          "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", scalars[0].getId());
     }
   });
   mDataManager->pTimesteps.connectAndTouch([this](std::vector<int> timesteps) {

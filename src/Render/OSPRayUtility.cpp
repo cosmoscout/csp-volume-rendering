@@ -71,18 +71,32 @@ void initOSPRay() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ospray::cpp::Volume createOSPRayVolumeUnstructured(vtkSmartPointer<vtkUnstructuredGrid> vtkVolume) {
+ospray::cpp::Volume createOSPRayVolume(
+    vtkSmartPointer<vtkUnstructuredGrid> vtkVolume, ScalarType scalarType) {
   std::vector<rkcommon::math::vec3f> vertexPositions(
       (rkcommon::math::vec3f*)vtkVolume->GetPoints()->GetVoidPointer(0),
       (rkcommon::math::vec3f*)vtkVolume->GetPoints()->GetVoidPointer(0) +
           vtkVolume->GetNumberOfPoints());
 
-  std::vector<double> vertexDataD(vtkVolume->GetNumberOfPoints());
-  vtkVolume->GetPointData()->GetScalars()->ExportToVoidPointer(vertexDataD.data());
-  std::vector<float> vertexData;
-  vertexData.reserve(vertexDataD.size());
-  std::transform(vertexDataD.begin(), vertexDataD.end(), std::back_inserter(vertexData),
-      [](double d) { return (float)d; });
+  std::vector<float> data;
+  switch (scalarType) {
+  case ScalarType::ePointData: {
+    std::vector<double> vertexDataD(vtkVolume->GetNumberOfPoints());
+    vtkVolume->GetPointData()->GetScalars()->ExportToVoidPointer(vertexDataD.data());
+    data.reserve(vertexDataD.size());
+    std::transform(vertexDataD.begin(), vertexDataD.end(), std::back_inserter(data),
+        [](double d) { return (float)d; });
+    break;
+  }
+  case ScalarType::eCellData: {
+    std::vector<double> cellDataD(vtkVolume->GetNumberOfCells());
+    vtkVolume->GetCellData()->GetScalars()->ExportToVoidPointer(cellDataD.data());
+    data.reserve(cellDataD.size());
+    std::transform(cellDataD.begin(), cellDataD.end(), std::back_inserter(data),
+        [](double d) { return (float)d; });
+    break;
+  }
+  }
 
   std::vector<uint64_t> vertexIndices(vtkVolume->GetCells()->GetNumberOfConnectivityEntries());
   vtkVolume->GetCells()->GetConnectivityArray64()->ExportToVoidPointer(vertexIndices.data());
@@ -98,8 +112,15 @@ ospray::cpp::Volume createOSPRayVolumeUnstructured(vtkSmartPointer<vtkUnstructur
       vtkVolume->GetCellTypesArray()->Begin(), vtkVolume->GetCellTypesArray()->End());
 
   ospray::cpp::Volume volume("unstructured");
+  switch (scalarType) {
+  case ScalarType::ePointData:
+    volume.setParam("vertex.data", ospray::cpp::Data(data));
+    break;
+  case ScalarType::eCellData:
+    volume.setParam("cell.data", ospray::cpp::Data(data));
+    break;
+  }
   volume.setParam("vertex.position", ospray::cpp::Data(vertexPositions));
-  volume.setParam("vertex.data", ospray::cpp::Data(vertexData));
   volume.setParam("index", ospray::cpp::Data(vertexIndices));
   volume.setParam("indexPrefixed", false);
   volume.setParam("cell.index", ospray::cpp::Data(cellIndices));
@@ -111,7 +132,8 @@ ospray::cpp::Volume createOSPRayVolumeUnstructured(vtkSmartPointer<vtkUnstructur
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ospray::cpp::Volume createOSPRayVolumeStructured(vtkSmartPointer<vtkStructuredPoints> vtkVolume) {
+ospray::cpp::Volume createOSPRayVolume(
+    vtkSmartPointer<vtkStructuredPoints> vtkVolume, ScalarType scalarType) {
   double spacing[3];
   vtkVolume->GetSpacing(spacing);
   int dimensions[3];
@@ -139,6 +161,57 @@ ospray::cpp::Volume createOSPRayVolumeStructured(vtkSmartPointer<vtkStructuredPo
     volume.setParam(
         "data", ospray::cpp::CopiedData(data.data(),
                     rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]}));
+  }
+  volume.commit();
+
+  return volume;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+ospray::cpp::Volume createOSPRayVolume(
+    vtkSmartPointer<vtkStructuredGrid> vtkVolume, ScalarType scalarType) {
+  std::array<int, 6> extent;
+  vtkVolume->GetExtent(extent.data());
+  std::array<double, 6> bounds;
+  vtkVolume->GetBounds(bounds.data());
+  std::array<int, 3> dimensions;
+  vtkVolume->GetDimensions(dimensions.data());
+  std::array<double, 3> origin;
+  vtkVolume->GetPoint(0, 0, 0, origin.data());
+
+  rkcommon::math::vec3f spacing = {
+      ((float)(bounds[3] - bounds[2]) / 2 - (float)origin[2]) / (dimensions[1] - 1),
+      (float)(extent[5] - extent[4]) / (dimensions[2] - 1),
+      (float)(extent[1] - extent[0]) / (dimensions[0] - 1)};
+
+  rkcommon::math::vec3i         dim;
+  vtkSmartPointer<vtkDataArray> vtkData;
+  switch (scalarType) {
+  case ScalarType::ePointData:
+    dim     = {dimensions[1], dimensions[2], dimensions[0]};
+    vtkData = vtkVolume->GetPointData()->GetScalars();
+    break;
+  case ScalarType::eCellData:
+    dim     = {dimensions[1] - 1, dimensions[2] - 1, dimensions[0] - 1};
+    vtkData = vtkVolume->GetCellData()->GetScalars();
+    break;
+  }
+
+  ospray::cpp::Volume volume("structuredSpherical");
+  volume.setParam("gridSpacing", spacing);
+  volume.setParam("gridOrigin", rkcommon::math::vec3f{(float)origin[2], 0, 0});
+
+  if (vtkData->GetDataTypeSize() == 4) {
+    std::vector<float> data((float*)vtkData->GetVoidPointer(0),
+        (float*)vtkData->GetVoidPointer(vtkData->GetNumberOfTuples()));
+    volume.setParam("data", ospray::cpp::CopiedData(data.data(), dim,
+                                rkcommon::math::vec3i{4 * dim[2], 4 * dim[2] * dim[0], 4}));
+  } else if (vtkData->GetDataTypeSize() == 8) {
+    std::vector<double> data((double*)vtkData->GetVoidPointer(0),
+        (double*)vtkData->GetVoidPointer(vtkData->GetNumberOfTuples()));
+    volume.setParam("data", ospray::cpp::CopiedData(data.data(), dim,
+                                rkcommon::math::vec3i{4 * dim[0], 4 * dim[0] * dim[1], 4}));
   }
   volume.commit();
 

@@ -7,9 +7,12 @@
 #ifndef CSP_VOLUME_RENDERING_OSPRAYUTILITY_HPP
 #define CSP_VOLUME_RENDERING_OSPRAYUTILITY_HPP
 
+#include "../Enums.hpp"
+
 #include <ospray/ospray_cpp.h>
 
 #include <vtkSmartPointer.h>
+#include <vtkStructuredGrid.h>
 #include <vtkStructuredPoints.h>
 #include <vtkUnstructuredGrid.h>
 
@@ -21,12 +24,14 @@ namespace csp::volumerendering::OSPRayUtility {
 /// Loads the volume_depth OSPRay extension module.
 void initOSPRay();
 
-/// Creates a volume representation usable by OSPRay from a vtkUnstructuredGrid object.
-/// Only the active scalar data will be present in the resulting object.
-ospray::cpp::Volume createOSPRayVolumeUnstructured(vtkSmartPointer<vtkUnstructuredGrid> vtkVolume);
-/// Creates a volume representation usable by OSPRay from a vtkStructuredPoints object.
-/// Only the active scalar data will be present in the resulting object.
-ospray::cpp::Volume createOSPRayVolumeStructured(vtkSmartPointer<vtkStructuredPoints> vtkVolume);
+/// Creates a volume representation usable by OSPRay from different vtk data set types.
+/// Only the active scalar data of the given type will be present in the resulting object.
+ospray::cpp::Volume createOSPRayVolume(
+    vtkSmartPointer<vtkUnstructuredGrid> vtkVolume, ScalarType scalarType);
+ospray::cpp::Volume createOSPRayVolume(
+    vtkSmartPointer<vtkStructuredPoints> vtkVolume, ScalarType scalarType);
+ospray::cpp::Volume createOSPRayVolume(
+    vtkSmartPointer<vtkStructuredGrid> vtkVolume, ScalarType scalarType);
 
 /// Creates a default transfer function for OSPRay.
 /// The transfer function interpolates from fully transparent blue to fully opaque red.

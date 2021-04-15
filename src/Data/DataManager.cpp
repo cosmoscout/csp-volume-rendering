@@ -10,6 +10,7 @@
 
 #include "../../../src/cs-utils/filesystem.hpp"
 
+#include <vtkCellData.h>
 #include <vtkPointData.h>
 
 #include <algorithm>
@@ -126,14 +127,16 @@ bool DataManager::isDirty() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void DataManager::setActiveScalar(std::string scalar) {
+void DataManager::setActiveScalar(std::string scalarId) {
   std::scoped_lock lock(mStateMutex);
-  if (std::find(pScalars.get().begin(), pScalars.get().end(), scalar) != pScalars.get().end()) {
-    mActiveScalar = scalar;
+  auto             scalar = std::find_if(pScalars.get().begin(), pScalars.get().end(),
+      [&scalarId](Scalar const& s) { return s.getId() == scalarId; });
+  if (scalar != pScalars.get().end()) {
+    mActiveScalar = *scalar;
     mDirty        = true;
   } else {
-    logger().warn("'{}' is not a scalar in the current dataset. '{}' will be used instead.", scalar,
-        mActiveScalar);
+    logger().warn("'{}' is not a scalar in the current dataset. '{}' will be used instead.",
+        scalarId, mActiveScalar.getId());
   }
 }
 
@@ -162,8 +165,15 @@ vtkSmartPointer<vtkDataSet> DataManager::getData(State state) {
     logger().error("Loaded data is null! Is the data type correctly set in the settings?");
     throw std::runtime_error("Loaded data is null.");
   }
-  if (state.mScalar != "") {
-    dataset->GetPointData()->SetActiveScalars(state.mScalar.c_str());
+  if (state.mScalar.mName != "") {
+    switch (state.mScalar.mType) {
+    case ScalarType::ePointData:
+      dataset->GetPointData()->SetActiveScalars(state.mScalar.mName.c_str());
+      break;
+    case ScalarType::eCellData:
+      dataset->GetCellData()->SetActiveScalars(state.mScalar.mName.c_str());
+      break;
+    }
   }
   return dataset;
 }
@@ -200,10 +210,21 @@ void DataManager::initScalars() {
     return;
   }
 
-  std::vector<std::string> scalars;
+  std::vector<Scalar> scalars;
   for (int i = 0; i < data->GetPointData()->GetNumberOfArrays(); i++) {
     if (data->GetPointData()->GetAbstractArray(i)->GetNumberOfComponents() == 1) {
-      scalars.push_back(data->GetPointData()->GetArrayName(i));
+      Scalar scalar;
+      scalar.mName = data->GetPointData()->GetArrayName(i);
+      scalar.mType = ScalarType::ePointData;
+      scalars.push_back(scalar);
+    }
+  }
+  for (int i = 0; i < data->GetCellData()->GetNumberOfArrays(); i++) {
+    if (data->GetCellData()->GetAbstractArray(i)->GetNumberOfComponents() == 1) {
+      Scalar scalar;
+      scalar.mName = data->GetCellData()->GetArrayName(i);
+      scalar.mType = ScalarType::eCellData;
+      scalars.push_back(scalar);
     }
   }
   if (scalars.size() == 0) {
@@ -219,7 +240,8 @@ void DataManager::initScalars() {
 
 void DataManager::loadData(int timestep) {
   logger().info("Loading data from {}, timestep {}...", mTimestepFiles[timestep], timestep);
-  auto data        = std::async(std::launch::async,
+  auto data = std::async(
+      std::launch::async,
       [this](std::string path, int timestep) {
         std::scoped_lock            lock(mReadMutex);
         auto                        timer = std::chrono::high_resolution_clock::now();

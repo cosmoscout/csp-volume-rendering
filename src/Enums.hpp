@@ -10,7 +10,7 @@
 namespace csp::volumerendering {
 
 enum class VolumeShape { eInvalid = -1, eCubic, eSpherical };
-enum class VolumeStructure { eInvalid = -1, eStructured, eUnstructured };
+enum class VolumeStructure { eInvalid = -1, eStructured, eUnstructured, eStructuredSpherical };
 enum class VolumeFileType { eInvalid = -1, eVtk };
 enum class DisplayMode { eMesh, ePoints };
 enum class DepthMode {
@@ -21,6 +21,7 @@ enum class DepthMode {
   eThreshold      = 8,
   eMultiThreshold = 16
 };
+enum class ScalarType { ePointData, eCellData };
 
 } // namespace csp::volumerendering
 

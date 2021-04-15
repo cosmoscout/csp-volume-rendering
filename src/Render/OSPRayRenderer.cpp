@@ -11,6 +11,7 @@
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <vtkCellData.h>
 #include <vtkPointData.h>
 #include <vtkStructuredPoints.h>
 
@@ -107,18 +108,22 @@ OSPRayRenderer::Volume OSPRayRenderer::loadVolume(DataManager::State state) {
   vtkSmartPointer<vtkDataSet> volumeData = mDataManager->getData(state);
   switch (mStructure) {
   case VolumeStructure::eUnstructured:
-    volume.mOsprayData = OSPRayUtility::createOSPRayVolumeUnstructured(
-        vtkUnstructuredGrid::SafeDownCast(volumeData));
+    volume.mOsprayData = OSPRayUtility::createOSPRayVolume(
+        vtkUnstructuredGrid::SafeDownCast(volumeData), state.mScalar.mType);
     break;
   case VolumeStructure::eStructured:
-    volume.mOsprayData =
-        OSPRayUtility::createOSPRayVolumeStructured(vtkStructuredPoints::SafeDownCast(volumeData));
+    volume.mOsprayData = OSPRayUtility::createOSPRayVolume(
+        vtkStructuredPoints::SafeDownCast(volumeData), state.mScalar.mType);
+    break;
+  case VolumeStructure::eStructuredSpherical:
+    volume.mOsprayData = OSPRayUtility::createOSPRayVolume(
+        vtkStructuredGrid::SafeDownCast(volumeData), state.mScalar.mType);
     break;
   case VolumeStructure::eInvalid:
     throw std::runtime_error("Trying to load volume with unknown/invalid structure!");
   }
   volume.mHeight       = getHeight(volumeData);
-  volume.mScalarBounds = getScalarBounds(volumeData);
+  volume.mScalarBounds = getScalarBounds(volumeData, state.mScalar.mType);
   return volume;
 }
 
@@ -156,10 +161,19 @@ float OSPRayRenderer::getHeight(vtkSmartPointer<vtkDataSet> data) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::array<float, 2> OSPRayRenderer::getScalarBounds(vtkSmartPointer<vtkDataSet> data) {
+std::array<float, 2> OSPRayRenderer::getScalarBounds(
+    vtkSmartPointer<vtkDataSet> data, ScalarType scalarType) {
   std::array<float, 2> bounds;
-  bounds[0] = (float)data->GetPointData()->GetScalars()->GetRange()[0];
-  bounds[1] = (float)data->GetPointData()->GetScalars()->GetRange()[1];
+  switch (scalarType) {
+  case ScalarType::ePointData:
+    bounds[0] = (float)data->GetPointData()->GetScalars()->GetRange()[0];
+    bounds[1] = (float)data->GetPointData()->GetScalars()->GetRange()[1];
+    break;
+  case ScalarType::eCellData:
+    bounds[0] = (float)data->GetCellData()->GetScalars()->GetRange()[0];
+    bounds[1] = (float)data->GetCellData()->GetScalars()->GetRange()[1];
+    break;
+  }
   return bounds;
 }
 

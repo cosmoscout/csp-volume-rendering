@@ -9,6 +9,8 @@
 
 #include "../logger.hpp"
 
+#include "../Enums.hpp"
+
 #include "../../../src/cs-utils/Property.hpp"
 
 #include <vtkCellArray.h>
@@ -18,9 +20,45 @@
 #include <future>
 #include <map>
 #include <mutex>
+#include <optional>
 #include <string>
 
 namespace csp::volumerendering {
+
+struct Scalar {
+  std::string mName;
+  ScalarType  mType;
+
+  std::string getId() const {
+    std::string id;
+    switch (mType) {
+    case ScalarType::ePointData:
+      id.append("point_");
+      break;
+    case ScalarType::eCellData:
+      id.append("cell_");
+      break;
+    }
+    id.append(mName);
+    return id;
+  }
+
+  bool operator==(const Scalar& other) const {
+    return mName == other.mName && mType == other.mType;
+  }
+
+  bool operator<(const Scalar& other) const {
+    if (mName < other.mName)
+      return true;
+    if (other.mName < mName)
+      return false;
+    if (mType < other.mType)
+      return true;
+    if (other.mType < mType)
+      return false;
+    return false;
+  }
+};
 
 class DataManagerException : public std::exception {
  public:
@@ -33,8 +71,8 @@ class DataManagerException : public std::exception {
 class DataManager {
  public:
   struct State {
-    int         mTimestep;
-    std::string mScalar;
+    int    mTimestep;
+    Scalar mScalar;
 
     bool operator<(const State& other) const {
       if (mTimestep < other.mTimestep)
@@ -54,7 +92,7 @@ class DataManager {
   /// List of timesteps for which files were found.
   cs::utils::Property<std::vector<int>> pTimesteps;
   /// List of available scalars in the data.
-  cs::utils::Property<std::vector<std::string>> pScalars;
+  cs::utils::Property<std::vector<Scalar>> pScalars;
 
   /// Until this returns true queried data will have no active scalar.
   bool isReady();
@@ -68,7 +106,7 @@ class DataManager {
   /// Sets the current scalar to the given value.
   /// Has to be one of the values in pScalars.
   /// Future calls to getData() will return data with this as the active scalar.
-  void setActiveScalar(std::string scalar);
+  void setActiveScalar(std::string scalarId);
   /// Returns whether the current state changed since the last call to getData().
   bool isDirty();
 
@@ -86,9 +124,9 @@ class DataManager {
   State getState();
 
  protected:
-  int         mCurrentTimestep;
-  std::string mActiveScalar = "";
-  bool        mDirty;
+  int    mCurrentTimestep;
+  Scalar mActiveScalar;
+  bool   mDirty;
 
   std::mutex mReadMutex;
   std::mutex mStateMutex;
