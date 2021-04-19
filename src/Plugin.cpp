@@ -7,6 +7,7 @@
 #include "Plugin.hpp"
 
 #include "Data/VtkDataManager.hpp"
+#include "Data/NetCdfDataManager.hpp"
 #include "Display/Billboard.hpp"
 #include "Display/PointsForwardWarped.hpp"
 #include "Render/OSPRayRenderer.hpp"
@@ -55,6 +56,7 @@ namespace csp::volumerendering {
 NLOHMANN_JSON_SERIALIZE_ENUM(VolumeFileType, {
                                                  {VolumeFileType::eInvalid, nullptr},
                                                  {VolumeFileType::eVtk, "vtk"},
+                                                 {VolumeFileType::eNetCdf, "netcdf"},
                                              })
 
 NLOHMANN_JSON_SERIALIZE_ENUM(
@@ -266,6 +268,10 @@ void Plugin::onLoad() {
   switch (mPluginSettings.mVolumeDataType.get()) {
   case VolumeFileType::eVtk:
     mDataManager = std::make_shared<VtkDataManager>(
+        mPluginSettings.mVolumeDataPath.get(), mPluginSettings.mVolumeDataPattern.get());
+    break;
+  case VolumeFileType::eNetCdf:
+    mDataManager = std::make_shared<NetCdfDataManager>(
         mPluginSettings.mVolumeDataPath.get(), mPluginSettings.mVolumeDataPattern.get());
     break;
   default:
