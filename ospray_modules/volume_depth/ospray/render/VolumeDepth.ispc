@@ -17,7 +17,8 @@ void VolumeDepth_renderSample(Renderer* uniform _self, FrameBuffer* uniform fb,
   varying LDSampler* uniform ldSampler = &ldSamplerObj;
   LDSampler_init(ldSampler, sample.sampleID.x + fb->size.x * sample.sampleID.y, sample.sampleID.z);
 
-  const float originalRayTFar = sample.ray.t;
+  uniform bool firstHit        = true;
+  const float  originalRayTFar = sample.ray.t;
 
   // This is our main ray
   Ray& ray = sample.ray;
@@ -29,29 +30,72 @@ void VolumeDepth_renderSample(Renderer* uniform _self, FrameBuffer* uniform fb,
 
   // Iterate over all translucent geometry till we are fully opaque
   vec4f outputColor = make_vec4f(0.f);
-
-  // Determine volume intervals by tracing ray in the volume scene
-  Ray             volumeRay = ray;
-  VolumeIntervals volumeIntervals;
-  traceVolumeRay(world, volumeRay, volumeIntervals);
-
-  float distance = inf;
-  // Sample volumes across volume intervals (in front of geometry hit)
-  if (volumeIntervals.numVolumeIntervals > 0) {
-    VolumeDepthRenderContext rc;
-    rc.renderer       = self;
-    rc.fb             = fb;
-    rc.world          = world;
-    rc.sample         = sample;
-    rc.ldSampler      = ldSampler;
-    vec4f volumeColor = integrateVolumeIntervals(rc, volumeIntervals, rayIntervals, volumeRay,
-        ldSampler, self->volumeSamplingRate, true, distance, self->depthMode);
-    outputColor       = outputColor + (1.f - outputColor.w) * volumeColor;
-  }
-  if (self->depthMode == eIsosurface) {
+  float distance    = inf;
+  while (outputColor.w < 0.99f) {
+    // Then trace normal geometry using calculated ray intervals,
+    // if hit ray.t will be updated
     traceGeometryRayIntervals(world, ray, rayIntervals);
-    if (hadHit(ray)) {
-      distance = ray.t;
+
+    // Determine volume intervals by tracing ray in the volume scene
+    Ray             volumeRay = ray;
+    VolumeIntervals volumeIntervals;
+    traceVolumeRay(world, volumeRay, volumeIntervals);
+
+    // Sample volumes across volume intervals (in front of geometry hit)
+    if (volumeIntervals.numVolumeIntervals > 0) {
+      VolumeDepthRenderContext rc;
+      rc.renderer       = self;
+      rc.fb             = fb;
+      rc.world          = world;
+      rc.sample         = sample;
+      rc.ldSampler      = ldSampler;
+      vec4f volumeColor = integrateVolumeIntervals(rc, volumeIntervals, rayIntervals, volumeRay,
+          ldSampler, self->volumeSamplingRate, true, distance, self->depthMode);
+      outputColor       = outputColor + (1.f - outputColor.w) * volumeColor;
+    }
+
+    // If any geometry has been hit
+    vec4f      blendedColor;
+    const bool hadHit = hadHit(ray);
+    if (hadHit) {
+      // Prepare differential geometry structure
+      DifferentialGeometry dg;
+      postIntersect(world, &self->super, dg, ray,
+          DG_NG | DG_NS | DG_NORMALIZE | DG_FACEFORWARD | DG_COLOR | DG_TEXCOORD);
+
+      // Shade geometry
+      SSI surfaceShading;
+      surfaceShading = computeShading(self, fb, world, dg, sample, ldSampler, ray.dir, ray.time);
+
+      // Use shaded color for blending
+      blendedColor = surfaceShading.shadedColor;
+
+      // Initialize other per sample data with first hit values
+      if (firstHit) {
+        if (ray.t < distance) {
+          distance = ray.t;
+        }
+        sample.albedo = surfaceShading.albedo;
+        sample.normal = dg.Ns;
+      }
+
+      // Prepare ray for next loop iteration,
+      // start from the last geometry hit all over to initial Tfar
+      setRay(ray, ray.t + dg.epsilon, originalRayTFar);
+    } else {
+      blendedColor = Renderer_getBackground(&self->super, sample.pos);
+      // Initialize other per sample data with first hit values
+      if (firstHit) {
+        sample.albedo = make_vec3f(blendedColor);
+        sample.normal = sample.ray.dir;
+      }
+    }
+
+    // Blend with output final color
+    outputColor = outputColor + (1.f - outputColor.w) * blendedColor;
+    firstHit    = false;
+    if (!hadHit) {
+      break;
     }
   }
 
