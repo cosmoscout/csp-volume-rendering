@@ -223,6 +223,8 @@ void Plugin::update() {
   case RenderState::eWaitForData:
     if (mDataManager->isReady()) {
       mRenderState = RenderState::eIdle;
+      // Make sure that the correct scalar is selected in the DataManager
+      mPluginSettings.mActiveScalar.touch();
     }
     break;
   case RenderState::ePaused:
@@ -396,15 +398,8 @@ void Plugin::registerUICallbacks() {
 
   // Data settings
   mGuiManager->getGui()->registerCallback("volumeRendering.setScalar",
-      "Set the scalar to be rendered.", std::function([this](std::string scalar) {
-        mRenderedFrames.clear();
-        mDataManager->setActiveScalar(scalar);
-        mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setXRange",
-            mDataManager->getState().mScalar.mRange[0], mDataManager->getState().mScalar.mRange[1],
-            true);
-        mPluginSettings.mActiveScalar = scalar;
-        mParametersDirty              = true;
-      }));
+      "Set the scalar to be rendered.",
+      std::function([this](std::string scalar) { mPluginSettings.mActiveScalar = scalar; }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setTimestep",
       "Sets the timestep of the rendered volume images.", std::function([this](double value) {
@@ -439,36 +434,6 @@ void Plugin::registerUICallbacks() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Plugin::connectSettings() {
-  // Connect to data manager properties
-  mDataManager->pScalars.connectAndTouch([this](std::vector<Scalar> scalars) {
-    mGuiManager->getGui()->callJavascript(
-        "CosmoScout.gui.clearDropdown", "volumeRendering.setScalar");
-    for (Scalar scalar : scalars) {
-      mGuiManager->getGui()->callJavascript("CosmoScout.gui.addDropdownValue",
-          "volumeRendering.setScalar", scalar.getId(), scalar.mName, false);
-    }
-    if (scalars.size() > 0) {
-      auto activeScalar = std::find_if(scalars.begin(), scalars.end(),
-          [this](Scalar s) { return s.getId() == mPluginSettings.mActiveScalar.get(); });
-      if (activeScalar == scalars.end()) {
-        activeScalar = scalars.begin();
-        mPluginSettings.mActiveScalar.set(activeScalar->getId());
-        mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setXRange",
-            activeScalar->mRange[0], activeScalar->mRange[1], true);
-      } else {
-        mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setXRange",
-            activeScalar->mRange[0], activeScalar->mRange[1], false);
-      }
-      mGuiManager->getGui()->callJavascript(
-          "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", activeScalar->getId());
-    }
-  });
-  mDataManager->pTimesteps.connectAndTouch([this](std::vector<int> timesteps) {
-    nlohmann::json timestepsJson(timesteps);
-    mGuiManager->getGui()->callJavascript(
-        "CosmoScout.volumeRendering.setTimesteps", timestepsJson.dump());
-  });
-
   // Connect to global CosmoScout graphics settings
   mLightingConnection =
       mAllSettings->mGraphics.pEnableLighting.connectAndTouch([this](bool enable) {
@@ -486,8 +451,16 @@ void Plugin::connectSettings() {
   // Connect to plugin settings
   // Data settings
   mPluginSettings.mActiveScalar.connectAndTouch([this](std::string value) {
-    mGuiManager->getGui()->callJavascript(
-        "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", value);
+    mRenderedFrames.clear();
+    if (mDataManager->isReady()) {
+      mDataManager->setActiveScalar(value);
+      mParametersDirty = true;
+      mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setXRange",
+          mDataManager->getState().mScalar.mRange[0], mDataManager->getState().mScalar.mRange[1],
+          true);
+      mGuiManager->getGui()->callJavascript(
+          "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", value);
+    }
   });
 
   // Rendering settings
@@ -591,6 +564,33 @@ void Plugin::connectSettings() {
     if (mDisplayedFrame.has_value()) {
       displayFrame(*mDisplayedFrame, displayMode);
     }
+  });
+
+  // Connect to data manager properties
+  mDataManager->pScalars.connectAndTouch([this](std::vector<Scalar> scalars) {
+    mGuiManager->getGui()->callJavascript(
+        "CosmoScout.gui.clearDropdown", "volumeRendering.setScalar");
+    for (Scalar scalar : scalars) {
+      mGuiManager->getGui()->callJavascript("CosmoScout.gui.addDropdownValue",
+          "volumeRendering.setScalar", scalar.getId(), scalar.mName, false);
+    }
+    if (scalars.size() > 0) {
+      auto activeScalar = std::find_if(scalars.begin(), scalars.end(),
+          [this](Scalar s) { return s.getId() == mPluginSettings.mActiveScalar.get(); });
+      if (activeScalar == scalars.end()) {
+        activeScalar = scalars.begin();
+      }
+      mPluginSettings.mActiveScalar.set(activeScalar->getId());
+      mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setXRange",
+          activeScalar->mRange[0], activeScalar->mRange[1], false);
+      mGuiManager->getGui()->callJavascript(
+          "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", activeScalar->getId());
+    }
+  });
+  mDataManager->pTimesteps.connectAndTouch([this](std::vector<int> timesteps) {
+    nlohmann::json timestepsJson(timesteps);
+    mGuiManager->getGui()->callJavascript(
+        "CosmoScout.volumeRendering.setTimesteps", timestepsJson.dump());
   });
 }
 
