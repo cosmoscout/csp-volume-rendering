@@ -17,6 +17,7 @@
 #include <vtkDataSet.h>
 #include <vtkSmartPointer.h>
 
+#include <array>
 #include <future>
 #include <map>
 #include <mutex>
@@ -28,6 +29,8 @@ namespace csp::volumerendering {
 struct Scalar {
   std::string mName;
   ScalarType  mType;
+
+  std::array<double, 2> mRange;
 
   std::string getId() const {
     std::string id;
@@ -44,7 +47,7 @@ struct Scalar {
   }
 
   bool operator==(const Scalar& other) const {
-    return mName == other.mName && mType == other.mType;
+    return mName == other.mName && mType == other.mType && mRange == other.mRange;
   }
 
   bool operator<(const Scalar& other) const {

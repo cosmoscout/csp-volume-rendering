@@ -216,6 +216,7 @@ void DataManager::initScalars() {
       Scalar scalar;
       scalar.mName = data->GetPointData()->GetArrayName(i);
       scalar.mType = ScalarType::ePointData;
+      data->GetPointData()->GetScalars(scalar.mName.c_str())->GetRange(scalar.mRange.data());
       scalars.push_back(scalar);
     }
   }
@@ -224,6 +225,7 @@ void DataManager::initScalars() {
       Scalar scalar;
       scalar.mName = data->GetCellData()->GetArrayName(i);
       scalar.mType = ScalarType::eCellData;
+      data->GetCellData()->GetScalars(scalar.mName.c_str())->GetRange(scalar.mRange.data());
       scalars.push_back(scalar);
     }
   }
@@ -243,9 +245,41 @@ void DataManager::loadData(int timestep) {
   auto data = std::async(
       std::launch::async,
       [this](std::string path, int timestep) {
-        std::scoped_lock            lock(mReadMutex);
-        auto                        timer = std::chrono::high_resolution_clock::now();
-        vtkSmartPointer<vtkDataSet> data  = loadDataImpl(timestep);
+        std::chrono::high_resolution_clock::time_point timer;
+        vtkSmartPointer<vtkDataSet>                    data;
+        {
+          std::scoped_lock lock(mReadMutex);
+          timer = std::chrono::high_resolution_clock::now();
+          data  = loadDataImpl(timestep);
+        }
+        {
+          std::scoped_lock(mStateMutex);
+          std::vector<Scalar> scalars;
+          bool                scalarsUpdated = false;
+          for (auto scalar : pScalars.get()) {
+            std::array<double, 2> range;
+            switch (scalar.mType) {
+            case ScalarType::ePointData:
+              data->GetPointData()->GetScalars(scalar.mName.c_str())->GetRange(range.data());
+              break;
+            case ScalarType::eCellData:
+              data->GetCellData()->GetScalars(scalar.mName.c_str())->GetRange(range.data());
+              break;
+            }
+            if (range[0] < scalar.mRange[0]) {
+              scalar.mRange[0] = range[0];
+              scalarsUpdated   = true;
+            }
+            if (range[1] > scalar.mRange[1]) {
+              scalar.mRange[1] = range[1];
+              scalarsUpdated   = true;
+            }
+            scalars.push_back(scalar);
+          }
+          if (scalarsUpdated) {
+            pScalars.set(scalars);
+          }
+        }
 
         logger().info("Finished loading data from {}, timestep {}. Took {}s.", path, timestep,
             (float)(std::chrono::high_resolution_clock::now() - timer).count() / 1000000000);

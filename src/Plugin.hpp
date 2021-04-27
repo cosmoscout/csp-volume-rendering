@@ -30,11 +30,12 @@ class Plugin : public cs::core::PluginBase {
  public:
   struct Settings {
     // Data settings
-    cs::utils::Property<std::string>     mVolumeDataPath;
-    cs::utils::Property<std::string>     mVolumeDataPattern;
-    cs::utils::Property<VolumeFileType>  mVolumeDataType;
-    cs::utils::Property<VolumeStructure> mVolumeStructure;
-    cs::utils::Property<VolumeShape>     mVolumeShape;
+    cs::utils::Property<std::string>        mVolumeDataPath;
+    cs::utils::Property<std::string>        mVolumeDataPattern;
+    cs::utils::Property<VolumeFileType>     mVolumeDataType;
+    cs::utils::Property<VolumeStructure>    mVolumeStructure;
+    cs::utils::Property<VolumeShape>        mVolumeShape;
+    cs::utils::DefaultProperty<std::string> mActiveScalar{""};
 
     // Rendering settings
     cs::utils::DefaultProperty<bool>        mRequestImages{true};

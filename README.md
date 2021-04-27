@@ -67,6 +67,7 @@ Mandatory settings are shown **bold**, while optional settings are shown in *ita
 | **volumeDataType** | `"vtk"` | - | Data format of the specified files. Currently only supports VTK data. |
 | **volumeStructure** | `"structured"` / `"unstructured"` | - | Structure of the volumetric data. Currently supports structured regular grids and unstructured grids. |
 | **volumeShape** | `"cubic"` / `"spherical"` | - | Shape of the volume. By default, spherical volumes are rendered with the same size as the planet they are bound to. Cubic volumes are rendered, so that their corners touch the planets surface. |
+| **activeScalar** | string | "" | The scalar, that should initially be active. Should be the name of the scalar, prefixed by `"cell_"` or `"point_"` to signify whether it is Point or Cell Data. |
 
 ### Rendering settings
 

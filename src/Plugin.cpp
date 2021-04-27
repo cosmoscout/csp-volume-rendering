@@ -6,8 +6,8 @@
 
 #include "Plugin.hpp"
 
-#include "Data/VtkDataManager.hpp"
 #include "Data/NetCdfDataManager.hpp"
+#include "Data/VtkDataManager.hpp"
 #include "Display/Billboard.hpp"
 #include "Display/PointsForwardWarped.hpp"
 #include "Render/OSPRayRenderer.hpp"
@@ -94,6 +94,7 @@ void from_json(nlohmann::json const& j, Plugin::Settings& o) {
   cs::core::Settings::deserialize(j, "volumeDataType", o.mVolumeDataType);
   cs::core::Settings::deserialize(j, "volumeStructure", o.mVolumeStructure);
   cs::core::Settings::deserialize(j, "volumeShape", o.mVolumeShape);
+  cs::core::Settings::deserialize(j, "activeScalar", o.mActiveScalar);
 
   // Rendering settings
   cs::core::Settings::deserialize(j, "requestImages", o.mRequestImages);
@@ -127,6 +128,7 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
   cs::core::Settings::serialize(j, "volumeDataType", o.mVolumeDataType);
   cs::core::Settings::serialize(j, "volumeStructure", o.mVolumeStructure);
   cs::core::Settings::serialize(j, "volumeShape", o.mVolumeShape);
+  cs::core::Settings::serialize(j, "activeScalar", o.mActiveScalar);
 
   // Rendering settings
   cs::core::Settings::serialize(j, "requestImages", o.mRequestImages);
@@ -397,7 +399,11 @@ void Plugin::registerUICallbacks() {
       "Set the scalar to be rendered.", std::function([this](std::string scalar) {
         mRenderedFrames.clear();
         mDataManager->setActiveScalar(scalar);
-        mParametersDirty = true;
+        mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setXRange",
+            mDataManager->getState().mScalar.mRange[0], mDataManager->getState().mScalar.mRange[1],
+            true);
+        mPluginSettings.mActiveScalar = scalar;
+        mParametersDirty              = true;
       }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setTimestep",
@@ -435,13 +441,26 @@ void Plugin::registerUICallbacks() {
 void Plugin::connectSettings() {
   // Connect to data manager properties
   mDataManager->pScalars.connectAndTouch([this](std::vector<Scalar> scalars) {
+    mGuiManager->getGui()->callJavascript(
+        "CosmoScout.gui.clearDropdown", "volumeRendering.setScalar");
     for (Scalar scalar : scalars) {
       mGuiManager->getGui()->callJavascript("CosmoScout.gui.addDropdownValue",
           "volumeRendering.setScalar", scalar.getId(), scalar.mName, false);
     }
     if (scalars.size() > 0) {
+      auto activeScalar = std::find_if(scalars.begin(), scalars.end(),
+          [this](Scalar s) { return s.getId() == mPluginSettings.mActiveScalar.get(); });
+      if (activeScalar == scalars.end()) {
+        activeScalar = scalars.begin();
+        mPluginSettings.mActiveScalar.set(activeScalar->getId());
+        mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setXRange",
+            activeScalar->mRange[0], activeScalar->mRange[1], true);
+      } else {
+        mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setXRange",
+            activeScalar->mRange[0], activeScalar->mRange[1], false);
+      }
       mGuiManager->getGui()->callJavascript(
-          "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", scalars[0].getId());
+          "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", activeScalar->getId());
     }
   });
   mDataManager->pTimesteps.connectAndTouch([this](std::vector<int> timesteps) {
@@ -465,6 +484,12 @@ void Plugin::connectSettings() {
       });
 
   // Connect to plugin settings
+  // Data settings
+  mPluginSettings.mActiveScalar.connectAndTouch([this](std::string value) {
+    mGuiManager->getGui()->callJavascript(
+        "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", value);
+  });
+
   // Rendering settings
   mPluginSettings.mRequestImages.connectAndTouch([this](bool enable) {
     mGuiManager->setCheckboxValue("volumeRendering.setEnableRequestImages", enable);
