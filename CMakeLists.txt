@@ -21,35 +21,31 @@ endif()
 if (DEFINED ENV{OSPRAY_CMAKE_CONFIG_DIR})
   SET(ospray_DIR "$ENV{OSPRAY_CMAKE_CONFIG_DIR}")
 else()
-  SET(ospray_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/ospray-2.3.0)
+  SET(ospray_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/ospray-2.5.0)
 endif()
 
 if (DEFINED ENV{EMBREE_CMAKE_CONFIG_DIR})
   SET(embree_DIR "$ENV{EMBREE_CMAKE_CONFIG_DIR}")
 else()
-  if (WIN32)
-    SET(embree_DIR ${COSMOSCOUT_EXTERNALS_DIR})
-  else()
-    SET(embree_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/embree-3.11.0)
-  endif()
+  SET(embree_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/embree-3.12.2)
 endif()
 
 if (DEFINED ENV{RKCOMMON_CMAKE_CONFIG_DIR})
   SET(rkcommon_DIR "$ENV{RKCOMMON_CMAKE_CONFIG_DIR}")
 else()
-  SET(rkcommon_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/rkcommon-1.5.0)
+  SET(rkcommon_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/rkcommon-1.6.0)
 endif()
 
 if (DEFINED ENV{OPENVKL_CMAKE_CONFIG_DIR})
   SET(openvkl_DIR "$ENV{OPENVKL_CMAKE_CONFIG_DIR}")
 else()
-  SET(openvkl_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/openvkl-0.10.0)
+  SET(openvkl_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/openvkl-0.12.0)
 endif()
 
 if (DEFINED ENV{OIDN_CMAKE_CONFIG_DIR})
   SET(OpenImageDenoise_DIR "$ENV{OIDN_CMAKE_CONFIG_DIR}")
 else()
-  SET(OpenImageDenoise_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/OpenImageDenoise)
+  SET(OpenImageDenoise_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake/OpenImageDenoise-1.3.0)
 endif()
 
 if (DEFINED ENV{RKCOMMON_TBB_ROOT})
@@ -95,7 +91,7 @@ target_link_libraries(csp-volume-rendering
 
 target_include_directories(csp-volume-rendering
   PUBLIC
-	  ${VTK_INCLUDE_DIRS}
+    ${VTK_INCLUDE_DIRS}
 )
 
 # Add this Plugin to a "plugins" folder in your IDE.

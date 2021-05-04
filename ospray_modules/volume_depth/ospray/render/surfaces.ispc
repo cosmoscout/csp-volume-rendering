@@ -1,12 +1,12 @@
-// Copyright 2009-2020 Intel Corporation
+// Copyright 2009-2021 Intel Corporation
 // SPDX-License-Identifier: Apache-2.0
 
 #include "math/random.ih"
 #include "math/sampling.ih"
 #include "render/util.ih"
 // SciVis renderer
-#include "render/scivis/SciVisMaterial.ih"
 #include "lights/Light.ih"
+#include "render/scivis/SciVisMaterial.ih"
 #include "surfaces.ih"
 
 vec3f directIllumination(const uniform VolumeDepth* uniform self, const FrameBuffer* uniform fb,
@@ -35,8 +35,7 @@ vec3f directIllumination(const uniform VolumeDepth* uniform self, const FrameBuf
       const vec3f light_contrib = (diffuse + specular) * light.weight;
 
       if (self->shadowsEnabled) {
-        const float max_contrib = reduce_max(light_contrib);
-        if (max_contrib > self->super.minContribution) {
+        if (luminance(light_contrib) > self->super.minContribution) {
           vec3f P = dg.P;
           if (dot(dg.Ng, light.dir) < 0.0f)
             P = P - (2.f * dg.epsilon) * dg.Ng;
@@ -44,8 +43,8 @@ vec3f directIllumination(const uniform VolumeDepth* uniform self, const FrameBuf
           Ray shadowRay;
           setRay(shadowRay, P, light.dir, 0.0f, light.dist, time);
 
-          float light_alpha = lightAlpha(
-              self, shadowRay, fb, world, sample, ldSampler, max_contrib, dg.epsilon, 0.25f);
+          vec3f light_alpha = lightAlpha(
+              self, shadowRay, fb, world, sample, ldSampler, light_contrib, dg.epsilon, 0.25f);
 
           color = color + light_alpha * light_contrib;
         }
@@ -68,14 +67,35 @@ SSI computeShading(const VolumeDepth* uniform self, const FrameBuffer* uniform f
 
   vec3f color = directIllumination(self, fb, world, dg, sample, ldSampler, bsdf, inDir, time);
 
-  float ao = 1.f;
-  if (self->aoSamples > 0 && reduce_max(world->scivisData.aoColorPi) > 0.01f)
-    ao = SciVis_computeAO(
+  vec3f ao = make_vec3f(1.f);
+  if (self->aoSamples > 0 && luminance(world->scivisData.aoColorPi) > self->super.minContribution)
+    ao = VolumeDepth_computeAO(
         self, fb, world, sample, ldSampler, dg, self->aoSamples, self->aoRadius, sample.sampleID);
 
   color = color + bsdf.diffuse * ao * world->scivisData.aoColorPi;
 
-  retval.shadedColor = make_vec4f(color, bsdf.opacity);
+  retval.shadedColor  = color;
+  retval.transmission = bsdf.transmission;
 
   return retval;
+}
+
+vec3f evaluateLights(const World* uniform world, const DifferentialGeometry& dg, const Ray& ray) {
+  // Exit if no lights
+  vec3f color = make_vec3f(0.f);
+  if (!world->scivisData.lightsVisible)
+    return color;
+
+  // Iterate through all lights
+  for (uniform int i = 0; i < world->scivisData.numLightsVisible; i++) {
+    // Skip lights with disabled visibilty via parameter
+    const uniform Light* uniform l = world->scivisData.lightsVisible[i];
+    if (!l->isVisible)
+      continue;
+
+    // Evaluate light contribution
+    const Light_EvalRes le = l->eval(l, dg, ray.dir, ray.t0, ray.t);
+    color                  = color + le.radiance;
+  }
+  return color;
 }

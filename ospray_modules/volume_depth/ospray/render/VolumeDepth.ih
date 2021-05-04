@@ -28,18 +28,18 @@ struct VolumeDepth {
 struct VolumeDepthRenderContext {
   const VolumeDepth* uniform renderer;
   const FrameBuffer* uniform fb;
-  const World* uniform world;
-  ScreenSample         sample;
+  const World* uniform       world;
+  ScreenSample               sample;
   varying LDSampler* uniform ldSampler;
 };
 
 struct LDSampler;
 
-float lightAlpha(const uniform VolumeDepth* uniform self, Ray& ray, const FrameBuffer* uniform fb,
+vec3f lightAlpha(const uniform VolumeDepth* uniform self, Ray& ray, const FrameBuffer* uniform fb,
     const World* uniform world, ScreenSample& sample, varying LDSampler* uniform ldSampler,
-    float weight, float rayOffset, uniform float quality);
+    vec3f weight, float rayOffset, uniform float quality);
 
-float SciVis_computeAO(const uniform VolumeDepth* uniform self, const FrameBuffer* uniform fb,
+vec3f VolumeDepth_computeAO(const uniform VolumeDepth* uniform self, const FrameBuffer* uniform fb,
     const World* uniform world, ScreenSample& sample, varying LDSampler* uniform ldSampler,
     const varying DifferentialGeometry& dg, const uniform int sampleCnt,
     const uniform float aoRadius, const varying vec3i& sampleID);

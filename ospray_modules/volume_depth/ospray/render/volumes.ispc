@@ -3,7 +3,7 @@
 
 #include "surfaces.ih"
 #include "volumes.ih"
-
+// ispc device
 #include "math/random.ih"
 #include "math/sampling.ih"
 #include "render/util.ih"
@@ -25,7 +25,8 @@ struct VolumeContext {
 };
 
 static void sampleVolume(VolumeDepthRenderContext& rc, VolumeContext& vc,
-    VolumetricModel* uniform m, const uniform float samplingRate, const uniform bool shade) {
+    VolumetricModel* uniform m, Ray& ray, const VolumeInterval& vi,
+    const uniform float samplingRate, const uniform bool shade) {
   // We have to iterate till we get a valid sample value
   float               dt;
   float               sampleVal = nan;
@@ -81,28 +82,33 @@ static void sampleVolume(VolumeDepthRenderContext& rc, VolumeContext& vc,
   if (gsc > 0.0f) {
     vec3f ns = Volume_getGradient(m->volume, p);
     if (dot(ns, ns) > 1e-6f) {
-      ns = normalize(ns);
+      // assume that opacity directly correlates to volume scalar field, i.e.
+      // that "outside" has lower values; because the gradient point towards
+      // increasing values we need to flip it
+      ns = neg(ns);
 
       // use scivis shading function
       // Prepare differential geometry structure
       DifferentialGeometry dg;
       dg.color    = vc.sample;
       dg.material = NULL;
-      dg.Ns = dg.Ng = ns;
-      dg.P          = p;
-      dg.epsilon    = dt / 2.f;
+      dg.epsilon  = dt / 2.f;
+      // transform to world coords
+      dg.Ns = dg.Ng = normalize(xfmVector(transposed(vi.xfm.l), ns));
+      dg.P          = ray.org + vc.distance * ray.dir;
       SSI shading =
-          computeShading(rc.renderer, rc.fb, rc.world, dg, rc.sample, rc.ldSampler, vc.dir, 0.f);
-      vc.sample = lerp(gsc, vc.sample, shading.shadedColor);
+          computeShading(rc.renderer, rc.fb, rc.world, dg, rc.sample, rc.ldSampler, ray.dir, 0.f);
+      vec4f shadedColor = make_vec4f(shading.shadedColor, 1.f - luminance(shading.transmission));
+      vc.sample         = lerp(gsc, vc.sample, shadedColor);
     }
   }
 
   // Weight the opacity with deltaT using Beer law
-  vc.sample.w = 1.f - exp(-vc.sample.w * dt * m->densityScale);
+  vc.sample.w = exp(-vc.sample.w * dt * m->densityScale);
 }
 
 static float sampleAllVolumes(VolumeDepthRenderContext& rc, const VolumeIntervals& volumeIntervals,
-    varying VolumeContext* uniform volumeContexts, const uniform float samplingRate,
+    varying VolumeContext* uniform volumeContexts, Ray& ray, const uniform float samplingRate,
     vec4f& sampledColor, const uniform bool shade) {
   // Look for the closest sample across all volumes
   float minDist      = inf;
@@ -116,7 +122,7 @@ static float sampleAllVolumes(VolumeDepthRenderContext& rc, const VolumeInterval
     if (vc.ready == 0) {
       const VolumeInterval& vi = volumeIntervals.intervals[i];
       foreach_unique(m in vi.volumetricModel) {
-        sampleVolume(rc, vc, m, samplingRate, shade);
+        sampleVolume(rc, vc, m, ray, vi, samplingRate, shade);
       }
       vc.ready = 1;
     }
@@ -138,12 +144,13 @@ static float sampleAllVolumes(VolumeDepthRenderContext& rc, const VolumeInterval
   return minDist;
 }
 
-vec4f integrateVolumeIntervals(VolumeDepthRenderContext& rc, const VolumeIntervals& volumeIntervals,
-    const RayIntervals& rayIntervals, Ray& ray, varying LDSampler* uniform ldSampler,
-    const uniform float samplingRate, const uniform bool shade, float& distance,
-    const uniform int depthMode) {
+vec4f integrateVolumeIntervalsGradient(VolumeDepthRenderContext& rc,
+    const VolumeIntervals& volumeIntervals, const RayIntervals& rayIntervals, Ray& ray,
+    varying LDSampler* uniform ldSampler, const uniform float samplingRate,
+    const uniform bool shade, float& distance, const uniform int depthMode) {
   // Array of volume contexts
-  VolumeContext volumeContexts[NUM_VOLUME_INTERVALS_MAX];
+  varying VolumeContext* uniform volumeContexts = (varying VolumeContext * uniform)
+      pushTLS(reduce_max(volumeIntervals.numVolumeIntervals) * sizeof(varying VolumeContext));
 
   // Sampling position jitter
   const float jitter = LDSampler_getFloat(ldSampler, 0);
@@ -165,12 +172,12 @@ vec4f integrateVolumeIntervals(VolumeDepthRenderContext& rc, const VolumeInterva
     vc.dir            = transformedRay.dir;
   }
 
-  // Define initial color with alpha
-  vec3f color = make_vec3f(0.f);
-  float alpha = 0.f;
+  // Define initial color and transmission
+  vec3f color        = make_vec3f(0.f);
+  float transmission = 1.f;
 
   // Iterate through all ray intervals
-  for (uniform int i = 0; i < reduce_max(rayIntervals.count) && (alpha < .99f); i++) {
+  for (uniform int i = 0; i < reduce_max(rayIntervals.count) && (transmission > 0.f); i++) {
     if (i >= rayIntervals.count)
       break;
 
@@ -208,7 +215,7 @@ vec4f integrateVolumeIntervals(VolumeDepthRenderContext& rc, const VolumeInterva
       VolumetricModel* varying model = vi.volumetricModel;
       foreach_unique(m in model) {
         // Create volume interval interator
-        vc.intervalIterator = vklInitIntervalIteratorV(m->volume->vklVolume,
+        vc.intervalIterator = vklInitIntervalIteratorV(m->volume->vklSampler,
             (varying vkl_vec3f*)&vc.org, (varying vkl_vec3f*)&vc.dir,
             (varying vkl_range1f*)&rInterval, m->vklValueSelector, vc.intervalIteratorBuffer);
       }
@@ -217,52 +224,58 @@ vec4f integrateVolumeIntervals(VolumeDepthRenderContext& rc, const VolumeInterva
     float perSampleThreshold = 0.0001f / samplingRate;
     int   hitCount           = 0;
     // Propagate ray across all volumes till opaque
-    while (alpha < .99f || depthMode == eLastHit) {
+    while (transmission > 0.f || depthMode == eLastHit) {
       // Sample across all volumes
-      vec4f sampledColorOpacity;
+      vec4f sampledColor;
       float dist = sampleAllVolumes(
-          rc, volumeIntervals, volumeContexts, samplingRate, sampledColorOpacity, shade);
+          rc, volumeIntervals, volumeContexts, ray, samplingRate, sampledColor, shade);
 
       // Exit loop if nothing sampled
       if (dist == inf)
         break;
 
-      // Alpha blend sampled color
-      color = color + ((1.f - alpha) * sampledColorOpacity.w * make_vec3f(sampledColorOpacity));
-      alpha = alpha + ((1.f - alpha) * sampledColorOpacity.w);
+      // Blend sampled color
+      color = color + transmission * (1.f - sampledColor.w) * make_vec3f(sampledColor);
+      transmission *= sampledColor.w;
 
+      // Determine distance value
       switch (depthMode) {
       case eFirstHit:
-        if (hitCount == 0 && sampledColorOpacity.w > perSampleThreshold) {
+        if (hitCount == 0 && sampledColor.w > perSampleThreshold) {
           distance = dist;
           hitCount = 1;
         }
         break;
       case eLastHit:
-        if (sampledColorOpacity.w > perSampleThreshold) {
+        if (sampledColor.w > perSampleThreshold) {
           distance = dist;
         }
         break;
       case eThreshold:
-        if (hitCount == 0 && alpha > 0.8f) {
+        if (hitCount == 0 && transmission < 0.2f) {
           distance = dist;
           hitCount = 1;
         }
         break;
       case eMultiThreshold:
-        if (hitCount == 0 && alpha > 0.35f) {
+        if (hitCount == 0 && transmission < 0.65f) {
           distance = dist;
           hitCount = 1;
         }
-        if (hitCount == 1 && alpha > 0.7f) {
+        if (hitCount == 1 && transmission < 0.3f) {
           distance = dist;
           hitCount = 2;
         }
         break;
       }
+
+      // Stop if we reached min contribution
+      if (transmission < rc.renderer->super.minContribution)
+        transmission = 0.f;
     }
   }
 
   // Return final color
-  return make_vec4f(color, alpha);
+  popTLS(volumeContexts);
+  return make_vec4f(color, transmission);
 }
