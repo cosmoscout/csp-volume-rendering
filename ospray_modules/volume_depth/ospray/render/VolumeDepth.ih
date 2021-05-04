@@ -16,6 +16,12 @@ enum DepthMode {
   eMultiThreshold = 16
 };
 
+struct ScalarFilter {
+  int attrIndex;
+  float min;
+  float max;
+};
+
 struct VolumeDepth {
   Renderer super;
   int      depthMode;

@@ -26,13 +26,21 @@ struct VolumeContext {
 
 static void sampleVolume(VolumeDepthRenderContext& rc, VolumeContext& vc,
     VolumetricModel* uniform m, Ray& ray, const VolumeInterval& vi,
-    const uniform float samplingRate, const uniform bool shade) {
+    const uniform float samplingRate, const uniform bool shade,
+    const uniform ScalarFilter* uniform filters, const uniform int numFilters) {
   // We have to iterate till we get a valid sample value
-  float               dt;
-  float               sampleVal = nan;
-  const uniform float gsc       = shade ? m->gradientShadingScale : 0.f;
-  vec3f               p;
-  while (isnan(sampleVal)) {
+  float          dt;
+  uniform uint32 attCount = numFilters + 1;
+  // TODO Use dynamic allocation for the arrays
+  float          sampleVal[10];
+  uniform uint32 atts[10];
+  atts[0] = 0;
+  for (int i = 0; i < numFilters; i++) {
+    atts[i + 1] = filters[i].attrIndex;
+  }
+  const uniform float gsc = shade ? m->gradientShadingScale : 0.f;
+  vec3f               p; // in volume local coords
+  while (isnan(sampleVal[0])) {
     // Iterate till sampling position is within interval
     float emptySpace = 0.f;
     while (vc.iuDistance > vc.iuLength) {
@@ -67,7 +75,8 @@ static void sampleVolume(VolumeDepthRenderContext& rc, VolumeContext& vc,
     p = vc.org + newDistance * vc.dir;
 
     // Sample volume value in given point
-    sampleVal = vklComputeSampleV(m->volume->vklSampler, (const varying vkl_vec3f* uniform) & p);
+    vklComputeSampleMV(
+        m->volume->vklSampler, (const varying vkl_vec3f* uniform) & p, sampleVal, attCount, atts);
 
     // Go to the next sub-interval
     vc.iuDistance += 1.f;
@@ -76,7 +85,12 @@ static void sampleVolume(VolumeDepthRenderContext& rc, VolumeContext& vc,
   }
 
   // Apply transfer function to get color with alpha
-  vc.sample = m->transferFunction->get(m->transferFunction, sampleVal);
+  vc.sample = m->transferFunction->get(m->transferFunction, sampleVal[0]);
+  for (int i = 0; i < numFilters; i++) {
+    if (sampleVal[i + 1] < filters[i].min || sampleVal[i + 1] > filters[i].max) {
+      vc.sample.w = 0;
+    }
+  }
 
   // compute gradient shading lighting
   if (gsc > 0.0f) {
@@ -111,8 +125,15 @@ static float sampleAllVolumes(VolumeDepthRenderContext& rc, const VolumeInterval
     varying VolumeContext* uniform volumeContexts, Ray& ray, const uniform float samplingRate,
     vec4f& sampledColor, const uniform bool shade) {
   // Look for the closest sample across all volumes
-  float minDist      = inf;
-  int   usedSampleId = -1;
+  float                minDist      = inf;
+  int                  usedSampleId = -1;
+  uniform ScalarFilter filters[2];
+  filters[0].attrIndex = 3;
+  filters[0].min       = 0;
+  filters[0].max       = inf;
+  filters[1].attrIndex = 2;
+  filters[1].min       = 2400;
+  filters[1].max       = inf;
   for (uniform int i = 0; i < reduce_max(volumeIntervals.numVolumeIntervals); i++) {
     if (i >= volumeIntervals.numVolumeIntervals)
       break;
@@ -122,7 +143,7 @@ static float sampleAllVolumes(VolumeDepthRenderContext& rc, const VolumeInterval
     if (vc.ready == 0) {
       const VolumeInterval& vi = volumeIntervals.intervals[i];
       foreach_unique(m in vi.volumetricModel) {
-        sampleVolume(rc, vc, m, ray, vi, samplingRate, shade);
+        sampleVolume(rc, vc, m, ray, vi, samplingRate, shade, (ScalarFilter*)filters, 2);
       }
       vc.ready = 1;
     }
