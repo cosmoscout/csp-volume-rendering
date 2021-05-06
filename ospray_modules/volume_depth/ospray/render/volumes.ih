@@ -11,5 +11,4 @@ struct RandomSampler;
 
 vec4f integrateVolumeIntervalsGradient(VolumeDepthRenderContext& rc, const VolumeIntervals& intervals,
     const RayIntervals& rayIntervals, Ray& ray, varying LDSampler* uniform ldSampler,
-    const uniform float samplingRate, const uniform bool shade, float& distance,
-    const uniform int depthMode);
+    const uniform float samplingRate, const uniform bool shade, float& distance);

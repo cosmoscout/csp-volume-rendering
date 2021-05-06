@@ -168,7 +168,7 @@ static float sampleAllVolumes(VolumeDepthRenderContext& rc, const VolumeInterval
 vec4f integrateVolumeIntervalsGradient(VolumeDepthRenderContext& rc,
     const VolumeIntervals& volumeIntervals, const RayIntervals& rayIntervals, Ray& ray,
     varying LDSampler* uniform ldSampler, const uniform float samplingRate,
-    const uniform bool shade, float& distance, const uniform int depthMode) {
+    const uniform bool shade, float& distance) {
   // Array of volume contexts
   varying VolumeContext* uniform volumeContexts = (varying VolumeContext * uniform)
       pushTLS(reduce_max(volumeIntervals.numVolumeIntervals) * sizeof(varying VolumeContext));
@@ -242,8 +242,9 @@ vec4f integrateVolumeIntervalsGradient(VolumeDepthRenderContext& rc,
       }
     }
 
-    float perSampleThreshold = 0.0001f / samplingRate;
-    int   hitCount           = 0;
+    const uniform int depthMode          = rc.renderer->depthMode;
+    float             perSampleThreshold = 0.0001f / samplingRate;
+    int               hitCount           = 0;
     // Propagate ray across all volumes till opaque
     while (transmission > 0.f || depthMode == eLastHit) {
       // Sample across all volumes

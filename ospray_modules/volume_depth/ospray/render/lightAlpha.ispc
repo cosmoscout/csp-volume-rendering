@@ -45,7 +45,7 @@ vec3f lightAlpha(const uniform VolumeDepth* uniform self, Ray& ray, const FrameB
       rc.ldSampler      = ldSampler;
       float distance    = inf;
       vec4f volumeColor = integrateVolumeIntervalsGradient(rc, volumeIntervals, rayIntervals,
-          volumeRay, ldSampler, self->volumeSamplingRate * quality, false, distance, eNone);
+          volumeRay, ldSampler, self->volumeSamplingRate * quality, false, distance);
 
       alpha = alpha * make_vec3f(volumeColor.w);
     }

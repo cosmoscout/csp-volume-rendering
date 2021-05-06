@@ -54,7 +54,7 @@ void VolumeDepth_renderSample(Renderer* uniform _self, FrameBuffer* uniform fb,
       rc.sample         = sample;
       rc.ldSampler      = ldSampler;
       vec4f volumeColor = integrateVolumeIntervalsGradient(rc, volumeIntervals, rayIntervals,
-          volumeRay, ldSampler, self->volumeSamplingRate, true, distance, self->depthMode);
+          volumeRay, ldSampler, self->volumeSamplingRate, true, distance);
 
       // Blend volume
       outColor        = outColor + outTransmission * make_vec3f(volumeColor);
