@@ -136,15 +136,17 @@ export void* uniform VolumeDepth_create(void* uniform cppE) {
 }
 
 export void VolumeDepth_set(void* uniform _self, uniform int depthMode, uniform bool shadowsEnabled,
-    uniform int aoSamples, uniform float aoRadius, uniform float volumeSamplingRate) {
+    uniform int aoSamples, uniform float aoRadius, uniform float volumeSamplingRate,
+    void* uniform scalarFilters, uniform int numScalarFilters) {
   uniform VolumeDepth* uniform self = (uniform VolumeDepth * uniform) _self;
 
-  self->depthMode      = depthMode;
-  self->shadowsEnabled = shadowsEnabled;
-  self->aoSamples      = aoSamples;
-  self->aoRadius       = aoRadius;
-
+  self->depthMode          = depthMode;
+  self->shadowsEnabled     = shadowsEnabled;
+  self->aoSamples          = aoSamples;
+  self->aoRadius           = aoRadius;
   self->volumeSamplingRate = volumeSamplingRate;
+  self->scalarFilters      = (ScalarFilter*)scalarFilters;
+  self->numScalarFilters   = numScalarFilters;
 }
 
 vec3f VolumeDepth_computeAO(const uniform VolumeDepth* uniform self, const FrameBuffer* uniform fb,

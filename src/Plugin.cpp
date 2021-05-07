@@ -155,6 +155,12 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
   cs::core::Settings::serialize(j, "rotation", o.mRotation);
 }
 
+void from_json(nlohmann::json const& j, ScalarFilter& o) {
+  cs::core::Settings::deserialize(j, "attrIndex", o.mAttrIndex);
+  cs::core::Settings::deserialize(j, "min", o.mMin);
+  cs::core::Settings::deserialize(j, "max", o.mMax);
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool Plugin::Frame::operator==(const Frame& other) {
@@ -427,6 +433,15 @@ void Plugin::registerUICallbacks() {
         mRenderedFrames.clear();
         cs::graphics::ColorMap colorMap(json);
         mRenderer->setTransferFunction(colorMap.getRawData());
+        mParametersDirty = true;
+      }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setScalarFilters",
+      "Sets filters for selecting which parts of the volume should be rendered.",
+      std::function([this](std::string json) {
+        mRenderedFrames.clear();
+        std::vector<ScalarFilter> filters = nlohmann::json::parse(json);
+        mRenderer->setScalarFilters(filters);
         mParametersDirty = true;
       }));
 }

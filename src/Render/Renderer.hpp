@@ -19,6 +19,12 @@
 
 namespace csp::volumerendering {
 
+struct ScalarFilter {
+  int   mAttrIndex;
+  float mMin;
+  float mMax;
+};
+
 class RendererException : public std::exception {
  public:
   const char* what() const noexcept override;
@@ -51,6 +57,9 @@ class Renderer {
   /// Sets the sampling rate used by the renderer. Higher sampling rates result in images with
   /// less noise.
   void setSamplingRate(float samplingRate);
+  /// Sets a factor making the volume more or less dense.
+  /// The higher the density, the more opaque the volume will appear.
+  void setDensityScale(float densityScale);
   /// Sets the heuristic with which the depth image should be rendered.
   void setDepthMode(DepthMode depthMode);
 
@@ -63,9 +72,10 @@ class Renderer {
   /// The transferFunction parameter should contain a vector of RGBA color values.
   /// The colors are evenly spaced over the domain of the function.
   void setTransferFunction(std::vector<glm::vec4> transferFunction);
-  /// Sets a factor making the volume more or less dense.
-  /// The higher the density, the more opaque the volume will appear.
-  void setDensityScale(float densityScale);
+  /// Sets filters to restrict the shown volume based on different scalars.
+  /// For each scalar a minimum and maximum value can be given. Only parts of the volume,
+  /// for which all scalars lie in the given ranges, will be visible.
+  void setScalarFilters(std::vector<ScalarFilter> filters);
 
   /// Enables or disables shading of the volume.
   void setShading(bool shading);
@@ -93,13 +103,14 @@ class Renderer {
   struct Parameters {
     int       mResolution;
     float     mSamplingRate;
+    float     mDensityScale;
     DepthMode mDepthMode;
 
     bool mDenoiseColor;
     bool mDenoiseDepth;
 
-    std::vector<glm::vec4> mTransferFunction;
-    float                  mDensityScale;
+    std::vector<glm::vec4>    mTransferFunction;
+    std::vector<ScalarFilter> mScalarFilters;
 
     bool      mShading;
     float     mAmbientLight;

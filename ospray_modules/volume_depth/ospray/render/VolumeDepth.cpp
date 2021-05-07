@@ -29,11 +29,14 @@ void VolumeDepth::commit() {
 
   rendererValid = false;
 
+  filters       = std::vector<ScalarFilter>((ScalarFilter*)getParam<void*>("scalarFilters"),
+      (ScalarFilter*)getParam<void*>("scalarFilters") + getParam<int>("numScalarFilters"));
   visibleLights = getParam<bool>("visibleLights", false);
+
   ispc::VolumeDepth_set(getIE(), getParam<int>("depthMode", 0), getParam<bool>("shadows", false),
       getParam<int>("aoSamples", 0),
       getParam<float>("aoDistance", getParam<float>("aoRadius", 1e20f)),
-      getParam<float>("volumeSamplingRate", 1.f));
+      getParam<float>("volumeSamplingRate", 1.f), filters.data(), (int32_t)filters.size());
 }
 
 void* VolumeDepth::beginFrame(FrameBuffer*, World* world) {

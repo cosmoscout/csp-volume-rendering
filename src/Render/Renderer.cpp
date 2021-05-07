@@ -84,6 +84,13 @@ void Renderer::setDensityScale(float densityScale) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void Renderer::setScalarFilters(std::vector<ScalarFilter> filters) {
+  std::scoped_lock lock(mParameterMutex);
+  mParameters.mScalarFilters = filters;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void Renderer::setShading(bool shading) {
   std::scoped_lock lock(mParameterMutex);
   mParameters.mShading = shading;

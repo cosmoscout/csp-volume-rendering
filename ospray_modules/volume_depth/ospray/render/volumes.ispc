@@ -26,17 +26,16 @@ struct VolumeContext {
 
 static void sampleVolume(VolumeDepthRenderContext& rc, VolumeContext& vc,
     VolumetricModel* uniform m, Ray& ray, const VolumeInterval& vi,
-    const uniform float samplingRate, const uniform bool shade,
-    const uniform ScalarFilter* uniform filters, const uniform int numFilters) {
+    const uniform float samplingRate, const uniform bool shade) {
   // We have to iterate till we get a valid sample value
   float          dt;
-  uniform uint32 attCount = numFilters + 1;
+  uniform uint32 attCount = rc.renderer->numScalarFilters + 1;
   // TODO Use dynamic allocation for the arrays
   float          sampleVal[10];
   uniform uint32 atts[10];
   atts[0] = 0;
-  for (int i = 0; i < numFilters; i++) {
-    atts[i + 1] = filters[i].attrIndex;
+  for (int i = 0; i < rc.renderer->numScalarFilters; i++) {
+    atts[i + 1] = rc.renderer->scalarFilters[i].attrIndex;
   }
   const uniform float gsc = shade ? m->gradientShadingScale : 0.f;
   vec3f               p; // in volume local coords
@@ -86,8 +85,9 @@ static void sampleVolume(VolumeDepthRenderContext& rc, VolumeContext& vc,
 
   // Apply transfer function to get color with alpha
   vc.sample = m->transferFunction->get(m->transferFunction, sampleVal[0]);
-  for (int i = 0; i < numFilters; i++) {
-    if (sampleVal[i + 1] < filters[i].min || sampleVal[i + 1] > filters[i].max) {
+  for (int i = 0; i < rc.renderer->numScalarFilters; i++) {
+    if (sampleVal[i + 1] < rc.renderer->scalarFilters[i].min ||
+        sampleVal[i + 1] > rc.renderer->scalarFilters[i].max) {
       vc.sample.w = 0;
     }
   }
@@ -127,13 +127,6 @@ static float sampleAllVolumes(VolumeDepthRenderContext& rc, const VolumeInterval
   // Look for the closest sample across all volumes
   float                minDist      = inf;
   int                  usedSampleId = -1;
-  uniform ScalarFilter filters[2];
-  filters[0].attrIndex = 3;
-  filters[0].min       = 0;
-  filters[0].max       = inf;
-  filters[1].attrIndex = 2;
-  filters[1].min       = 2400;
-  filters[1].max       = inf;
   for (uniform int i = 0; i < reduce_max(volumeIntervals.numVolumeIntervals); i++) {
     if (i >= volumeIntervals.numVolumeIntervals)
       break;
@@ -143,7 +136,7 @@ static float sampleAllVolumes(VolumeDepthRenderContext& rc, const VolumeInterval
     if (vc.ready == 0) {
       const VolumeInterval& vi = volumeIntervals.intervals[i];
       foreach_unique(m in vi.volumetricModel) {
-        sampleVolume(rc, vc, m, ray, vi, samplingRate, shade, (ScalarFilter*)filters, 2);
+        sampleVolume(rc, vc, m, ray, vi, samplingRate, shade);
       }
       vc.ready = 1;
     }

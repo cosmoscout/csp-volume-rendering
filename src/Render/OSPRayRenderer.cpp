@@ -363,6 +363,9 @@ ospray::cpp::FrameBuffer OSPRayRenderer::renderFrame(
   renderer.setParam("shadows", false);
   renderer.setParam("volumeSamplingRate", parameters.mSamplingRate);
   renderer.setParam("depthMode", (int)parameters.mDepthMode);
+  const void* filtersPtr = parameters.mScalarFilters.data();
+  renderer.setParam("scalarFilters", OSP_VOID_PTR, &filtersPtr);
+  renderer.setParam("numScalarFilters", (int)parameters.mScalarFilters.size());
   renderer.commit();
 
   int channels = OSP_FB_COLOR;

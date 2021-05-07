@@ -17,7 +17,7 @@ enum DepthMode {
 };
 
 struct ScalarFilter {
-  int attrIndex;
+  int   attrIndex;
   float min;
   float max;
 };
@@ -29,6 +29,9 @@ struct VolumeDepth {
   int      aoSamples;
   float    aoRadius;
   float    volumeSamplingRate;
+
+  ScalarFilter* scalarFilters;
+  int           numScalarFilters;
 };
 
 struct VolumeDepthRenderContext {
