@@ -30,7 +30,25 @@
 
       this.transferFunctionEditor = CosmoScout.transferFunctionEditor.create(
           document.getElementById("volumeRendering.tfEditor"), this.setTransferFunction,
-          {fitToData: true});
+        { fitToData: true });
+    }
+
+    showParCoords() {
+      var data = d3.csvParse(csvData);
+      data = d3.shuffle(data);
+
+      var pc2 = ParCoords()("#example");
+
+      pc2
+        .data(data)
+        .width(1000)
+        .height(150)
+        .color("#000")
+        .alpha(0.005)
+        .mode("queue")
+        .rate(100)
+        .render()
+        .brushMode("1D-axes");
     }
 
     /**

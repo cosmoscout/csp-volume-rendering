@@ -618,6 +618,7 @@ void Plugin::initUI() {
   mGuiManager->addPluginTabToSideBarFromHTML(
       "Volume Rendering", "blur_circular", "../share/resources/gui/volume_rendering_tab.html");
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/third-party/js/parcoords.standalone.js");
+  mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/mantle_resample_100.js");
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
 }
 
