@@ -30,3 +30,7 @@
   user-select: none;
   background-color: white;
 }
+.parcoords-container {
+  overflow: auto;
+  position: relative;
+}
