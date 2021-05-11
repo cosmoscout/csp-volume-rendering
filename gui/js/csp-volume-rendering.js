@@ -36,19 +36,20 @@
     showParCoords() {
       var data = d3.csvParse(csvData);
       data = d3.shuffle(data);
-
-      var pc2 = ParCoords()("#example");
-
-      pc2
+      var pc = ParCoords()("#example");
+      pc
         .data(data)
         .width(1000)
-        .height(150)
+        .height(200)
         .color("#000")
-        .alpha(0.005)
+        .alpha(0.05)
         .mode("queue")
-        .rate(100)
+        .rate(50)
         .render()
         .brushMode("1D-axes");
+      pc.on("brush", (brushed, args) => {
+        CosmoScout.callbacks.volumeRendering.setScalarFilters(JSON.stringify(pc.brushExtents()));
+      });
     }
 
     /**

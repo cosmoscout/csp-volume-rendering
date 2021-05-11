@@ -155,12 +155,6 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
   cs::core::Settings::serialize(j, "rotation", o.mRotation);
 }
 
-void from_json(nlohmann::json const& j, ScalarFilter& o) {
-  cs::core::Settings::deserialize(j, "attrIndex", o.mAttrIndex);
-  cs::core::Settings::deserialize(j, "min", o.mMin);
-  cs::core::Settings::deserialize(j, "max", o.mMax);
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool Plugin::Frame::operator==(const Frame& other) {
@@ -438,9 +432,21 @@ void Plugin::registerUICallbacks() {
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setScalarFilters",
       "Sets filters for selecting which parts of the volume should be rendered.",
-      std::function([this](std::string json) {
+      std::function([this](std::string jsonString) {
+        auto                      j = nlohmann::json::parse(jsonString);
+        std::vector<ScalarFilter> filters;
+        for (auto const& [axis, value] : j.items()) {
+          auto const& scalar = std::find_if(mDataManager->pScalars.get().begin(),
+              mDataManager->pScalars.get().end(), [&axis = axis](Scalar const& s) { return s.mName == axis; });
+          if (scalar != mDataManager->pScalars.get().end()) {
+            ScalarFilter filter;
+            filter.mAttrIndex = (int)std::distance(mDataManager->pScalars.get().begin(), scalar) + 1;
+            filter.mMin       = value["selection"]["scaled"][1];
+            filter.mMax       = value["selection"]["scaled"][0];
+            filters.push_back(filter);
+          }
+        }
         mRenderedFrames.clear();
-        std::vector<ScalarFilter> filters = nlohmann::json::parse(json);
         mRenderer->setScalarFilters(filters);
         mParametersDirty = true;
       }));
