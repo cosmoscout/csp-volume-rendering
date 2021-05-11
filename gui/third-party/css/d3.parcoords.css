@@ -7,6 +7,9 @@
 }
 .parcoords text.label {
   cursor: default;
+  fill: black;
+  transform: rotate(-5deg);
+  text-anchor: start;
 }
 .parcoords rect.background:hover {
   fill: rgba(120,120,120,0.2);
