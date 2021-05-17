@@ -7,6 +7,7 @@
 #ifndef CSP_VOLUME_RENDERING_OSPRAYUTILITY_HPP
 #define CSP_VOLUME_RENDERING_OSPRAYUTILITY_HPP
 
+#include "../Data/DataManager.hpp"
 #include "../Enums.hpp"
 
 #include <ospray/ospray_cpp.h>
@@ -31,7 +32,7 @@ ospray::cpp::Volume createOSPRayVolume(
 ospray::cpp::Volume createOSPRayVolume(
     vtkSmartPointer<vtkStructuredPoints> vtkVolume, ScalarType scalarType);
 ospray::cpp::Volume createOSPRayVolume(
-    vtkSmartPointer<vtkStructuredGrid> vtkVolume, ScalarType scalarType);
+    vtkSmartPointer<vtkStructuredGrid> vtkVolume, std::vector<Scalar> const& scalars);
 
 /// Creates a default transfer function for OSPRay.
 /// The transfer function interpolates from fully transparent blue to fully opaque red.

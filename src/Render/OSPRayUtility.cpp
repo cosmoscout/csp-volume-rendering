@@ -170,7 +170,7 @@ ospray::cpp::Volume createOSPRayVolume(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ospray::cpp::Volume createOSPRayVolume(
-    vtkSmartPointer<vtkStructuredGrid> vtkVolume, ScalarType scalarType) {
+    vtkSmartPointer<vtkStructuredGrid> vtkVolume, std::vector<Scalar> const& scalars) {
   std::array<int, 6> extent;
   vtkVolume->GetExtent(extent.data());
   std::array<double, 6> bounds;
@@ -185,37 +185,28 @@ ospray::cpp::Volume createOSPRayVolume(
       (float)(extent[5] - extent[4]) / (dimensions[2] - 1),
       (float)(extent[1] - extent[0]) / (dimensions[0] - 1)};
 
-  std::vector<std::string> scalars{"", "spin transition-induced density anomaly", "temperature",
-      "temperature anomaly", "thermal conductivity", "thermal expansivity", "vx", "vy", "vz"};
   std::vector<ospray::cpp::CopiedData> ospData(scalars.size());
   vtkSmartPointer<vtkDataArray>        vtkData;
   rkcommon::math::vec3i                dim;
 
   for (int i = 0; i < scalars.size(); i++) {
-    std::string scalar = scalars[i];
-    switch (scalarType) {
+    switch (scalars[i].mType) {
     case ScalarType::ePointData:
       dim     = {dimensions[1], dimensions[2], dimensions[0]};
-      vtkData = i == 0 ? vtkVolume->GetPointData()->GetScalars()
-                       : vtkVolume->GetPointData()->GetScalars(scalar.c_str());
+      vtkData = vtkVolume->GetPointData()->GetScalars(scalars[i].mName.c_str());
       break;
     case ScalarType::eCellData:
       dim     = {dimensions[1] - 1, dimensions[2] - 1, dimensions[0] - 1};
-      vtkData = i == 0 ? vtkVolume->GetCellData()->GetScalars()
-                       : vtkVolume->GetCellData()->GetScalars(scalar.c_str());
+      vtkData = vtkVolume->GetCellData()->GetScalars(scalars[i].mName.c_str());
       break;
     }
 
     if (vtkData->GetDataTypeSize() == 4) {
-      std::vector<float> data((float*)vtkData->GetVoidPointer(0),
-          (float*)vtkData->GetVoidPointer(vtkData->GetNumberOfTuples()));
-      ospData[i] = ospray::cpp::CopiedData(
-          data.data(), dim, rkcommon::math::vec3i{4 * dim[2], 4 * dim[2] * dim[0], 4});
+      ospData[i] = ospray::cpp::CopiedData((float*)vtkData->GetVoidPointer(0), dim,
+          rkcommon::math::vec3i{4 * dim[2], 4 * dim[2] * dim[0], 4});
     } else if (vtkData->GetDataTypeSize() == 8) {
-      std::vector<double> data((double*)vtkData->GetVoidPointer(0),
-          (double*)vtkData->GetVoidPointer(vtkData->GetNumberOfTuples()));
-      ospData[i] = ospray::cpp::CopiedData(
-          data.data(), dim, rkcommon::math::vec3i{8 * dim[2], 8 * dim[2] * dim[0], 8});
+      ospData[i] = ospray::cpp::CopiedData((double*)vtkData->GetVoidPointer(0), dim,
+          rkcommon::math::vec3i{8 * dim[2], 8 * dim[2] * dim[0], 8});
     }
   }
 
