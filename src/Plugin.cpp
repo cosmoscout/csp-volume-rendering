@@ -436,13 +436,15 @@ void Plugin::registerUICallbacks() {
         auto                      j = nlohmann::json::parse(jsonString);
         std::vector<ScalarFilter> filters;
         for (auto const& [axis, value] : j.items()) {
-          auto const& scalar = std::find_if(mDataManager->pScalars.get().begin(),
-              mDataManager->pScalars.get().end(), [&axis = axis](Scalar const& s) { return s.mName == axis; });
+          auto const& scalar =
+              std::find_if(mDataManager->pScalars.get().begin(), mDataManager->pScalars.get().end(),
+                  [&axis = axis](Scalar const& s) { return s.mName == axis; });
           if (scalar != mDataManager->pScalars.get().end()) {
             ScalarFilter filter;
-            filter.mAttrIndex = (int)std::distance(mDataManager->pScalars.get().begin(), scalar) + 1;
-            filter.mMin       = value["selection"]["scaled"][1];
-            filter.mMax       = value["selection"]["scaled"][0];
+            filter.mAttrIndex =
+                (int)std::distance(mDataManager->pScalars.get().begin(), scalar) + 1;
+            filter.mMin = value["selection"]["scaled"][1];
+            filter.mMax = value["selection"]["scaled"][0];
             filters.push_back(filter);
           }
         }
@@ -477,8 +479,8 @@ void Plugin::connectSettings() {
       mDataManager->setActiveScalar(value);
       mParametersDirty = true;
       mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setXRange",
-          mDataManager->getState().mScalar.mRange[0], mDataManager->getState().mScalar.mRange[1],
-          true);
+          mDataManager->getScalarRange(mDataManager->getState().mScalar.getId())[0],
+          mDataManager->getScalarRange(mDataManager->getState().mScalar.getId())[1], true);
       mGuiManager->getGui()->callJavascript(
           "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", value);
     }
@@ -603,7 +605,8 @@ void Plugin::connectSettings() {
       }
       mPluginSettings.mActiveScalar.set(activeScalar->getId());
       mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setXRange",
-          activeScalar->mRange[0], activeScalar->mRange[1], false);
+          mDataManager->getScalarRange(activeScalar->getId())[0],
+          mDataManager->getScalarRange(activeScalar->getId())[1], true);
       mGuiManager->getGui()->callJavascript(
           "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", activeScalar->getId());
     }
@@ -612,6 +615,13 @@ void Plugin::connectSettings() {
     nlohmann::json timestepsJson(timesteps);
     mGuiManager->getGui()->callJavascript(
         "CosmoScout.volumeRendering.setTimesteps", timestepsJson.dump());
+  });
+  mDataManager->onScalarRangeUpdated().connect([this](Scalar const& scalar) {
+    if (scalar.getId() == mPluginSettings.mActiveScalar.get()) {
+      mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setXRange",
+          mDataManager->getScalarRange(scalar.getId())[0],
+          mDataManager->getScalarRange(scalar.getId())[1], false);
+    }
   });
 }
 

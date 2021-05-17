@@ -126,7 +126,7 @@ OSPRayRenderer::Volume OSPRayRenderer::loadVolume(DataManager::State state) {
     throw std::runtime_error("Trying to load volume with unknown/invalid structure!");
   }
   volume.mHeight       = getHeight(volumeData);
-  volume.mScalarBounds = getScalarBounds(volumeData, state.mScalar.mType);
+  volume.mScalarBounds = mDataManager->getScalarRange(state.mScalar);
   return volume;
 }
 
@@ -164,29 +164,11 @@ float OSPRayRenderer::getHeight(vtkSmartPointer<vtkDataSet> data) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::array<float, 2> OSPRayRenderer::getScalarBounds(
-    vtkSmartPointer<vtkDataSet> data, ScalarType scalarType) {
-  std::array<float, 2> bounds;
-  switch (scalarType) {
-  case ScalarType::ePointData:
-    bounds[0] = (float)data->GetPointData()->GetScalars()->GetRange()[0];
-    bounds[1] = (float)data->GetPointData()->GetScalars()->GetRange()[1];
-    break;
-  case ScalarType::eCellData:
-    bounds[0] = (float)data->GetCellData()->GetScalars()->GetRange()[0];
-    bounds[1] = (float)data->GetCellData()->GetScalars()->GetRange()[1];
-    break;
-  }
-  return bounds;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 ospray::cpp::TransferFunction OSPRayRenderer::getTransferFunction(
     const Volume& volume, const Parameters& parameters) {
   if (parameters.mTransferFunction.size() > 0) {
-    return OSPRayUtility::createOSPRayTransferFunction(
-        volume.mScalarBounds[0], volume.mScalarBounds[1], parameters.mTransferFunction);
+    return OSPRayUtility::createOSPRayTransferFunction((float)volume.mScalarBounds[0],
+        (float)volume.mScalarBounds[1], parameters.mTransferFunction);
   } else {
     return OSPRayUtility::createOSPRayTransferFunction();
   }

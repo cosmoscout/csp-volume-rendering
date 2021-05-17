@@ -30,8 +30,6 @@ struct Scalar {
   std::string mName;
   ScalarType  mType;
 
-  std::array<double, 2> mRange;
-
   std::string getId() const {
     std::string id;
     switch (mType) {
@@ -47,7 +45,7 @@ struct Scalar {
   }
 
   bool operator==(const Scalar& other) const {
-    return mName == other.mName && mType == other.mType && mRange == other.mRange;
+    return mName == other.mName && mType == other.mType;
   }
 
   bool operator<(const Scalar& other) const {
@@ -100,6 +98,12 @@ class DataManager {
   /// Until this returns true queried data will have no active scalar.
   bool isReady();
 
+  /// This signal is called, when the scalar range for the given scalar changed.
+  cs::utils::Signal<Scalar const&> const& onScalarRangeUpdated() const;
+  /// Gets the min and max value for the given scalar.
+  std::array<double, 2> getScalarRange(Scalar const& scalar);
+  std::array<double, 2> getScalarRange(std::string scalarId);
+
   /// Sets the current timestep to the given value.
   /// Future calls to getData() will return data for this time.
   void setTimestep(int timestep);
@@ -132,14 +136,18 @@ class DataManager {
   bool   mDirty;
 
   std::mutex mReadMutex;
+  std::mutex mScalarsMutex;
   std::mutex mStateMutex;
   std::mutex mDataMutex;
 
-  std::map<int, std::string> mTimestepFiles;
+  std::map<int, std::string>                   mTimestepFiles;
+  std::map<std::string, std::array<double, 2>> mScalarRanges;
 
   std::map<int, std::shared_future<vtkSmartPointer<vtkDataSet>>> mCache;
 
   std::thread mInitScalarsThread;
+
+  cs::utils::Signal<Scalar const&> mOnScalarRangeUpdated;
 
   DataManager(std::string path, std::string filenamePattern);
 

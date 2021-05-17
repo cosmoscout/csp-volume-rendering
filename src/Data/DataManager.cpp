@@ -89,8 +89,28 @@ DataManager::~DataManager() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool DataManager::isReady() {
-  std::scoped_lock lock(mStateMutex);
+  std::scoped_lock lock(mScalarsMutex);
   return pScalars.get().size() > 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+cs::utils::Signal<Scalar const&> const& DataManager::onScalarRangeUpdated() const {
+  return mOnScalarRangeUpdated;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::array<double, 2> DataManager::getScalarRange(Scalar const& scalar) {
+  std::scoped_lock lock(mStateMutex);
+  return mScalarRanges[scalar.getId()];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::array<double, 2> DataManager::getScalarRange(std::string scalarId) {
+  std::scoped_lock lock(mStateMutex);
+  return mScalarRanges[scalarId];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -128,7 +148,7 @@ bool DataManager::isDirty() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void DataManager::setActiveScalar(std::string scalarId) {
-  std::scoped_lock lock(mStateMutex);
+  std::scoped_lock lock(mStateMutex, mScalarsMutex);
   auto             scalar = std::find_if(pScalars.get().begin(), pScalars.get().end(),
       [&scalarId](Scalar const& s) { return s.getId() == scalarId; });
   if (scalar != pScalars.get().end()) {
@@ -211,30 +231,37 @@ void DataManager::initScalars() {
   }
 
   std::vector<Scalar> scalars;
-  for (int i = 0; i < data->GetPointData()->GetNumberOfArrays(); i++) {
-    if (data->GetPointData()->GetAbstractArray(i)->GetNumberOfComponents() == 1) {
-      Scalar scalar;
-      scalar.mName = data->GetPointData()->GetArrayName(i);
-      scalar.mType = ScalarType::ePointData;
-      data->GetPointData()->GetScalars(scalar.mName.c_str())->GetRange(scalar.mRange.data());
-      scalars.push_back(scalar);
+  {
+    std::scoped_lock lock(mStateMutex);
+    for (int i = 0; i < data->GetPointData()->GetNumberOfArrays(); i++) {
+      if (data->GetPointData()->GetAbstractArray(i)->GetNumberOfComponents() == 1) {
+        Scalar scalar;
+        scalar.mName = data->GetPointData()->GetArrayName(i);
+        scalar.mType = ScalarType::ePointData;
+        data->GetPointData()
+            ->GetScalars(scalar.mName.c_str())
+            ->GetRange(mScalarRanges[scalar.getId()].data());
+        scalars.push_back(scalar);
+      }
     }
-  }
-  for (int i = 0; i < data->GetCellData()->GetNumberOfArrays(); i++) {
-    if (data->GetCellData()->GetAbstractArray(i)->GetNumberOfComponents() == 1) {
-      Scalar scalar;
-      scalar.mName = data->GetCellData()->GetArrayName(i);
-      scalar.mType = ScalarType::eCellData;
-      data->GetCellData()->GetScalars(scalar.mName.c_str())->GetRange(scalar.mRange.data());
-      scalars.push_back(scalar);
+    for (int i = 0; i < data->GetCellData()->GetNumberOfArrays(); i++) {
+      if (data->GetCellData()->GetAbstractArray(i)->GetNumberOfComponents() == 1) {
+        Scalar scalar;
+        scalar.mName = data->GetCellData()->GetArrayName(i);
+        scalar.mType = ScalarType::eCellData;
+        data->GetCellData()
+            ->GetScalars(scalar.mName.c_str())
+            ->GetRange(mScalarRanges[scalar.getId()].data());
+        scalars.push_back(scalar);
+      }
     }
+    if (scalars.size() == 0) {
+      logger().error("No scalars found in volume data! Requested data may have no active scalar.");
+      return;
+    }
+    mActiveScalar = scalars[0];
   }
-  if (scalars.size() == 0) {
-    logger().error("No scalars found in volume data! Requested data may have no active scalar.");
-    return;
-  }
-  std::scoped_lock lock(mStateMutex);
-  mActiveScalar = scalars[0];
+  std::scoped_lock lock(mScalarsMutex);
   pScalars.set(scalars);
 }
 
@@ -253,10 +280,9 @@ void DataManager::loadData(int timestep) {
           data  = loadDataImpl(timestep);
         }
         {
-          std::scoped_lock(mStateMutex);
-          std::vector<Scalar> scalars;
-          bool                scalarsUpdated = false;
-          for (auto scalar : pScalars.get()) {
+          std::scoped_lock lock(mStateMutex, mScalarsMutex);
+          for (auto const& scalar : pScalars.get()) {
+            bool                  rangeUpdated = false;
             std::array<double, 2> range;
             switch (scalar.mType) {
             case ScalarType::ePointData:
@@ -266,18 +292,17 @@ void DataManager::loadData(int timestep) {
               data->GetCellData()->GetScalars(scalar.mName.c_str())->GetRange(range.data());
               break;
             }
-            if (range[0] < scalar.mRange[0]) {
-              scalar.mRange[0] = range[0];
-              scalarsUpdated   = true;
+            if (range[0] < mScalarRanges[scalar.getId()][0]) {
+              mScalarRanges[scalar.getId()][0] = range[0];
+              rangeUpdated                     = true;
             }
-            if (range[1] > scalar.mRange[1]) {
-              scalar.mRange[1] = range[1];
-              scalarsUpdated   = true;
+            if (range[1] > mScalarRanges[scalar.getId()][1]) {
+              mScalarRanges[scalar.getId()][1] = range[1];
+              rangeUpdated                     = true;
             }
-            scalars.push_back(scalar);
-          }
-          if (scalarsUpdated) {
-            pScalars.set(scalars);
+            if (rangeUpdated) {
+              mOnScalarRangeUpdated.emit(scalar);
+            }
           }
         }
 

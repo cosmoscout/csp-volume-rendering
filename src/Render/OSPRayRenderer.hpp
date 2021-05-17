@@ -35,9 +35,9 @@ class OSPRayRenderer : public Renderer {
 
  private:
   struct Volume {
-    ospray::cpp::Volume  mOsprayData;
-    float                mHeight;
-    std::array<float, 2> mScalarBounds;
+    ospray::cpp::Volume   mOsprayData;
+    float                 mHeight;
+    std::array<double, 2> mScalarBounds;
   };
 
   struct Camera {
@@ -55,10 +55,9 @@ class OSPRayRenderer : public Renderer {
   RenderedImage getFrameImpl(
       glm::mat4 cameraTransform, Parameters parameters, DataManager::State dataState) override;
 
-  const Volume&        getVolume(DataManager::State state);
-  Volume               loadVolume(DataManager::State state);
-  float                getHeight(vtkSmartPointer<vtkDataSet> data);
-  std::array<float, 2> getScalarBounds(vtkSmartPointer<vtkDataSet> data, ScalarType scalarType);
+  const Volume&                 getVolume(DataManager::State state);
+  Volume                        loadVolume(DataManager::State state);
+  float                         getHeight(vtkSmartPointer<vtkDataSet> data);
   ospray::cpp::TransferFunction getTransferFunction(
       const Volume& volume, const Parameters& parameters);
   ospray::cpp::World       getWorld(const Volume& volume, const Parameters& parameters);
