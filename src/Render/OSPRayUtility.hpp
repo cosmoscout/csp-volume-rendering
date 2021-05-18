@@ -30,7 +30,7 @@ void initOSPRay();
 ospray::cpp::Volume createOSPRayVolume(
     vtkSmartPointer<vtkUnstructuredGrid> vtkVolume, ScalarType scalarType);
 ospray::cpp::Volume createOSPRayVolume(
-    vtkSmartPointer<vtkStructuredPoints> vtkVolume, ScalarType scalarType);
+    vtkSmartPointer<vtkStructuredPoints> vtkVolume, std::vector<Scalar> const& scalars);
 ospray::cpp::Volume createOSPRayVolume(
     vtkSmartPointer<vtkStructuredGrid> vtkVolume, std::vector<Scalar> const& scalars);
 

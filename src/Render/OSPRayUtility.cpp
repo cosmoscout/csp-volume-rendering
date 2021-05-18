@@ -133,7 +133,7 @@ ospray::cpp::Volume createOSPRayVolume(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ospray::cpp::Volume createOSPRayVolume(
-    vtkSmartPointer<vtkStructuredPoints> vtkVolume, ScalarType scalarType) {
+    vtkSmartPointer<vtkStructuredPoints> vtkVolume, std::vector<Scalar> const& scalars) {
   double spacing[3];
   vtkVolume->GetSpacing(spacing);
   int dimensions[3];
@@ -143,25 +143,35 @@ ospray::cpp::Volume createOSPRayVolume(
     origin[i] = -(vtkVolume->GetBounds()[i * 2 + 1] - vtkVolume->GetBounds()[i * 2]) / 2;
   }
 
+  std::vector<ospray::cpp::CopiedData> ospData(scalars.size());
+  vtkSmartPointer<vtkDataArray>        vtkData;
+
+  for (int i = 0; i < scalars.size(); i++) {
+    switch (scalars[i].mType) {
+    case ScalarType::ePointData:
+      vtkData = vtkVolume->GetPointData()->GetScalars(scalars[i].mName.c_str());
+      break;
+    case ScalarType::eCellData:
+      vtkData = vtkVolume->GetCellData()->GetScalars(scalars[i].mName.c_str());
+      break;
+    }
+
+    if (vtkData->GetDataTypeSize() == 4) {
+      ospData[i] = ospray::cpp::CopiedData((float*)vtkData->GetVoidPointer(0),
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+    } else if (vtkData->GetDataTypeSize() == 8) {
+      ospData[i] = ospray::cpp::CopiedData((double*)vtkData->GetVoidPointer(0),
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+    }
+  }
+
   ospray::cpp::Volume volume("structuredRegular");
   volume.setParam(
       "gridOrigin", rkcommon::math::vec3f{(float)origin[0], (float)origin[1], (float)origin[2]});
   volume.setParam("gridSpacing",
       rkcommon::math::vec3f{(float)spacing[0], (float)spacing[1], (float)spacing[2]});
-
-  if (vtkVolume->GetScalarSize() == 4) {
-    std::vector<float> data((float*)vtkVolume->GetScalarPointer(),
-        (float*)vtkVolume->GetScalarPointer() + vtkVolume->GetNumberOfPoints());
-    volume.setParam(
-        "data", ospray::cpp::CopiedData(data.data(),
-                    rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]}));
-  } else if (vtkVolume->GetScalarSize() == 8) {
-    std::vector<double> data((double*)vtkVolume->GetScalarPointer(),
-        (double*)vtkVolume->GetScalarPointer() + vtkVolume->GetNumberOfPoints());
-    volume.setParam(
-        "data", ospray::cpp::CopiedData(data.data(),
-                    rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]}));
-  }
+  volume.setParam("data", ospray::cpp::Data(ospData.data(), OSP_DATA, ospData.size()));
+  volume.setParam("dimensions", rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
   volume.commit();
 
   return volume;
