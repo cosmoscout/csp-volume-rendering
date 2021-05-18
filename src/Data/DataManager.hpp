@@ -114,8 +114,6 @@ class DataManager {
   /// Has to be one of the values in pScalars.
   /// Future calls to getData() will return data with this as the active scalar.
   void setActiveScalar(std::string scalarId);
-  /// Returns whether the current state changed since the last call to getData().
-  bool isDirty();
 
   /// Returns the data for the current state.
   /// May block, if the requested data is not yet loaded.
@@ -131,19 +129,21 @@ class DataManager {
   State getState();
 
  protected:
-  int    mCurrentTimestep;
-  Scalar mActiveScalar;
-  bool   mDirty;
+  using Timestep = int;
+  using Lod      = int;
+
+  Timestep mCurrentTimestep;
+  Scalar   mActiveScalar;
 
   std::mutex mReadMutex;
   std::mutex mScalarsMutex;
   std::mutex mStateMutex;
   std::mutex mDataMutex;
 
-  std::map<int, std::string>                   mTimestepFiles;
-  std::map<std::string, std::array<double, 2>> mScalarRanges;
+  std::map<Timestep, std::map<Lod, std::string>> mFiles;
+  std::map<std::string, std::array<double, 2>>   mScalarRanges;
 
-  std::map<int, std::shared_future<vtkSmartPointer<vtkDataSet>>> mCache;
+  std::map<Timestep, std::map<Lod, std::shared_future<vtkSmartPointer<vtkDataSet>>>> mCache;
 
   std::thread mInitScalarsThread;
 
@@ -154,8 +154,10 @@ class DataManager {
   void initState();
   void initScalars();
 
-  void                                loadData(int timestep);
-  virtual vtkSmartPointer<vtkDataSet> loadDataImpl(int timestep) = 0;
+  std::shared_future<vtkSmartPointer<vtkDataSet>> getFromCache(Timestep timestep);
+
+  void                                loadData(Timestep timestep, Lod lod);
+  virtual vtkSmartPointer<vtkDataSet> loadDataImpl(Timestep timestep, Lod lod) = 0;
 };
 
 } // namespace csp::volumerendering

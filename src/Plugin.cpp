@@ -617,7 +617,7 @@ void Plugin::connectSettings() {
         "CosmoScout.volumeRendering.setTimesteps", timestepsJson.dump());
   });
   mDataManager->onScalarRangeUpdated().connect([this](Scalar const& scalar) {
-    if (scalar.getId() == mPluginSettings.mActiveScalar.get()) {
+    if (mDataManager->isReady() && scalar.getId() == mPluginSettings.mActiveScalar.get()) {
       mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setXRange",
           mDataManager->getScalarRange(scalar.getId())[0],
           mDataManager->getScalarRange(scalar.getId())[1], false);

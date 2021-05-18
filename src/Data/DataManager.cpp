@@ -36,7 +36,11 @@ DataManager::DataManager(std::string path, std::string filenamePattern) {
         "Filename pattern '{}' is not a valid regular expression: {}", filenamePattern, e.what());
     throw DataManagerException();
   }
-  if (patternRegex.mark_count() != 1) {
+
+  bool haveLodFiles = false;
+  if (patternRegex.mark_count() == 2) {
+    haveLodFiles = true;
+  } else if (patternRegex.mark_count() != 1) {
     logger().error(
         "Filename pattern '{}' has the wrong amount of capture groups: {}! The pattern should "
         "contain only one capture group capturing the timestep component of the filename.",
@@ -52,13 +56,14 @@ DataManager::DataManager(std::string path, std::string filenamePattern) {
     throw DataManagerException();
   }
 
-  std::vector<int> timesteps;
+  std::vector<Timestep> timesteps;
   for (std::string file : files) {
     file = std::regex_replace(file, std::regex(R"(\\)"), "/");
     std::smatch match;
     std::regex_search(file, match, patternRegex);
 
-    int timestep;
+    Timestep timestep;
+    Lod      lod;
     try {
       timestep = std::stoi(match[1].str());
     } catch (const std::invalid_argument&) {
@@ -67,9 +72,17 @@ DataManager::DataManager(std::string path, std::string filenamePattern) {
           filenamePattern, file, match[1].str());
       throw DataManagerException();
     }
+    try {
+      lod = haveLodFiles ? std::stoi(match[2].str()) : 0;
+    } catch (const std::invalid_argument&) {
+      logger().error("Capture group in filename pattern '{}' does not match an integer for file "
+                     "'{}': Match of group is '{}'! A suitable capture group could be '([0-9])+'.",
+          filenamePattern, file, match[2].str());
+      throw DataManagerException();
+    }
 
     timesteps.push_back(timestep);
-    mTimestepFiles[timestep] = file;
+    mFiles[timestep][lod] = file;
   }
   if (timesteps.size() == 0) {
     logger().error("No files matching '{}' found in '{}'!", filenamePattern, path);
@@ -116,33 +129,27 @@ std::array<double, 2> DataManager::getScalarRange(std::string scalarId) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void DataManager::setTimestep(int timestep) {
-  std::scoped_lock lock(mStateMutex, mDataMutex);
+  std::scoped_lock lock(mStateMutex);
   if (std::find(pTimesteps.get().begin(), pTimesteps.get().end(), timestep) !=
       pTimesteps.get().end()) {
     mCurrentTimestep = timestep;
-    mDirty           = true;
   } else {
     logger().warn("'{}' is not a timestep in the current dataset. '{}' will be used instead.",
         timestep, mCurrentTimestep);
   }
-  if (mCache.find(timestep) == mCache.end()) {
-    loadData(timestep);
-  }
+  getFromCache(timestep);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void DataManager::cacheTimestep(int timestep) {
-  std::scoped_lock lock(mDataMutex);
-  if (mCache.find(timestep) == mCache.end()) {
-    loadData(timestep);
+  if (std::find(pTimesteps.get().begin(), pTimesteps.get().end(), timestep) ==
+      pTimesteps.get().end()) {
+    logger().warn(
+        "'{}' is not a timestep in the current dataset. No timestep will be cached.", timestep);
+    return;
   }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-bool DataManager::isDirty() {
-  return mDirty;
+  getFromCache(timestep);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -153,7 +160,6 @@ void DataManager::setActiveScalar(std::string scalarId) {
       [&scalarId](Scalar const& s) { return s.getId() == scalarId; });
   if (scalar != pScalars.get().end()) {
     mActiveScalar = *scalar;
-    mDirty        = true;
   } else {
     logger().warn("'{}' is not a scalar in the current dataset. '{}' will be used instead.",
         scalarId, mActiveScalar.getId());
@@ -169,18 +175,8 @@ vtkSmartPointer<vtkDataSet> DataManager::getData() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 vtkSmartPointer<vtkDataSet> DataManager::getData(State state) {
-  std::shared_future<vtkSmartPointer<vtkDataSet>> futureData;
-  {
-    std::scoped_lock lock(mDataMutex);
-    mDirty          = false;
-    auto cacheEntry = mCache.find(state.mTimestep);
-    if (cacheEntry == mCache.end()) {
-      loadData(state.mTimestep);
-      cacheEntry = mCache.find(state.mTimestep);
-    }
-    futureData = cacheEntry->second;
-  }
-  vtkSmartPointer<vtkDataSet> dataset = futureData.get();
+  std::shared_future<vtkSmartPointer<vtkDataSet>> futureData = getFromCache(state.mTimestep);
+  vtkSmartPointer<vtkDataSet>                     dataset    = futureData.get();
   if (!dataset) {
     logger().error("Loaded data is null! Is the data type correctly set in the settings?");
     throw std::runtime_error("Loaded data is null.");
@@ -209,7 +205,7 @@ DataManager::State DataManager::getState() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void DataManager::initState() {
-  int timestep;
+  Timestep timestep;
   {
     std::scoped_lock lock(mStateMutex);
     timestep = pTimesteps.get()[0];
@@ -261,24 +257,47 @@ void DataManager::initScalars() {
     }
     mActiveScalar = scalars[0];
   }
-  std::scoped_lock lock(mScalarsMutex);
-  pScalars.set(scalars);
+  {
+    std::scoped_lock lock(mScalarsMutex);
+    pScalars.setWithNoEmit(scalars);
+  }
+  pScalars.touch();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void DataManager::loadData(int timestep) {
-  logger().info("Loading data from {}, timestep {}...", mTimestepFiles[timestep], timestep);
+std::shared_future<vtkSmartPointer<vtkDataSet>> DataManager::getFromCache(Timestep timestep) {
+  std::scoped_lock lock(mDataMutex);
+  auto             lods       = mFiles.find(timestep)->second;
+  auto             cacheEntry = mCache.find(timestep);
+  if (cacheEntry == mCache.end()) {
+    Lod lod = lods.lower_bound(0)->first;
+    loadData(timestep, lod);
+    return mCache[timestep][lod];
+  }
+  Lod  maxLod  = (--cacheEntry->second.end())->first;
+  auto nextLod = lods.upper_bound(maxLod);
+  if (nextLod != lods.end()) {
+    loadData(timestep, nextLod->first);
+  }
+  return mCache[timestep][maxLod];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void DataManager::loadData(Timestep timestep, Lod lod) {
+  logger().info("Loading data for timestep {}, level of detail {}...", timestep, lod);
   auto data = std::async(
       std::launch::async,
-      [this](std::string path, int timestep) {
+      [this](Timestep timestep, Lod lod) {
         std::chrono::high_resolution_clock::time_point timer;
         vtkSmartPointer<vtkDataSet>                    data;
         {
           std::scoped_lock lock(mReadMutex);
           timer = std::chrono::high_resolution_clock::now();
-          data  = loadDataImpl(timestep);
+          data  = loadDataImpl(timestep, lod);
         }
+        std::vector<Scalar> updatedScalars;
         {
           std::scoped_lock lock(mStateMutex, mScalarsMutex);
           for (auto const& scalar : pScalars.get()) {
@@ -301,18 +320,22 @@ void DataManager::loadData(int timestep) {
               rangeUpdated                     = true;
             }
             if (rangeUpdated) {
-              mOnScalarRangeUpdated.emit(scalar);
+              updatedScalars.push_back(scalar);
             }
           }
         }
+        for (auto const& scalar : updatedScalars) {
+          mOnScalarRangeUpdated.emit(scalar);
+        }
 
-        logger().info("Finished loading data from {}, timestep {}. Took {}s.", path, timestep,
+        logger().info("Finished loading data for timestep {}, level of detail {}. Took {}s.",
+            timestep, lod,
             (float)(std::chrono::high_resolution_clock::now() - timer).count() / 1000000000);
 
         return data;
       },
-      mTimestepFiles[timestep], timestep);
-  mCache[timestep] = std::move(data);
+      timestep, lod);
+  mCache[timestep][lod] = std::move(data);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

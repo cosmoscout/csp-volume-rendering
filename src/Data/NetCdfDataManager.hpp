@@ -21,7 +21,7 @@ class NetCdfDataManager : public DataManager {
   NetCdfDataManager(std::string path, std::string filenamePattern);
 
  protected:
-  vtkSmartPointer<vtkDataSet> loadDataImpl(int timestep) override;
+  vtkSmartPointer<vtkDataSet> loadDataImpl(Timestep timestep, Lod lod) override;
 };
 
 } // namespace csp::volumerendering

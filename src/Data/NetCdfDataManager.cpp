@@ -21,11 +21,11 @@ NetCdfDataManager::NetCdfDataManager(std::string path, std::string filenamePatte
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-vtkSmartPointer<vtkDataSet> NetCdfDataManager::loadDataImpl(int timestep) {
+vtkSmartPointer<vtkDataSet> NetCdfDataManager::loadDataImpl(Timestep timestep, Lod lod) {
   vtkSmartPointer<vtkDataSet> data;
 
   auto reader = vtkSmartPointer<vtkNetCDFCFReader>::New();
-  reader->SetFileName(mTimestepFiles[timestep].c_str());
+  reader->SetFileName(mFiles[timestep][lod].c_str());
   reader->SphericalCoordinatesOn();
   reader->SetDimensions("(lat, r, lon)");
   reader->Update();
