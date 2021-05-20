@@ -58,7 +58,7 @@ float OSPRayRenderer::getProgress() {
 
 void OSPRayRenderer::preloadData(DataManager::State state) {
   if (mCachedVolumes.find(state) == mCachedVolumes.end()) {
-    mCachedVolumes[state] =
+    mCachedVolumes[state][mDataManager->getMaxLod(state)] =
         std::async(std::launch::async, [this, state]() { return loadVolume(state); });
   }
 }
@@ -93,12 +93,24 @@ Renderer::RenderedImage OSPRayRenderer::getFrameImpl(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 const OSPRayRenderer::Volume& OSPRayRenderer::getVolume(DataManager::State state) {
-  auto cachedVolume = mCachedVolumes.find(state);
-  if (cachedVolume == mCachedVolumes.end()) {
-    mCachedVolumes[state] =
+  int         maxLod     = mDataManager->getMaxLod(state);
+  auto const& stateCache = mCachedVolumes.find(state);
+  if (stateCache == mCachedVolumes.end()) {
+    mCachedVolumes[state][maxLod] =
         std::async(std::launch::deferred, [this, state]() { return loadVolume(state); });
+  } else {
+    auto const& cachedVolume = stateCache->second.find(maxLod);
+    if (cachedVolume == stateCache->second.end()) {
+      mCachedVolumes[state][maxLod] =
+          std::async(std::launch::async, [this, state]() { return loadVolume(state); });
+    }
+    for (auto const& cacheEntry : stateCache->second) {
+      if (cacheEntry.second.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        maxLod = cacheEntry.first;
+      }
+    }
   }
-  return mCachedVolumes[state].get();
+  return mCachedVolumes[state][maxLod].get();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

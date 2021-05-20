@@ -46,7 +46,7 @@ class OSPRayRenderer : public Renderer {
     glm::mat4           mTransformationMatrix;
   };
 
-  std::map<DataManager::State, std::shared_future<Volume>> mCachedVolumes;
+  std::map<DataManager::State, std::map<int, std::shared_future<Volume>>> mCachedVolumes;
 
   std::optional<ospray::cpp::Future> mRenderFuture;
   bool                               mRenderingCancelled;

@@ -127,6 +127,8 @@ class DataManager {
   /// Returns the current state.
   /// If isReady() returns false, the scalar won't be set yet.
   State getState();
+  /// Returns the maximum level of detail, that can instantly be returned for the given state.
+  int getMaxLod(State state);
 
  protected:
   using Timestep = int;
@@ -139,6 +141,8 @@ class DataManager {
   std::mutex mScalarsMutex;
   std::mutex mStateMutex;
   std::mutex mDataMutex;
+
+  std::condition_variable mTimestepCv;
 
   std::map<Timestep, std::map<Lod, std::string>> mFiles;
   std::map<std::string, std::array<double, 2>>   mScalarRanges;

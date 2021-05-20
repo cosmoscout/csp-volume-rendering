@@ -129,14 +129,18 @@ std::array<double, 2> DataManager::getScalarRange(std::string scalarId) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void DataManager::setTimestep(int timestep) {
-  std::scoped_lock lock(mStateMutex);
-  if (std::find(pTimesteps.get().begin(), pTimesteps.get().end(), timestep) !=
-      pTimesteps.get().end()) {
-    mCurrentTimestep = timestep;
-  } else {
-    logger().warn("'{}' is not a timestep in the current dataset. '{}' will be used instead.",
-        timestep, mCurrentTimestep);
+  {
+    std::scoped_lock lock(mStateMutex);
+    if (std::find(pTimesteps.get().begin(), pTimesteps.get().end(), timestep) !=
+        pTimesteps.get().end()) {
+      mCurrentTimestep = timestep;
+    } else {
+      logger().warn("'{}' is not a timestep in the current dataset. '{}' will be used instead.",
+          timestep, mCurrentTimestep);
+      timestep = mCurrentTimestep;
+    }
   }
+  mTimestepCv.notify_all();
   getFromCache(timestep);
 }
 
@@ -204,6 +208,23 @@ DataManager::State DataManager::getState() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+int DataManager::getMaxLod(State state) {
+  std::scoped_lock lock(mDataMutex);
+  auto             cacheEntry = mCache.find(state.mTimestep);
+  if (cacheEntry == mCache.end()) {
+    return 0;
+  }
+  Lod maxLod = 0;
+  for (auto const& lod : cacheEntry->second) {
+    if (lod.second.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+      maxLod = lod.first;
+    }
+  }
+  return maxLod;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void DataManager::initState() {
   Timestep timestep;
   {
@@ -267,19 +288,33 @@ void DataManager::initScalars() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::shared_future<vtkSmartPointer<vtkDataSet>> DataManager::getFromCache(Timestep timestep) {
+  auto lods   = mFiles.find(timestep)->second;
+  Lod  maxLod = getMaxLod({timestep, mActiveScalar});
+
   std::scoped_lock lock(mDataMutex);
-  auto             lods       = mFiles.find(timestep)->second;
   auto             cacheEntry = mCache.find(timestep);
   if (cacheEntry == mCache.end()) {
     Lod lod = lods.lower_bound(0)->first;
     loadData(timestep, lod);
     return mCache[timestep][lod];
   }
-  Lod  maxLod  = (--cacheEntry->second.end())->first;
-  auto nextLod = lods.upper_bound(maxLod);
-  if (nextLod != lods.end()) {
-    loadData(timestep, nextLod->first);
-  }
+  std::thread loadNext([this, maxLod, lods, timestep]() {
+    {
+      std::unique_lock<std::mutex> cvLock(mStateMutex);
+      if (mTimestepCv.wait_for(cvLock, std::chrono::seconds(2),
+              [this, timestep]() { return mCurrentTimestep != timestep; })) {
+        return;
+      }
+    }
+    std::scoped_lock lock(mDataMutex);
+    auto             cacheEntry = mCache.find(timestep);
+    auto             loadingLod = cacheEntry->second.upper_bound(maxLod);
+    auto             nextLod    = lods.upper_bound(maxLod);
+    if (loadingLod == cacheEntry->second.end() && nextLod != lods.end()) {
+      loadData(timestep, nextLod->first);
+    }
+  });
+  loadNext.detach();
   return mCache[timestep][maxLod];
 }
 
