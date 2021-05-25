@@ -190,11 +190,6 @@ ospray::cpp::Volume createOSPRayVolume(
   std::array<double, 3> origin;
   vtkVolume->GetPoint(0, 0, 0, origin.data());
 
-  rkcommon::math::vec3f spacing = {
-      ((float)(bounds[3] - bounds[2]) / 2 - (float)origin[2]) / (dimensions[1] - 1),
-      (float)(extent[5] - extent[4]) / (dimensions[2] - 1),
-      (float)(extent[1] - extent[0]) / (dimensions[0] - 1)};
-
   std::vector<ospray::cpp::CopiedData> ospData(scalars.size());
   vtkSmartPointer<vtkDataArray>        vtkData;
   rkcommon::math::vec3i                dim;
@@ -220,9 +215,14 @@ ospray::cpp::Volume createOSPRayVolume(
     }
   }
 
+  rkcommon::math::vec3f spacing = {((float)(bounds[3] - bounds[2]) / 2 - (float)origin[2]) / dim[0],
+      180.f / dim[1], 360.f / dim[2]};
+  rkcommon::math::vec3f gridOrigin =
+      rkcommon::math::vec3f{(float)origin[2], spacing[1] / 2, spacing[2] / 2};
+
   ospray::cpp::Volume volume("structuredSpherical");
   volume.setParam("gridSpacing", spacing);
-  volume.setParam("gridOrigin", rkcommon::math::vec3f{(float)origin[2], 0, 0});
+  volume.setParam("gridOrigin", gridOrigin);
   volume.setParam("data", ospray::cpp::Data(ospData.data(), OSP_DATA, ospData.size()));
   volume.setParam("dimensions", dim);
   volume.commit();
