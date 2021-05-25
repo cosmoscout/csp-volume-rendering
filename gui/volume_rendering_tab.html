@@ -1,9 +1,9 @@
 <div class="accordion" id="volumeRenderingTab-accordion">
-  <div class="parcoords-container">
-    <div id="example" class="parcoords" style="width:1000px;height:200px"></div>
+  <div id="volumeRendering-parcoords" class="parcoords-container">
+    <div class="parcoords" style="width:1000px;height:200px"></div>
   </div>
-  <a class="btn glass block px-3" onclick="CosmoScout.volumeRendering.showParCoords()">
-    Show
+  <a class="btn glass block px-3" onclick="CosmoScout.volumeRendering.undockParcoords()">
+    <i class="material-icons">launch</i>
   </a>
   <div class="settings-section">
     <div class="section-header collapsed font-alegreya" id="headingVolume-data"
@@ -301,3 +301,21 @@
     </div>
   </div>
 </div>
+
+<template id="volumeRendering-parcoordsPopout-template">
+  <div id="volumeRendering-parcoordsPopout" class="draggable-window resizable-window">
+    <div class="window-wrapper">
+      <div class="window-header">
+        <span class="window-title">
+          <i class="material-icons">layers</i>
+          <span>Parallel Coordinates</span>
+        </span>
+        <a class="btn light-glass" data-action="close" data-toggle="tooltip" title="Close" onclick="CosmoScout.volumeRendering.dockParcoords()">
+          <i class="material-icons">close</i>
+        </a>
+      </div>
+      <div class="window-content container-fluid">
+      </div>
+    </div>
+  </div>
+</template>

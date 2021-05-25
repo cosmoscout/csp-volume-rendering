@@ -31,12 +31,19 @@
       this.transferFunctionEditor = CosmoScout.transferFunctionEditor.create(
           document.getElementById("volumeRendering.tfEditor"), this.setTransferFunction,
         { fitToData: true });
+
+      this._parcoords = document.getElementById("volumeRendering-parcoords");
+      this._parcoordsParent = this._parcoords.parentNode;
+      this._parcoordsPopout = CosmoScout.gui.loadTemplateContent("volumeRendering-parcoordsPopout");
+      document.getElementById("cosmoscout").appendChild(this._parcoordsPopout);
+
+      this.showParcoords();
     }
 
-    showParCoords() {
-      var data = d3.csvParse(csvData);
+    showParcoords() {
+      let data = d3.csvParse(csvData);
       data = d3.shuffle(data);
-      var pc = ParCoords()("#example");
+      const pc = ParCoords()("#volumeRendering-parcoords .parcoords");
       pc
         .data(data)
         .width(1000)
@@ -50,6 +57,17 @@
       pc.on("brush", (brushed, args) => {
         CosmoScout.callbacks.volumeRendering.setScalarFilters(JSON.stringify(pc.brushExtents()));
       });
+    }
+
+    undockParcoords() {
+      this._parcoordsPopout.classList.add("visible");
+      this._parcoords = this._parcoordsParent.removeChild(this._parcoords);
+      this._parcoordsPopout.querySelector(".window-content").appendChild(this._parcoords);
+    }
+
+    dockParcoords() {
+      this._parcoords = this._parcoordsPopout.querySelector(".window-content").removeChild(this._parcoords);
+      this._parcoordsParent.appendChild(this._parcoords);
     }
 
     /**
