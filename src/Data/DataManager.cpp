@@ -65,19 +65,19 @@ DataManager::DataManager(std::string path, std::string filenamePattern) {
     Timestep timestep;
     Lod      lod;
     try {
-      timestep = std::stoi(match[1].str());
+      timestep = std::stoi(match[haveLodFiles ? 2 : 1].str());
+    } catch (const std::invalid_argument&) {
+      logger().error("Capture group in filename pattern '{}' does not match an integer for file "
+                     "'{}': Match of group is '{}'! A suitable capture group could be '([0-9])+'.",
+          filenamePattern, file, match[haveLodFiles ? 2 : 1].str());
+      throw DataManagerException();
+    }
+    try {
+      lod = haveLodFiles ? std::stoi(match[1].str()) : 0;
     } catch (const std::invalid_argument&) {
       logger().error("Capture group in filename pattern '{}' does not match an integer for file "
                      "'{}': Match of group is '{}'! A suitable capture group could be '([0-9])+'.",
           filenamePattern, file, match[1].str());
-      throw DataManagerException();
-    }
-    try {
-      lod = haveLodFiles ? std::stoi(match[2].str()) : 0;
-    } catch (const std::invalid_argument&) {
-      logger().error("Capture group in filename pattern '{}' does not match an integer for file "
-                     "'{}': Match of group is '{}'! A suitable capture group could be '([0-9])+'.",
-          filenamePattern, file, match[2].str());
       throw DataManagerException();
     }
 
