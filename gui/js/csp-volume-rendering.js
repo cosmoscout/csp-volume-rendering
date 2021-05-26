@@ -30,10 +30,11 @@
 
       this.transferFunctionEditor = CosmoScout.transferFunctionEditor.create(
           document.getElementById("volumeRendering.tfEditor"), this.setTransferFunction,
-        { fitToData: true });
+          {fitToData: true});
 
-      this._parcoords = document.getElementById("volumeRendering-parcoords");
-      this._parcoordsParent = this._parcoords.parentNode;
+      this._parcoords             = document.getElementById("volumeRendering-parcoords");
+      this._parcoordsParent       = this._parcoords.parentNode;
+      this._parcoordsUndockButton = document.getElementById("volumeRendering-parcoordsUndockButton");
       this._parcoordsPopout = CosmoScout.gui.loadTemplateContent("volumeRendering-parcoordsPopout");
       document.getElementById("cosmoscout").appendChild(this._parcoordsPopout);
 
@@ -42,31 +43,33 @@
 
     showParcoords() {
       let data = d3.csvParse(csvData);
-      data = d3.shuffle(data);
+      data     = d3.shuffle(data);
       const pc = ParCoords()("#volumeRendering-parcoords .parcoords");
-      pc
-        .data(data)
-        .width(1000)
-        .height(200)
-        .color("#000")
-        .alpha(0.05)
-        .mode("queue")
-        .rate(50)
-        .render()
-        .brushMode("1D-axes");
+      pc.data(data)
+          .width(1000)
+          .height(200)
+          .color("#000")
+          .alpha(0.05)
+          .mode("queue")
+          .rate(50)
+          .render()
+          .brushMode("1D-axes");
       pc.on("brush", (brushed, args) => {
         CosmoScout.callbacks.volumeRendering.setScalarFilters(JSON.stringify(pc.brushExtents()));
       });
     }
 
     undockParcoords() {
+      this._parcoordsUndockButton.hidden = true;
       this._parcoordsPopout.classList.add("visible");
       this._parcoords = this._parcoordsParent.removeChild(this._parcoords);
       this._parcoordsPopout.querySelector(".window-content").appendChild(this._parcoords);
     }
 
     dockParcoords() {
-      this._parcoords = this._parcoordsPopout.querySelector(".window-content").removeChild(this._parcoords);
+      this._parcoordsUndockButton.hidden = false;
+      this._parcoords =
+          this._parcoordsPopout.querySelector(".window-content").removeChild(this._parcoords);
       this._parcoordsParent.appendChild(this._parcoords);
     }
 

@@ -1,10 +1,4 @@
 <div class="accordion" id="volumeRenderingTab-accordion">
-  <div id="volumeRendering-parcoords" class="parcoords-container">
-    <div class="parcoords" style="width:1000px;height:200px"></div>
-  </div>
-  <a class="btn glass block px-3" onclick="CosmoScout.volumeRendering.undockParcoords()">
-    <i class="material-icons">launch</i>
-  </a>
   <div class="settings-section">
     <div class="section-header collapsed font-alegreya" id="headingVolume-data"
          data-toggle="collapse" data-target="#collapseVolume-data" aria-expanded="false"
@@ -142,6 +136,28 @@
     <div class="section-body collapse container-fluid" id="collapseVolume-transferFunction"
          aria-labelledby="headingVolume-transferFunction" data-parent="#volumeRenderingTab-accordion">
       <div id="volumeRendering.tfEditor"></div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-parcoords"
+         data-toggle="collapse" data-target="#collapseVolume-parcoords" aria-expanded="false"
+         aria-controls="collapseVolume-parcoords" type="button">
+      <i class="material-icons">waves</i>
+      <span>Parallel Coordinates</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-parcoords"
+         aria-labelledby="headingVolume-parcoords" data-parent="#volumeRenderingTab-accordion">
+      <div id="volumeRendering-parcoordsContainer">
+        <a id="volumeRendering-parcoordsUndockButton" class="btn glass block px-3"
+           onclick="CosmoScout.volumeRendering.undockParcoords()">
+          <i class="material-icons">launch</i>
+        </a>
+        <div id="volumeRendering-parcoords">
+          <div class="parcoords" style="width:1000px;height:200px"></div>
+        </div>
+      </div>
     </div>
   </div>
 

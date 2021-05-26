@@ -22,3 +22,20 @@
     max-height: 300px;
     overflow: auto;
 }
+
+#volumeRendering-parcoordsContainer {
+    position: relative;
+}
+
+#volumeRendering-parcoordsUndockButton {
+    z-index: 10;
+    position: absolute;
+    width: 50px;
+    top: 0px;
+    right: 0px;
+}
+
+#volumeRendering-parcoords {
+    overflow: auto;
+    position: relative;
+}
