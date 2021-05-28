@@ -11,8 +11,11 @@
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <vtkCellArrayIterator.h>
 #include <vtkCellData.h>
+#include <vtkDataSetReader.h>
 #include <vtkPointData.h>
+#include <vtkPolyData.h>
 #include <vtkStructuredPoints.h>
 
 #include <rkcommon/math/vec.h>
@@ -80,8 +83,16 @@ Renderer::RenderedImage OSPRayRenderer::getFrameImpl(
   mRenderingCancelled = false;
   RenderedImage renderedImage;
   try {
-    const Volume&            volume = getVolume(dataState);
-    ospray::cpp::World       world  = getWorld(volume, parameters);
+    const Volume&      volume = getVolume(dataState);
+    ospray::cpp::World world;
+    if (dataState == mCachedState && parameters == mCachedParameters) {
+      world = mCachedWorld;
+    } else {
+      world             = getWorld(volume, parameters);
+      mCachedState      = dataState;
+      mCachedParameters = parameters;
+      mCachedWorld      = world;
+    }
     Camera                   camera = getCamera(volume.mHeight, cameraTransform);
     ospray::cpp::FrameBuffer frame  = renderFrame(world, camera.mOsprayCamera, parameters);
     renderedImage                   = extractImageData(frame, camera, volume.mHeight, parameters);
@@ -216,6 +227,60 @@ ospray::cpp::World OSPRayRenderer::getWorld(const Volume& volume, const Paramete
   ospray::cpp::GeometricModel clipModel(clip);
   clipModel.commit();
 
+  if (!mPathlinesModel) {
+    vtkSmartPointer<vtkDataSetReader> reader = vtkSmartPointer<vtkDataSetReader>::New();
+    reader->SetFileName("C:\\pathlines.vtk");
+    reader->ReadAllScalarsOn();
+    reader->Update();
+
+    vtkSmartPointer<vtkPolyData>       data = vtkPolyData::SafeDownCast(reader->GetOutput());
+    std::vector<rkcommon::math::vec4f> vertices(data->GetNumberOfPoints());
+    std::vector<rkcommon::math::vec4f> colors(data->GetNumberOfPoints());
+    std::vector<uint32_t> indices(data->GetNumberOfPoints() - data->GetNumberOfLines());
+    int                   indicesIndex = 0;
+
+    auto lineIter = vtk::TakeSmartPointer(data->GetLines()->NewIterator());
+    for (lineIter->GoToFirstCell(); !lineIter->IsDoneWithTraversal(); lineIter->GoToNextCell()) {
+      vtkSmartPointer<vtkIdList> idList = vtkSmartPointer<vtkIdList>::New();
+      lineIter->GetCurrentCell(idList);
+      for (auto index = idList->begin(); index != idList->end() - 1; index++) {
+        indices[indicesIndex++] = (uint32_t)*index;
+      }
+    }
+
+    for (int i = 0; i < data->GetNumberOfPoints(); i++) {
+      std::array<double, 3> pos;
+      data->GetPoint(i, pos.data());
+      vertices[i][0] = (float)pos[0];
+      vertices[i][1] = (float)pos[1];
+      vertices[i][2] = (float)pos[2];
+      vertices[i][3] = 2;
+      double* value  = data->GetPointData()->GetScalars("temperature")->GetTuple(i);
+      double  norm =
+          (*value - volume.mScalarBounds[0]) / (volume.mScalarBounds[1] - volume.mScalarBounds[0]);
+      // Red - Black - Blue
+      /*colors[i] = rkcommon::math::vec4f{norm > 0.5 ? ((float)norm - 0.5f) * 2.f : 0.f, 0.f,
+          norm < 0.5 ? -((float)norm - 0.5f) * 2.f : 0.f, .5f};*/
+      // Red - White - Blue
+      colors[i] = rkcommon::math::vec4f{norm < 0.5 ? (float)norm * 2.f : 1.f,
+          1.f - std::abs(((float)norm - 0.5f) * 2.f),
+          norm > 0.5 ? 1.f - ((float)norm - 0.5f) * 2.f : 1.f, .5f};
+    }
+
+    ospray::cpp::Geometry pathlines("curve");
+    pathlines.setParam("type", OSP_FLAT);
+    pathlines.setParam("basis", OSP_LINEAR);
+    pathlines.setParam("vertex.position_radius", ospray::cpp::Data(vertices));
+    pathlines.setParam("vertex.color", ospray::cpp::Data(colors));
+    pathlines.setParam("index", ospray::cpp::Data(indices));
+    pathlines.commit();
+
+    ospray::cpp::GeometricModel pathlinesModel(pathlines);
+    pathlinesModel.commit();
+
+    mPathlinesModel = pathlinesModel;
+  }
+
   ospray::cpp::Group group;
   group.setParam("volume", ospray::cpp::Data(volumetricModel));
   if (parameters.mDepthMode == DepthMode::eIsosurface) {
@@ -231,7 +296,8 @@ ospray::cpp::World OSPRayRenderer::getWorld(const Volume& volume, const Paramete
 
     group.setParam("geometry", ospray::cpp::Data(isoModel));
   }
-  group.setParam("geometry", ospray::cpp::Data(coreModel));
+  group.setParam("geometry", ospray::cpp::Data(std::vector<ospray::cpp::GeometricModel>{
+                                 coreModel, mPathlinesModel.value()}));
   group.setParam("clippingGeometry", ospray::cpp::Data(clipModel));
   group.commit();
 

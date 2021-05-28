@@ -48,6 +48,11 @@ class OSPRayRenderer : public Renderer {
 
   std::map<DataManager::State, std::map<int, std::shared_future<Volume>>> mCachedVolumes;
 
+  ospray::cpp::World                         mCachedWorld;
+  DataManager::State                         mCachedState;
+  Parameters                                 mCachedParameters;
+  std::optional<ospray::cpp::GeometricModel> mPathlinesModel;
+
   std::optional<ospray::cpp::Future> mRenderFuture;
   bool                               mRenderingCancelled;
   std::mutex                         mRenderFutureMutex;

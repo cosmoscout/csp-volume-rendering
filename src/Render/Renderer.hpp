@@ -23,6 +23,10 @@ struct ScalarFilter {
   int   mAttrIndex;
   float mMin;
   float mMax;
+
+  bool operator==(ScalarFilter const& other) const {
+    return mAttrIndex == other.mAttrIndex && mMin == other.mMin && mMax == other.mMax;
+  }
 };
 
 class RendererException : public std::exception {
@@ -116,6 +120,18 @@ class Renderer {
     float     mAmbientLight;
     glm::vec3 mSunDirection;
     float     mSunStrength;
+
+    bool operator==(const Parameters& other) const {
+      return mResolution == other.mResolution && mSamplingRate == other.mSamplingRate &&
+             mDensityScale == other.mDensityScale && mDepthMode == other.mDepthMode &&
+             mDenoiseColor == other.mDenoiseColor && mDenoiseDepth == other.mDenoiseDepth &&
+             mTransferFunction == other.mTransferFunction &&
+             mScalarFilters == other.mScalarFilters && mShading == other.mShading &&
+             mAmbientLight == other.mAmbientLight &&
+             // If shading is deactivated sun direction can be ignored
+             (mSunDirection == other.mSunDirection || !mShading) &&
+             mSunStrength == other.mSunStrength;
+    }
   };
 
   std::shared_ptr<DataManager> mDataManager;

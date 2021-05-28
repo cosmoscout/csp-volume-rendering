@@ -75,6 +75,10 @@ class DataManager {
     int    mTimestep;
     Scalar mScalar;
 
+    bool operator==(const State& other) const {
+      return mTimestep == other.mTimestep && mScalar == other.mScalar;
+    }
+
     bool operator<(const State& other) const {
       if (mTimestep < other.mTimestep)
         return true;
