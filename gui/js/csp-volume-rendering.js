@@ -34,21 +34,54 @@
           document.getElementById("volumeRendering.tfEditor"), this.setTransferFunction,
           {fitToData: true});
 
-      this._parcoords             = document.getElementById("volumeRendering-parcoords");
-      this._parcoordsParent       = this._parcoords.parentNode;
-      this._parcoordsUndockButton = document.getElementById("volumeRendering-parcoordsUndockButton");
-      this._parcoordsPopout = CosmoScout.gui.loadTemplateContent("volumeRendering-parcoordsPopout");
-      document.getElementById("cosmoscout").appendChild(this._parcoordsPopout);
-
-      this.showParcoords();
+      this._parcoordsVolume = this.initParcoords(
+          "volumeRendering-parcoordsVolume", "Volume", csvData, function(brushed, args) {
+            CosmoScout.callbacks.volumeRendering.setScalarFilters(
+                JSON.stringify(this.pc.brushExtents()));
+          });
     }
 
-    showParcoords() {
-      let data = d3.csvParse(csvData);
-      data     = d3.shuffle(data);
-      const pc = ParCoords()("#volumeRendering-parcoords .parcoords");
-      pc.data(data)
-          .width(1000)
+    initParcoords(rootId, name, csv, callback) {
+      const root     = document.getElementById(rootId);
+      const template = CosmoScout.gui.loadTemplateContent("volumeRendering-parcoords");
+      root.appendChild(template);
+
+      const parcoords                 = {};
+      parcoords.id                    = rootId;
+      parcoords.parcoords             = root.querySelector(".parcoordsScroller");
+      parcoords.parcoordsParent       = parcoords.parcoords.parentNode;
+      parcoords.parcoordsUndockButton = root.querySelector(".parcoordsUndockButton");
+      parcoords.parcoordsPopout =
+          CosmoScout.gui.loadTemplateContent("volumeRendering-parcoordsPopout");
+      parcoords.parcoordsPopout.innerHTML =
+          parcoords.parcoordsPopout.innerHTML.replace("%NAME%", name);
+      document.getElementById("cosmoscout").appendChild(parcoords.parcoordsPopout);
+
+      parcoords.parcoordsUndockButton.addEventListener("click", () => { parcoords.undock(); });
+      parcoords.parcoordsPopout.querySelector(`[data-action="close"]`)
+          .addEventListener("click", () => { parcoords.dock(); });
+
+      parcoords.undock = function() {
+        this.parcoordsUndockButton.hidden = true;
+        this.parcoordsPopout.classList.add("visible");
+        this.parcoords = this.parcoordsParent.removeChild(this.parcoords);
+        this.parcoordsPopout.querySelector(".window-content").appendChild(this.parcoords);
+      };
+      parcoords.dock = function() {
+        this.parcoordsUndockButton.hidden = false;
+        this.parcoords =
+            this.parcoordsPopout.querySelector(".window-content").removeChild(this.parcoords);
+        this.parcoordsParent.appendChild(this.parcoords);
+      };
+
+      let data     = d3.csvParse(csv);
+      data = d3.shuffle(data);
+      const width = 100 * data.columns.length;
+      console.log(width);
+      root.querySelector(".parcoords").style.width = `${width}px`;
+      parcoords.pc = ParCoords()(`#${parcoords.id} .parcoords`);
+      parcoords.pc.data(data)
+          .width(width)
           .height(200)
           .color("#000")
           .alpha(0.05)
@@ -56,23 +89,9 @@
           .rate(50)
           .render()
           .brushMode("1D-axes");
-      pc.on("brush", (brushed, args) => {
-        CosmoScout.callbacks.volumeRendering.setScalarFilters(JSON.stringify(pc.brushExtents()));
-      });
-    }
+      parcoords.pc.on("brush", callback.bind(parcoords));
 
-    undockParcoords() {
-      this._parcoordsUndockButton.hidden = true;
-      this._parcoordsPopout.classList.add("visible");
-      this._parcoords = this._parcoordsParent.removeChild(this._parcoords);
-      this._parcoordsPopout.querySelector(".window-content").appendChild(this._parcoords);
-    }
-
-    dockParcoords() {
-      this._parcoordsUndockButton.hidden = false;
-      this._parcoords =
-          this._parcoordsPopout.querySelector(".window-content").removeChild(this._parcoords);
-      this._parcoordsParent.appendChild(this._parcoords);
+      return parcoords;
     }
 
     /**

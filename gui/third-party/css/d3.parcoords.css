@@ -11,9 +11,6 @@
   transform: rotate(-5deg);
   text-anchor: start;
 }
-.parcoords rect.background:hover {
-  fill: rgba(120,120,120,0.2);
-}
 .parcoords canvas {
   opacity: 1;
   transition: opacity 0.3s;

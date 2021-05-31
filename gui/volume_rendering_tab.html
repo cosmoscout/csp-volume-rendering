@@ -149,15 +149,7 @@
     </div>
     <div class="section-body collapse container-fluid" id="collapseVolume-parcoords"
          aria-labelledby="headingVolume-parcoords" data-parent="#volumeRenderingTab-accordion">
-      <div id="volumeRendering-parcoordsContainer">
-        <a id="volumeRendering-parcoordsUndockButton" class="btn glass block px-3"
-           onclick="CosmoScout.volumeRendering.undockParcoords()">
-          <i class="material-icons">launch</i>
-        </a>
-        <div id="volumeRendering-parcoords">
-          <div class="parcoords" style="width:1000px;height:200px"></div>
-        </div>
-      </div>
+      <div id="volumeRendering-parcoordsVolume"></div>
     </div>
   </div>
 
@@ -360,15 +352,26 @@
   </div>
 </div>
 
+<template id="volumeRendering-parcoords-template">
+  <div class="parcoordsContainer">
+    <a class="btn glass block px-3 parcoordsUndockButton">
+      <i class="material-icons">launch</i>
+    </a>
+    <div class="parcoordsScroller">
+      <div class="parcoords" style="height:200px"></div>
+    </div>
+  </div>
+</template>
+
 <template id="volumeRendering-parcoordsPopout-template">
   <div id="volumeRendering-parcoordsPopout" class="draggable-window resizable-window">
     <div class="window-wrapper">
       <div class="window-header">
         <span class="window-title">
-          <i class="material-icons">layers</i>
-          <span>Parallel Coordinates</span>
+          <i class="material-icons">waves</i>
+          <span>Parallel Coordinates - %NAME%</span>
         </span>
-        <a class="btn light-glass" data-action="close" data-toggle="tooltip" title="Close" onclick="CosmoScout.volumeRendering.dockParcoords()">
+        <a class="btn light-glass" data-action="close" data-toggle="tooltip" title="Close">
           <i class="material-icons">close</i>
         </a>
       </div>

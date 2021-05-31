@@ -23,11 +23,11 @@
     overflow: auto;
 }
 
-#volumeRendering-parcoordsContainer {
+.parcoordsContainer {
     position: relative;
 }
 
-#volumeRendering-parcoordsUndockButton {
+.parcoordsContainer .parcoordsUndockButton {
     z-index: 10;
     position: absolute;
     width: 50px;
@@ -35,7 +35,7 @@
     right: 0px;
 }
 
-#volumeRendering-parcoords {
+.parcoordsScroller {
     overflow: auto;
     position: relative;
 }
