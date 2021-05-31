@@ -60,6 +60,12 @@ class Plugin : public cs::core::PluginBase {
     cs::utils::DefaultProperty<glm::dvec3> mPosition{glm::dvec3(0, 0, 0)};
     cs::utils::DefaultProperty<double>     mScale{1.};
     cs::utils::DefaultProperty<glm::dquat> mRotation{glm::dquat(1, 0, 0, 0)};
+
+    struct Pathlines {
+      cs::utils::DefaultProperty<bool>  mEnabled{true};
+      cs::utils::DefaultProperty<float> mLineOpacity{1.f};
+      cs::utils::DefaultProperty<float> mLineSize{1.f};
+    } mPathlines;
   };
 
   void init() override;

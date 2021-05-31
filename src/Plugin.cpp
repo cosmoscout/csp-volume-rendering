@@ -452,6 +452,20 @@ void Plugin::registerUICallbacks() {
         mRenderer->setScalarFilters(filters);
         mParametersDirty = true;
       }));
+
+  // Pathline settings
+  mGuiManager->getGui()->registerCallback("volumeRendering.setEnablePathlines",
+      "Enable/disable rendering of pathlines.",
+      std::function([this](bool enable) { mPluginSettings.mPathlines.mEnabled = enable; }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setPathlineOpacity",
+      "Sets the opacity of the rendered pathlines.", std::function([this](double value) {
+        mPluginSettings.mPathlines.mLineOpacity = (float)value;
+      }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setPathlineSize",
+      "Sets the size of the rendered pathlines.",
+      std::function([this](double value) { mPluginSettings.mPathlines.mLineSize = (float)value; }));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -587,6 +601,26 @@ void Plugin::connectSettings() {
     if (mDisplayedFrame.has_value()) {
       displayFrame(*mDisplayedFrame, displayMode);
     }
+  });
+
+  // Pathline settings
+  mPluginSettings.mPathlines.mEnabled.connectAndTouch([this](bool enable) {
+    mRenderedFrames.clear();
+    mRenderer->setPathlinesEnabled(enable);
+    mParametersDirty = true;
+    mGuiManager->setCheckboxValue("volumeRendering.setEnablePathlines", enable);
+  });
+  mPluginSettings.mPathlines.mLineOpacity.connectAndTouch([this](float value) {
+    mRenderedFrames.clear();
+    mRenderer->setPathlineOpacity(value);
+    mParametersDirty = true;
+    mGuiManager->setSliderValue("volumeRendering.setPathlineOpacity", value);
+  });
+  mPluginSettings.mPathlines.mLineSize.connectAndTouch([this](float value) {
+    mRenderedFrames.clear();
+    mRenderer->setPathlineSize(value);
+    mParametersDirty = true;
+    mGuiManager->setSliderValue("volumeRendering.setPathlineSize", value);
   });
 
   // Connect to data manager properties

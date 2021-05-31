@@ -227,7 +227,9 @@ ospray::cpp::World OSPRayRenderer::getWorld(const Volume& volume, const Paramete
   ospray::cpp::GeometricModel clipModel(clip);
   clipModel.commit();
 
-  if (!mPathlinesModel) {
+  if (parameters.mPathlineParameters.mEnable &&
+      (!mPathlinesModel ||
+          !(parameters.mPathlineParameters == mCachedParameters.mPathlineParameters))) {
     vtkSmartPointer<vtkDataSetReader> reader = vtkSmartPointer<vtkDataSetReader>::New();
     reader->SetFileName("C:\\pathlines.vtk");
     reader->ReadAllScalarsOn();
@@ -247,6 +249,7 @@ ospray::cpp::World OSPRayRenderer::getWorld(const Volume& volume, const Paramete
         indices[indicesIndex++] = (uint32_t)*index;
       }
     }
+    indices.resize(indicesIndex);
 
     for (int i = 0; i < data->GetNumberOfPoints(); i++) {
       std::array<double, 3> pos;
@@ -254,7 +257,7 @@ ospray::cpp::World OSPRayRenderer::getWorld(const Volume& volume, const Paramete
       vertices[i][0] = (float)pos[0];
       vertices[i][1] = (float)pos[1];
       vertices[i][2] = (float)pos[2];
-      vertices[i][3] = 2;
+      vertices[i][3] = parameters.mPathlineParameters.mLineSize;
       double* value  = data->GetPointData()->GetScalars("temperature")->GetTuple(i);
       double  norm =
           (*value - volume.mScalarBounds[0]) / (volume.mScalarBounds[1] - volume.mScalarBounds[0]);
@@ -264,7 +267,8 @@ ospray::cpp::World OSPRayRenderer::getWorld(const Volume& volume, const Paramete
       // Red - White - Blue
       colors[i] = rkcommon::math::vec4f{norm < 0.5 ? (float)norm * 2.f : 1.f,
           1.f - std::abs(((float)norm - 0.5f) * 2.f),
-          norm > 0.5 ? 1.f - ((float)norm - 0.5f) * 2.f : 1.f, .5f};
+          norm > 0.5 ? 1.f - ((float)norm - 0.5f) * 2.f : 1.f,
+          parameters.mPathlineParameters.mLineOpacity};
     }
 
     ospray::cpp::Geometry pathlines("curve");
@@ -296,8 +300,12 @@ ospray::cpp::World OSPRayRenderer::getWorld(const Volume& volume, const Paramete
 
     group.setParam("geometry", ospray::cpp::Data(isoModel));
   }
-  group.setParam("geometry", ospray::cpp::Data(std::vector<ospray::cpp::GeometricModel>{
-                                 coreModel, mPathlinesModel.value()}));
+  std::vector<ospray::cpp::GeometricModel> geometries;
+  geometries.push_back(coreModel);
+  if (parameters.mPathlineParameters.mEnable) {
+    geometries.push_back(mPathlinesModel.value());
+  }
+  group.setParam("geometry", ospray::cpp::Data(geometries));
   group.setParam("clippingGeometry", ospray::cpp::Data(clipModel));
   group.commit();
 

@@ -21,6 +21,8 @@
           {"min": 0.001, "25%": 0.01, "50%": 0.1, "75%": 1, "max": 10}, [0.005]);
       CosmoScout.gui.initSlider("volumeRendering.setSunStrength", 0, 10, 0.1, [1]);
       CosmoScout.gui.initSlider("volumeRendering.setDensityScale", 0, 10, 0.1, [1]);
+      CosmoScout.gui.initSlider("volumeRendering.setPathlineOpacity", 0, 1, 0.05, [1]);
+      CosmoScout.gui.initSlider("volumeRendering.setPathlineSize", 1, 10, 1, [1]);
 
       // Trigger "setTimestep" callback on "update" event
       var timestepSlider = document.querySelector(`[data-callback="volumeRendering.setTimestep"]`);

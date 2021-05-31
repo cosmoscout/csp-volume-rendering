@@ -90,6 +90,10 @@ class Renderer {
   /// Sets the strength of the light of the sun.
   void setSunStrength(float strength);
 
+  void setPathlinesEnabled(bool enable);
+  void setPathlineOpacity(float value);
+  void setPathlineSize(float value);
+
   /// Starts asynchronously rendering an image of the volume for the given camera perspective.
   /// The rendering process will use all parameters set before calling this method
   /// and will not be influenced by any later changes to the parameters.
@@ -104,6 +108,17 @@ class Renderer {
   virtual void cancelRendering() = 0;
 
  protected:
+  struct PathlineParameters {
+    bool  mEnable;
+    float mLineOpacity;
+    float mLineSize;
+
+    bool operator==(const PathlineParameters& other) const {
+      return mEnable == other.mEnable && mLineOpacity == other.mLineOpacity &&
+             mLineSize == other.mLineSize;
+    }
+  };
+
   struct Parameters {
     int       mResolution;
     float     mSamplingRate;
@@ -121,6 +136,8 @@ class Renderer {
     glm::vec3 mSunDirection;
     float     mSunStrength;
 
+    PathlineParameters mPathlineParameters;
+
     bool operator==(const Parameters& other) const {
       return mResolution == other.mResolution && mSamplingRate == other.mSamplingRate &&
              mDensityScale == other.mDensityScale && mDepthMode == other.mDepthMode &&
@@ -130,7 +147,7 @@ class Renderer {
              mAmbientLight == other.mAmbientLight &&
              // If shading is deactivated sun direction can be ignored
              (mSunDirection == other.mSunDirection || !mShading) &&
-             mSunStrength == other.mSunStrength;
+             mSunStrength == other.mSunStrength && mPathlineParameters == other.mPathlineParameters;
     }
   };
 

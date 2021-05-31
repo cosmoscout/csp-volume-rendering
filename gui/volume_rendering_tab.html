@@ -316,6 +316,48 @@
       </div>
     </div>
   </div>
+
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-pathlines"
+         data-toggle="collapse" data-target="#collapseVolume-pathlines" aria-expanded="false"
+         aria-controls="collapseVolume-pathlines" type="button">
+      <i class="material-icons">texture</i>
+      <span>Pathlines</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-pathlines"
+         aria-labelledby="headingVolume-pathlines" data-parent="#volumeRenderingTab-accordion">
+      <div class="row">
+        <div class="col-7 offset-5">
+          <label class="checklabel">
+            <input type="checkbox" data-callback="volumeRendering.setEnablePathlines" />
+            <i class="material-icons"></i>
+            <span>Render pathlines</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Line opacity
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setPathlineOpacity">
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Line size
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setPathlineSize">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 
 <template id="volumeRendering-parcoordsPopout-template">
