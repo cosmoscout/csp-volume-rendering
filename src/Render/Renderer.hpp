@@ -19,16 +19,6 @@
 
 namespace csp::volumerendering {
 
-struct ScalarFilter {
-  int   mAttrIndex;
-  float mMin;
-  float mMax;
-
-  bool operator==(ScalarFilter const& other) const {
-    return mAttrIndex == other.mAttrIndex && mMin == other.mMin && mMax == other.mMax;
-  }
-};
-
 class RendererException : public std::exception {
  public:
   const char* what() const noexcept override;
@@ -93,6 +83,7 @@ class Renderer {
   void setPathlinesEnabled(bool enable);
   void setPathlineOpacity(float value);
   void setPathlineSize(float value);
+  void setPathlineScalarFilters(std::vector<ScalarFilter> const& value);
 
   /// Starts asynchronously rendering an image of the volume for the given camera perspective.
   /// The rendering process will use all parameters set before calling this method
@@ -109,13 +100,14 @@ class Renderer {
 
  protected:
   struct PathlineParameters {
-    bool  mEnable;
-    float mLineOpacity;
-    float mLineSize;
+    bool                      mEnable;
+    float                     mLineOpacity;
+    float                     mLineSize;
+    std::vector<ScalarFilter> mScalarFilters;
 
     bool operator==(const PathlineParameters& other) const {
       return mEnable == other.mEnable && mLineOpacity == other.mLineOpacity &&
-             mLineSize == other.mLineSize;
+             mLineSize == other.mLineSize && mScalarFilters == other.mScalarFilters;
     }
   };
 

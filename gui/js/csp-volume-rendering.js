@@ -36,7 +36,12 @@
 
       this._parcoordsVolume = this.initParcoords(
           "volumeRendering-parcoordsVolume", "Volume", csvData, function(brushed, args) {
-            CosmoScout.callbacks.volumeRendering.setScalarFilters(
+            CosmoScout.callbacks.volumeRendering.setVolumeScalarFilters(
+                JSON.stringify(this.pc.brushExtents()));
+          });
+      this._parcoordsPathlines = this.initParcoords(
+          "volumeRendering-parcoordsPathlines", "Pathlines", csvData2, function(brushed, args) {
+            CosmoScout.callbacks.volumeRendering.setPathlinesScalarFilters(
                 JSON.stringify(this.pc.brushExtents()));
           });
     }
@@ -74,12 +79,11 @@
         this.parcoordsParent.appendChild(this.parcoords);
       };
 
-      let data     = d3.csvParse(csv);
-      data = d3.shuffle(data);
-      const width = 100 * data.columns.length;
-      console.log(width);
+      let data                                     = d3.csvParse(csv);
+      data                                         = d3.shuffle(data);
+      const width                                  = 100 * data.columns.length;
       root.querySelector(".parcoords").style.width = `${width}px`;
-      parcoords.pc = ParCoords()(`#${parcoords.id} .parcoords`);
+      parcoords.pc                                 = ParCoords()(`#${parcoords.id} .parcoords`);
       parcoords.pc.data(data)
           .width(width)
           .height(200)

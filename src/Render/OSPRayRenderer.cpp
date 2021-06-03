@@ -11,11 +11,8 @@
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#include <vtkCellArrayIterator.h>
 #include <vtkCellData.h>
-#include <vtkDataSetReader.h>
 #include <vtkPointData.h>
-#include <vtkPolyData.h>
 #include <vtkStructuredPoints.h>
 
 #include <rkcommon/math/vec.h>
@@ -227,62 +224,33 @@ ospray::cpp::World OSPRayRenderer::getWorld(const Volume& volume, const Paramete
   ospray::cpp::GeometricModel clipModel(clip);
   clipModel.commit();
 
+  bool pathlinesPresent = true;
   if (parameters.mPathlineParameters.mEnable &&
       (!mPathlinesModel ||
           !(parameters.mPathlineParameters == mCachedParameters.mPathlineParameters))) {
-    vtkSmartPointer<vtkDataSetReader> reader = vtkSmartPointer<vtkDataSetReader>::New();
-    reader->SetFileName("C:\\pathlines.vtk");
-    reader->ReadAllScalarsOn();
-    reader->Update();
+    std::vector<uint32_t> indices =
+        mDataManager->getPathlines().getIndices(parameters.mPathlineParameters.mScalarFilters);
+    if (indices.size() <= 0) {
+      pathlinesPresent = false;
+    } else {
+      std::vector<rkcommon::math::vec4f> vertices =
+          mDataManager->getPathlines().getVertices(parameters.mPathlineParameters.mLineSize);
+      std::vector<rkcommon::math::vec4f> colors = mDataManager->getPathlines().getColors(
+          "point_temperature", parameters.mPathlineParameters.mLineOpacity);
 
-    vtkSmartPointer<vtkPolyData>       data = vtkPolyData::SafeDownCast(reader->GetOutput());
-    std::vector<rkcommon::math::vec4f> vertices(data->GetNumberOfPoints());
-    std::vector<rkcommon::math::vec4f> colors(data->GetNumberOfPoints());
-    std::vector<uint32_t> indices(data->GetNumberOfPoints() - data->GetNumberOfLines());
-    int                   indicesIndex = 0;
+      ospray::cpp::Geometry pathlines("curve");
+      pathlines.setParam("type", OSP_FLAT);
+      pathlines.setParam("basis", OSP_LINEAR);
+      pathlines.setParam("vertex.position_radius", ospray::cpp::Data(vertices));
+      pathlines.setParam("vertex.color", ospray::cpp::Data(colors));
+      pathlines.setParam("index", ospray::cpp::Data(indices));
+      pathlines.commit();
 
-    auto lineIter = vtk::TakeSmartPointer(data->GetLines()->NewIterator());
-    for (lineIter->GoToFirstCell(); !lineIter->IsDoneWithTraversal(); lineIter->GoToNextCell()) {
-      vtkSmartPointer<vtkIdList> idList = vtkSmartPointer<vtkIdList>::New();
-      lineIter->GetCurrentCell(idList);
-      for (auto index = idList->begin(); index != idList->end() - 1; index++) {
-        indices[indicesIndex++] = (uint32_t)*index;
-      }
+      ospray::cpp::GeometricModel pathlinesModel(pathlines);
+      pathlinesModel.commit();
+
+      mPathlinesModel = pathlinesModel;
     }
-    indices.resize(indicesIndex);
-
-    for (int i = 0; i < data->GetNumberOfPoints(); i++) {
-      std::array<double, 3> pos;
-      data->GetPoint(i, pos.data());
-      vertices[i][0] = (float)pos[0];
-      vertices[i][1] = (float)pos[1];
-      vertices[i][2] = (float)pos[2];
-      vertices[i][3] = parameters.mPathlineParameters.mLineSize;
-      double* value  = data->GetPointData()->GetScalars("temperature")->GetTuple(i);
-      double  norm =
-          (*value - volume.mScalarBounds[0]) / (volume.mScalarBounds[1] - volume.mScalarBounds[0]);
-      // Red - Black - Blue
-      /*colors[i] = rkcommon::math::vec4f{norm > 0.5 ? ((float)norm - 0.5f) * 2.f : 0.f, 0.f,
-          norm < 0.5 ? -((float)norm - 0.5f) * 2.f : 0.f, .5f};*/
-      // Red - White - Blue
-      colors[i] = rkcommon::math::vec4f{norm < 0.5 ? (float)norm * 2.f : 1.f,
-          1.f - std::abs(((float)norm - 0.5f) * 2.f),
-          norm > 0.5 ? 1.f - ((float)norm - 0.5f) * 2.f : 1.f,
-          parameters.mPathlineParameters.mLineOpacity};
-    }
-
-    ospray::cpp::Geometry pathlines("curve");
-    pathlines.setParam("type", OSP_FLAT);
-    pathlines.setParam("basis", OSP_LINEAR);
-    pathlines.setParam("vertex.position_radius", ospray::cpp::Data(vertices));
-    pathlines.setParam("vertex.color", ospray::cpp::Data(colors));
-    pathlines.setParam("index", ospray::cpp::Data(indices));
-    pathlines.commit();
-
-    ospray::cpp::GeometricModel pathlinesModel(pathlines);
-    pathlinesModel.commit();
-
-    mPathlinesModel = pathlinesModel;
   }
 
   ospray::cpp::Group group;
@@ -302,7 +270,7 @@ ospray::cpp::World OSPRayRenderer::getWorld(const Volume& volume, const Paramete
   }
   std::vector<ospray::cpp::GeometricModel> geometries;
   geometries.push_back(coreModel);
-  if (parameters.mPathlineParameters.mEnable) {
+  if (parameters.mPathlineParameters.mEnable && pathlinesPresent) {
     geometries.push_back(mPathlinesModel.value());
   }
   group.setParam("geometry", ospray::cpp::Data(geometries));

@@ -102,6 +102,9 @@ class Plugin : public cs::core::PluginBase {
   void displayFrame(Frame& frame, DisplayMode displayMode);
   void tryReuseFrame(glm::mat4 cameraTransform);
 
+  std::vector<ScalarFilter> parseScalarFilters(
+      std::string const& json, std::vector<Scalar> const& scalars);
+
   Settings mPluginSettings;
 
   int mOnLoadConnection = -1;

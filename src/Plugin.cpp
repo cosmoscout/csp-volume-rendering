@@ -430,24 +430,12 @@ void Plugin::registerUICallbacks() {
         mParametersDirty = true;
       }));
 
-  mGuiManager->getGui()->registerCallback("volumeRendering.setScalarFilters",
+  mGuiManager->getGui()->registerCallback("volumeRendering.setVolumeScalarFilters",
       "Sets filters for selecting which parts of the volume should be rendered.",
       std::function([this](std::string jsonString) {
-        auto                      j = nlohmann::json::parse(jsonString);
-        std::vector<ScalarFilter> filters;
-        for (auto const& [axis, value] : j.items()) {
-          auto const& scalar =
-              std::find_if(mDataManager->pScalars.get().begin(), mDataManager->pScalars.get().end(),
-                  [&axis = axis](Scalar const& s) { return s.mName == axis; });
-          if (scalar != mDataManager->pScalars.get().end()) {
-            ScalarFilter filter;
-            filter.mAttrIndex =
-                (int)std::distance(mDataManager->pScalars.get().begin(), scalar) + 1;
-            filter.mMin = value["selection"]["scaled"][1];
-            filter.mMax = value["selection"]["scaled"][0];
-            filters.push_back(filter);
-          }
-        }
+        std::vector<Scalar> scalars = mDataManager->pScalars.get();
+        scalars.insert(scalars.begin(), mDataManager->getState().mScalar);
+        std::vector<ScalarFilter> filters = parseScalarFilters(jsonString, scalars);
         mRenderedFrames.clear();
         mRenderer->setScalarFilters(filters);
         mParametersDirty = true;
@@ -466,6 +454,16 @@ void Plugin::registerUICallbacks() {
   mGuiManager->getGui()->registerCallback("volumeRendering.setPathlineSize",
       "Sets the size of the rendered pathlines.",
       std::function([this](double value) { mPluginSettings.mPathlines.mLineSize = (float)value; }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setPathlinesScalarFilters",
+      "Sets filters for selecting which parts of the pathlines should be rendered.",
+      std::function([this](std::string jsonString) {
+        std::vector<ScalarFilter> filters =
+            parseScalarFilters(jsonString, mDataManager->getPathlines().getScalars());
+        mRenderedFrames.clear();
+        mRenderer->setPathlineScalarFilters(filters);
+        mParametersDirty = true;
+      }));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -667,8 +665,10 @@ void Plugin::initUI() {
   mGuiManager->addCssToGui("third-party/css/d3.parcoords.css");
   mGuiManager->addPluginTabToSideBarFromHTML(
       "Volume Rendering", "blur_circular", "../share/resources/gui/volume_rendering_tab.html");
-  mGuiManager->addScriptToGuiFromJS("../share/resources/gui/third-party/js/parcoords.standalone.js");
-  mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/mantle_resample_100.js");
+  mGuiManager->addScriptToGuiFromJS(
+      "../share/resources/gui/third-party/js/parcoords.standalone.js");
+  mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/mantle_spherical_resample_0.js");
+  mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/pathlines.js");
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
 }
 
@@ -793,6 +793,26 @@ void Plugin::tryReuseFrame(glm::mat4 cameraTransform) {
   if (mDisplayedFrame.has_value() && !(bestFrame == *mDisplayedFrame) && minDiff > 0) {
     displayFrame(bestFrame);
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::vector<ScalarFilter> csp::volumerendering::Plugin::parseScalarFilters(
+    std::string const& json, std::vector<Scalar> const& scalars) {
+  auto                      j = nlohmann::json::parse(json);
+  std::vector<ScalarFilter> filters;
+  for (auto const& [axis, value] : j.items()) {
+    auto const& scalar = std::find_if(scalars.begin(), scalars.end(),
+        [&axis = axis](Scalar const& s) { return s.mName == axis; });
+    if (scalar != scalars.end()) {
+      ScalarFilter filter;
+      filter.mAttrIndex = (int)std::distance(scalars.begin(), scalar);
+      filter.mMin       = value["selection"]["scaled"][1];
+      filter.mMax       = value["selection"]["scaled"][0];
+      filters.push_back(filter);
+    }
+  }
+  return filters;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

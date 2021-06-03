@@ -10,6 +10,8 @@
 #include "../logger.hpp"
 
 #include "../Enums.hpp"
+#include "../Pathlines.hpp"
+#include "Scalar.hpp"
 
 #include "../../../src/cs-utils/Property.hpp"
 
@@ -25,41 +27,6 @@
 #include <string>
 
 namespace csp::volumerendering {
-
-struct Scalar {
-  std::string mName;
-  ScalarType  mType;
-
-  std::string getId() const {
-    std::string id;
-    switch (mType) {
-    case ScalarType::ePointData:
-      id.append("point_");
-      break;
-    case ScalarType::eCellData:
-      id.append("cell_");
-      break;
-    }
-    id.append(mName);
-    return id;
-  }
-
-  bool operator==(const Scalar& other) const {
-    return mName == other.mName && mType == other.mType;
-  }
-
-  bool operator<(const Scalar& other) const {
-    if (mName < other.mName)
-      return true;
-    if (other.mName < mName)
-      return false;
-    if (mType < other.mType)
-      return true;
-    if (other.mType < mType)
-      return false;
-    return false;
-  }
-};
 
 class DataManagerException : public std::exception {
  public:
@@ -134,12 +101,16 @@ class DataManager {
   /// Returns the maximum level of detail, that can instantly be returned for the given state.
   int getMaxLod(State state);
 
+  Pathlines const& getPathlines() const;
+
  protected:
   using Timestep = int;
   using Lod      = int;
 
   Timestep mCurrentTimestep;
   Scalar   mActiveScalar;
+
+  Pathlines mPathlines;
 
   std::mutex mReadMutex;
   std::mutex mScalarsMutex;

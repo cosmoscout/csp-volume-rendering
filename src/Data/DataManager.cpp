@@ -27,7 +27,8 @@ const char* DataManagerException::what() const noexcept {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-DataManager::DataManager(std::string path, std::string filenamePattern) {
+DataManager::DataManager(std::string path, std::string filenamePattern)
+    : mPathlines("C:\\pathlines.vtk") {
   std::regex patternRegex;
   try {
     patternRegex = std::regex(".*" + filenamePattern);
@@ -221,6 +222,12 @@ int DataManager::getMaxLod(State state) {
     }
   }
   return maxLod;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+Pathlines const& DataManager::getPathlines() const {
+  return mPathlines;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

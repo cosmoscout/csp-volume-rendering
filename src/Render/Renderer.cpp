@@ -140,6 +140,13 @@ void Renderer::setPathlineSize(float value) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void Renderer::setPathlineScalarFilters(std::vector<ScalarFilter> const& value) {
+  std::scoped_lock lock(mParameterMutex);
+  mParameters.mPathlineParameters.mScalarFilters = value;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 std::future<Renderer::RenderedImage> Renderer::getFrame(glm::mat4 cameraTransform) {
   std::scoped_lock lock(mParameterMutex);
   return std::async(std::launch::async, &Renderer::getFrameImpl, this, cameraTransform, mParameters,
