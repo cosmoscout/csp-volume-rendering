@@ -35,6 +35,14 @@
     right: 0px;
 }
 
+.parcoordsContainer .parcoords {
+    background-color: #181818;
+}
+
+.parcoordsContainer .parcoords g.axis text {
+    fill: var(--cs-color-text);
+}
+
 .parcoordsScroller {
     overflow: auto;
     position: relative;

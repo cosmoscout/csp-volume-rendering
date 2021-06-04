@@ -87,13 +87,15 @@
       parcoords.pc.data(data)
           .width(width)
           .height(200)
-          .color("#000")
+          .color("#99f")
           .alpha(0.05)
           .mode("queue")
           .rate(50)
           .render()
           .brushMode("1D-axes");
       parcoords.pc.on("brush", callback.bind(parcoords));
+      root.querySelectorAll(".parcoords g.tick line, .parcoords path.domain")
+          .forEach(e => {e.style.stroke = "var(--cs-color-text)"});
 
       return parcoords;
     }
