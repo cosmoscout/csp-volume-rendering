@@ -80,13 +80,17 @@
         this.setHeight(200);
       };
       parcoords.setHeight = function(height) {
-        this.pc.brushMode("angular");
+        // The range of the yscale is used to determine the height with which the axes will be
+        // rendered. It seems, as if the range is not updated automatically when setting the
+        // parcoords height, so instead it is updated manually here.
         Object.values(this.pc.dimensions()).forEach((d) => {
           d.yscale.range([
             this.pc.state.height - this.pc.state.margin.top - this.pc.state.margin.bottom + 1, 1
           ]);
         });
-        this.pc.height(height).render().brushMode("1D-axes");
+        // Apparently brushMode has to be switched back and forth once, or else the brushing will
+        // not work after a resize
+        this.pc.height(height).render().brushMode("angular").brushMode("1D-axes");
         this.parcoords.style.height = `${height}px`;
       };
 
