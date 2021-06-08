@@ -61,17 +61,26 @@
       parcoords.popout.innerHTML = parcoords.popout.innerHTML.replace("%NAME%", name);
       document.getElementById("cosmoscout").appendChild(parcoords.popout);
       parcoords.popoutContent = parcoords.popout.querySelector(".window-content");
+      parcoords.popoutWrapper = parcoords.popout.querySelector(".window-wrapper");
 
       parcoords.parcoordsUndockButton.addEventListener("click", () => { parcoords.undock(); });
       parcoords.popout.querySelector(`[data-action="close"]`)
           .addEventListener("click", () => { parcoords.dock(); });
 
+      const sizeOffset = 80;
+
+      parcoords.exportBrushes = function () {
+        const brushExtents = this.pc.brushExtents();
+        Object.keys(brushExtents)
+          .forEach(e => { brushExtents[e] = brushExtents[e].selection.scaled.reverse(); });
+        return brushExtents;
+      }
       parcoords.undock = function() {
         this.parcoordsUndockButton.hidden = true;
         this.popout.classList.add("visible");
         this.parcoordsScroller = this.parcoordsParent.removeChild(this.parcoordsScroller);
         this.popoutContent.appendChild(this.parcoordsScroller);
-        this.setHeight(parcoords.popoutContent.clientHeight);
+        this.setHeight(parcoords.popoutWrapper.clientHeight - sizeOffset);
       };
       parcoords.dock = function() {
         this.parcoordsUndockButton.hidden = false;
@@ -79,19 +88,22 @@
         this.parcoordsParent.appendChild(this.parcoordsScroller);
         this.setHeight(200);
       };
-      parcoords.setHeight = function(height) {
+      parcoords.setHeight = function (height) {
+        // BrushExtents are deleted when resizing, so they have to be carried over manually
+        const brushExtents = this.exportBrushes();
         // The range of the yscale is used to determine the height with which the axes will be
         // rendered. It seems, as if the range is not updated automatically when setting the
         // parcoords height, so instead it is updated manually here.
         Object.values(this.pc.dimensions()).forEach((d) => {
-          d.yscale.range([
-            this.pc.state.height - this.pc.state.margin.top - this.pc.state.margin.bottom + 1, 1
-          ]);
+          d.yscale.range([height - this.pc.state.margin.top - this.pc.state.margin.bottom + 1, 1]);
         });
         // Apparently brushMode has to be switched back and forth once, or else the brushing will
         // not work after a resize
-        this.pc.height(height).render().brushMode("angular").brushMode("1D-axes");
+        this.pc.height(height).render().brushMode("angular").brushMode("1D-axes").brushExtents(
+            brushExtents);
         this.parcoords.style.height = `${height}px`;
+        this.parcoords.querySelectorAll("g.tick line, path.domain")
+            .forEach(e => {e.style.stroke = "var(--cs-color-text)"});
       };
 
       parcoords.data                               = d3.csvParse(csv);
@@ -110,12 +122,11 @@
           .brushMode("1D-axes")
           .interactive();
       parcoords.pc.on("brush", callback.bind(parcoords));
-      root.querySelectorAll(".parcoords g.tick line, .parcoords path.domain")
+      parcoords.parcoords.querySelectorAll("g.tick line, path.domain")
           .forEach(e => {e.style.stroke = "var(--cs-color-text)"});
 
-      const target             = parcoords.popout.querySelector(".window-wrapper");
+      const target             = parcoords.popoutWrapper;
       const config             = {attributes: true};
-      const sizeOffset         = 50;
       parcoords.resizeObserver = new MutationObserver((mutations, observer) => {
         for (const mut of mutations) {
           if (mut.type === "attributes") {
