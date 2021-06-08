@@ -53,38 +53,49 @@
 
       const parcoords                 = {};
       parcoords.id                    = rootId;
-      parcoords.parcoords             = root.querySelector(".parcoordsScroller");
-      parcoords.parcoordsParent       = parcoords.parcoords.parentNode;
+      parcoords.parcoords             = root.querySelector(".parcoords");
+      parcoords.parcoordsScroller     = root.querySelector(".parcoordsScroller");
+      parcoords.parcoordsParent       = parcoords.parcoordsScroller.parentNode;
       parcoords.parcoordsUndockButton = root.querySelector(".parcoordsUndockButton");
-      parcoords.parcoordsPopout =
-          CosmoScout.gui.loadTemplateContent("volumeRendering-parcoordsPopout");
-      parcoords.parcoordsPopout.innerHTML =
-          parcoords.parcoordsPopout.innerHTML.replace("%NAME%", name);
-      document.getElementById("cosmoscout").appendChild(parcoords.parcoordsPopout);
+      parcoords.popout = CosmoScout.gui.loadTemplateContent("volumeRendering-parcoordsPopout");
+      parcoords.popout.innerHTML = parcoords.popout.innerHTML.replace("%NAME%", name);
+      document.getElementById("cosmoscout").appendChild(parcoords.popout);
+      parcoords.popoutContent = parcoords.popout.querySelector(".window-content");
 
       parcoords.parcoordsUndockButton.addEventListener("click", () => { parcoords.undock(); });
-      parcoords.parcoordsPopout.querySelector(`[data-action="close"]`)
+      parcoords.popout.querySelector(`[data-action="close"]`)
           .addEventListener("click", () => { parcoords.dock(); });
 
       parcoords.undock = function() {
         this.parcoordsUndockButton.hidden = true;
-        this.parcoordsPopout.classList.add("visible");
-        this.parcoords = this.parcoordsParent.removeChild(this.parcoords);
-        this.parcoordsPopout.querySelector(".window-content").appendChild(this.parcoords);
+        this.popout.classList.add("visible");
+        this.parcoordsScroller = this.parcoordsParent.removeChild(this.parcoordsScroller);
+        this.popoutContent.appendChild(this.parcoordsScroller);
+        this.setHeight(parcoords.popoutContent.clientHeight);
       };
       parcoords.dock = function() {
         this.parcoordsUndockButton.hidden = false;
-        this.parcoords =
-            this.parcoordsPopout.querySelector(".window-content").removeChild(this.parcoords);
-        this.parcoordsParent.appendChild(this.parcoords);
+        this.parcoordsScroller            = this.popoutContent.removeChild(this.parcoordsScroller);
+        this.parcoordsParent.appendChild(this.parcoordsScroller);
+        this.setHeight(200);
+      };
+      parcoords.setHeight = function(height) {
+        this.pc.brushMode("angular");
+        Object.values(this.pc.dimensions()).forEach((d) => {
+          d.yscale.range([
+            this.pc.state.height - this.pc.state.margin.top - this.pc.state.margin.bottom + 1, 1
+          ]);
+        });
+        this.pc.height(height).render().brushMode("1D-axes");
+        this.parcoords.style.height = `${height}px`;
       };
 
-      let data                                     = d3.csvParse(csv);
-      data                                         = d3.shuffle(data);
-      const width                                  = 100 * data.columns.length;
+      parcoords.data                               = d3.csvParse(csv);
+      parcoords.data                               = d3.shuffle(parcoords.data);
+      const width                                  = 100 * parcoords.data.columns.length;
       root.querySelector(".parcoords").style.width = `${width}px`;
       parcoords.pc                                 = ParCoords()(`#${parcoords.id} .parcoords`);
-      parcoords.pc.data(data)
+      parcoords.pc.data(parcoords.data)
           .width(width)
           .height(200)
           .color("#99f")
@@ -92,10 +103,25 @@
           .mode("queue")
           .rate(50)
           .render()
-          .brushMode("1D-axes");
+          .brushMode("1D-axes")
+          .interactive();
       parcoords.pc.on("brush", callback.bind(parcoords));
       root.querySelectorAll(".parcoords g.tick line, .parcoords path.domain")
           .forEach(e => {e.style.stroke = "var(--cs-color-text)"});
+
+      const target             = parcoords.popout.querySelector(".window-wrapper");
+      const config             = {attributes: true};
+      const sizeOffset         = 50;
+      parcoords.resizeObserver = new MutationObserver((mutations, observer) => {
+        for (const mut of mutations) {
+          if (mut.type === "attributes") {
+            if (mut.attributeName === "style") {
+              parcoords.setHeight(target.clientHeight - sizeOffset);
+            }
+          }
+        }
+      });
+      parcoords.resizeObserver.observe(target, config);
 
       return parcoords;
     }
