@@ -359,8 +359,30 @@
     <a class="btn glass block px-3 parcoordsUndockButton">
       <i class="material-icons">launch</i>
     </a>
-    <div class="parcoordsScroller">
-      <div class="parcoords" style="height:200px"></div>
+    <div class="parcoordsControls">
+      <div class="parcoordsScroller">
+        <div class="parcoords" style="height:200px"></div>
+      </div>
+      <div style="max-width: 400px">
+        <div class="row">
+          <div class="col-5">
+            <button class="parcoordsExport waves-effect waves-light block btn glass text">Export</button>
+          </div>
+          <div class="col-7">
+            <input type="text" placeholder="Filename" class="parcoordsExportLocation text-input text">
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-5">
+            <button class="parcoordsImport waves-effect waves-light block btn glass text">Import</button>
+          </div>
+          <div class="parcoordsImportSelectParent col-7">
+            <select class="parcoordsImportSelect">
+              <option value="-1">none</option>
+            </select>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>

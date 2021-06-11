@@ -464,6 +464,46 @@ void Plugin::registerUICallbacks() {
         mRenderer->setPathlineScalarFilters(filters);
         mParametersDirty = true;
       }));
+
+  // Parcoords
+  mGuiManager->getGui()->registerCallback("parcoords.importBrushState",
+      "Import a saved parcoords brush state.",
+      std::function([this](std::string name, std::string editorId) {
+        std::stringstream json;
+        std::ifstream     i("../share/resources/parcoords/" + name);
+        json << i.rdbuf();
+
+        mGuiManager->getGui()->callJavascript(
+            "CosmoScout.parcoords.loadBrushState", json.str(), editorId);
+      }));
+
+  mGuiManager->getGui()->registerCallback("parcoords.exportBrushState",
+      "Export the current parcoords brush state to a file.",
+      std::function([this](std::string name, std::string json) {
+        std::ofstream o("../share/resources/parcoords/" + name);
+        o << json;
+
+        mGuiManager->getGui()->callJavascript("CosmoScout.parcoords.addAvailableBrushState", name);
+      }));
+
+  mGuiManager->getGui()->registerCallback("parcoords.getAvailableBrushStates",
+      "Requests the list of currently available parcoords brush state files.",
+      std::function([this]() {
+        nlohmann::json j = nlohmann::json::array();
+        std::string    parcoordsPath("../share/resources/parcoords/");
+        if (!boost::filesystem::exists(parcoordsPath)) {
+          cs::utils::filesystem::createDirectoryRecursively(
+              parcoordsPath, boost::filesystem::perms::all_all);
+        }
+        for (const auto& file : cs::utils::filesystem::listFiles(parcoordsPath)) {
+          std::string filename = file;
+          filename.erase(0, 29);
+          j.push_back(filename);
+        }
+
+        mGuiManager->getGui()->callJavascript(
+            "CosmoScout.parcoords.setAvailableBrushStates", j.dump());
+      }));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -669,6 +709,7 @@ void Plugin::initUI() {
       "../share/resources/gui/third-party/js/parcoords.standalone.js");
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/mantle_spherical_resample_0.js");
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/pathlines.js");
+  mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/parcoords.js");
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
 }
 
