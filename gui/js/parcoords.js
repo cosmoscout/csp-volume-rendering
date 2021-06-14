@@ -3,17 +3,17 @@
 (() => {
   class Parcoords {
     constructor(rootId, name, csv, callback) {
-      const root = document.getElementById(rootId);
+      const root     = document.getElementById(rootId);
       const template = CosmoScout.gui.loadTemplateContent("volumeRendering-parcoords");
       root.appendChild(template);
       root.parcoords = this;
 
-      this.id = rootId;
-      this.parcoords = root.querySelector(".parcoords");
-      this.parcoordsControls = root.querySelector(".parcoordsControls");
-      this.parcoordsParent = this.parcoordsControls.parentNode;
+      this.id                    = rootId;
+      this.parcoords             = root.querySelector(".parcoords");
+      this.parcoordsControls     = root.querySelector(".parcoordsControls");
+      this.parcoordsParent       = this.parcoordsControls.parentNode;
       this.parcoordsUndockButton = root.querySelector(".parcoordsUndockButton");
-      this.popout = CosmoScout.gui.loadTemplateContent("volumeRendering-parcoordsPopout");
+      this.popout           = CosmoScout.gui.loadTemplateContent("volumeRendering-parcoordsPopout");
       this.popout.innerHTML = this.popout.innerHTML.replace("%NAME%", name);
       document.getElementById("cosmoscout").appendChild(this.popout);
       this.popoutContent = this.popout.querySelector(".window-content");
@@ -21,12 +21,12 @@
 
       this.parcoordsUndockButton.addEventListener("click", () => { this.undock(); });
       this.popout.querySelector(`[data-action="close"]`)
-        .addEventListener("click", () => { this.dock(); });
+          .addEventListener("click", () => { this.dock(); });
 
       this.exportLocation = this.parcoordsControls.querySelector(".parcoordsExportLocation");
       this.parcoordsControls.querySelector(".parcoordsExport").addEventListener("click", () => {
         CosmoScout.callbacks.parcoords.exportBrushState(
-          this.exportLocation.value, JSON.stringify(this.exportBrushState()));
+            this.exportLocation.value, JSON.stringify(this.exportBrushState()));
       });
       this.importSelect = this.parcoordsControls.querySelector(".parcoordsImportSelect");
       this.parcoordsControls.querySelector(".parcoordsImport").addEventListener("click", () => {
@@ -35,27 +35,27 @@
 
       this.heightOffset = 120;
 
-      this.data = d3.csvParse(csv);
-      this.data = d3.shuffle(this.data);
-      const width = 100 * this.data.columns.length;
+      this.data                                    = d3.csvParse(csv);
+      this.data                                    = d3.shuffle(this.data);
+      const width                                  = 100 * this.data.columns.length;
       root.querySelector(".parcoords").style.width = `${width}px`;
-      this.pc = ParCoords()(`#${this.id} .parcoords`);
+      this.pc                                      = ParCoords()(`#${this.id} .parcoords`);
       this.pc.data(this.data)
-        .width(width)
-        .height(200)
-        .color("#99f")
-        .alpha(0.05)
-        .mode("queue")
-        .rate(50)
-        .render()
-        .brushMode("1D-axes")
-        .interactive();
+          .width(width)
+          .height(200)
+          .color("#99f")
+          .alpha(0.05)
+          .mode("queue")
+          .rate(50)
+          .render()
+          .brushMode("1D-axes")
+          .interactive();
       this.pc.on("brush", callback.bind(this));
       this.parcoords.querySelectorAll("g.tick line, path.domain")
-        .forEach(e => { e.style.stroke = "var(--cs-color-text)" });
+          .forEach(e => {e.style.stroke = "var(--cs-color-text)"});
 
-      const target = this.popoutWrapper;
-      const config = { attributes: true };
+      const target        = this.popoutWrapper;
+      const config        = {attributes: true};
       this.resizeObserver = new MutationObserver((mutations, observer) => {
         for (const mut of mutations) {
           if (mut.type === "attributes") {
@@ -71,7 +71,7 @@
     exportBrushState() {
       const brushExtents = this.pc.brushExtents();
       Object.keys(brushExtents)
-        .forEach(e => { brushExtents[e] = brushExtents[e].selection.scaled.reverse(); });
+          .forEach(e => { brushExtents[e] = brushExtents[e].selection.scaled.reverse(); });
       return brushExtents;
     }
 
@@ -98,7 +98,7 @@
 
     dock() {
       this.parcoordsUndockButton.hidden = false;
-      this.parcoordsControls = this.popoutContent.removeChild(this.parcoordsControls);
+      this.parcoordsControls            = this.popoutContent.removeChild(this.parcoordsControls);
       this.parcoordsParent.appendChild(this.parcoordsControls);
       this.setHeight(200);
     }
@@ -115,10 +115,10 @@
       // Apparently brushMode has to be switched back and forth once, or else the brushing will
       // not work after a resize
       this.pc.height(height).render().brushMode("angular").brushMode("1D-axes").brushExtents(
-        brushExtents);
+          brushExtents);
       this.parcoords.style.height = `${height}px`;
       this.parcoords.querySelectorAll("g.tick line, path.domain")
-        .forEach(e => { e.style.stroke = "var(--cs-color-text)" });
+          .forEach(e => {e.style.stroke = "var(--cs-color-text)"});
     }
   }
 
