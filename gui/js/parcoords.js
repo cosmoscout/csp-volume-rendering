@@ -33,6 +33,26 @@
         CosmoScout.callbacks.parcoords.importBrushState(this.importSelect.value, this.id);
       });
 
+      this.brushMin         = this.parcoordsControls.querySelector(".parcoordsBrushMin");
+      this.brushMax         = this.parcoordsControls.querySelector(".parcoordsBrushMax");
+      this.activeBrushLabel = this.parcoordsControls.querySelector(".parcoordsActiveBrushLabel");
+      this.activeBrush      = "";
+
+      this.brushMin.addEventListener("change", () => {
+        let max = this.brushMax.value;
+        if (max == "") {
+          max = this.pc.dimensions()[this.activeBrush].yscale.domain()[1];
+        }
+        this.pc.brushExtents({[this.activeBrush]: [this.brushMin.value, max]});
+      });
+      this.brushMax.addEventListener("change", () => {
+        let min = this.brushMin.value;
+        if (min == "") {
+          min = this.pc.dimensions()[this.activeBrush].yscale.domain()[0];
+        }
+        this.pc.brushExtents({[this.activeBrush]: [min, this.brushMax.value]});
+      });
+
       this.heightOffset = 120;
 
       this.data                                    = d3.csvParse(csv);
@@ -50,7 +70,18 @@
           .render()
           .brushMode("1D-axes")
           .interactive();
-      this.pc.on("brush", callback.bind(this));
+      const boundCallback = callback.bind(this);
+      this.pc.on("brush", (brushed, args) => {
+        boundCallback(brushed, args);
+        if (args) {
+          this._updateMinMax(args.axis);
+        }
+      });
+      this.pc.on("brushend", (brushed, args) => {
+        if (args) {
+          this._updateMinMax(args.axis);
+        }
+      });
       this.parcoords.querySelectorAll("g.tick line, path.domain")
           .forEach(e => {e.style.stroke = "var(--cs-color-text)"});
 
@@ -66,6 +97,8 @@
         }
       });
       this.resizeObserver.observe(target, config);
+
+      this.setHeight(200);
     }
 
     exportBrushState() {
@@ -120,6 +153,20 @@
       this.parcoords.querySelectorAll("g.tick line, path.domain")
           .forEach(e => {e.style.stroke = "var(--cs-color-text)"});
     }
+
+    _updateMinMax(dimension) {
+      this.activeBrushLabel.innerText = dimension;
+      this.activeBrush                = dimension;
+      this.brushMin.disabled          = false;
+      this.brushMax.disabled          = false;
+      if (this.pc.brushExtents().hasOwnProperty(dimension)) {
+        this.brushMin.value = this.pc.brushExtents()[dimension].selection.scaled[1];
+        this.brushMax.value = this.pc.brushExtents()[dimension].selection.scaled[0];
+      } else {
+        this.brushMin.value = "";
+        this.brushMax.value = "";
+      }
+    }
   }
 
   /**
@@ -147,7 +194,6 @@
      * @inheritDoc
      */
     init() {
-      console.log("Initing parcoords");
     }
 
     /**
