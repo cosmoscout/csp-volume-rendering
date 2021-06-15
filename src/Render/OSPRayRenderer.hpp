@@ -19,6 +19,17 @@
 
 namespace csp::volumerendering {
 
+class OSPRayInitializer {
+ public:
+  OSPRayInitializer() {
+    OSPRayUtility::initOSPRay();
+  }
+
+  ~OSPRayInitializer() {
+    ospShutdown();
+  }
+};
+
 /// Renderer imeplementation that uses Intel OSPRay for rendering volumes.
 class OSPRayRenderer : public Renderer {
  public:
@@ -34,6 +45,8 @@ class OSPRayRenderer : public Renderer {
   void  cancelRendering() override;
 
  private:
+  OSPRayInitializer mInitializer;
+
   struct Volume {
     ospray::cpp::Volume   mOsprayData;
     float                 mHeight;

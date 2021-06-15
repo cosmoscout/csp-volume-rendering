@@ -31,7 +31,6 @@ namespace csp::volumerendering {
 OSPRayRenderer::OSPRayRenderer(
     std::shared_ptr<DataManager> dataManager, VolumeStructure structure, VolumeShape shape)
     : Renderer(dataManager, structure, shape) {
-  OSPRayUtility::initOSPRay();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,8 +38,6 @@ OSPRayRenderer::OSPRayRenderer(
 OSPRayRenderer::~OSPRayRenderer() {
   mCachedVolumes.clear();
   mRenderFuture.reset();
-
-  ospShutdown();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
