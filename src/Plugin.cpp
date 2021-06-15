@@ -333,6 +333,12 @@ void Plugin::registerUICallbacks() {
         mPluginSettings.mResolution = (int)std::lround(value);
       }));
 
+  mGuiManager->getGui()->registerCallback("volumeRendering.setMaxRenderPasses",
+      "Sets the maximum number of render passes for constant rendering parameters.",
+      std::function([this](double value) {
+        mPluginSettings.mRendering.mMaxPasses = (int)std::lround(value);
+      }));
+
   mGuiManager->getGui()->registerCallback("volumeRendering.setSamplingRate",
       "Sets the sampling rate for volume rendering.",
       std::function([this](double value) { mPluginSettings.mSamplingRate = (float)value; }));
@@ -555,6 +561,12 @@ void Plugin::connectSettings() {
     mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setSamplingRate", value);
   });
+  mPluginSettings.mRendering.mMaxPasses.connectAndTouch([this](int value) {
+    mRenderedFrames.clear();
+    mRenderer->setMaxRenderPasses(value);
+    mParametersDirty = true;
+    mGuiManager->setSliderValue("volumeRendering.setMaxRenderPasses", value);
+  });
   mPluginSettings.mSunStrength.connectAndTouch([this](float value) {
     mRenderedFrames.clear();
     mRenderer->setSunStrength(value);
@@ -716,8 +728,7 @@ void Plugin::initUI() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool Plugin::tryRequestFrame() {
-  if ((!(mNextFrame == mRenderingFrame) || mParametersDirty || mFrameInvalid) &&
-      mActiveDisplay->pVisible.get()) {
+  if (mActiveDisplay->pVisible.get()) {
     cs::utils::FrameTimings::ScopedTimer timer("Request frame");
 
     mRenderingFrame = mNextFrame;

@@ -56,6 +56,8 @@ class Renderer {
   void setDensityScale(float densityScale);
   /// Sets the heuristic with which the depth image should be rendered.
   void setDepthMode(DepthMode depthMode);
+  /// Sets the maximum number of render passes for constant rendering parameters.
+  void setMaxRenderPasses(int maxRenderPasses);
 
   /// Enables or disables denoising of the color image.
   void setDenoiseColor(bool denoiseColor);
@@ -112,6 +114,10 @@ class Renderer {
   };
 
   struct Parameters {
+    struct Rendering {
+      int mMaxPasses;
+    } mRendering;
+
     int       mResolution;
     float     mSamplingRate;
     float     mDensityScale;

@@ -79,21 +79,29 @@ Renderer::RenderedImage OSPRayRenderer::getFrameImpl(
     glm::mat4 cameraTransform, Parameters parameters, DataManager::State dataState) {
   mRenderingCancelled = false;
   RenderedImage renderedImage;
+  if (cameraTransform == mCachedCameraTransform && dataState == mCachedState &&
+      parameters == mCachedParameters &&
+      mFrameBufferAccumulationPasses >= parameters.mRendering.mMaxPasses) {
+    renderedImage.mValid = false;
+    return renderedImage;
+  }
   try {
     const Volume&      volume = getVolume(dataState);
     ospray::cpp::World world;
     if (dataState == mCachedState && parameters == mCachedParameters) {
       world = mCachedWorld;
     } else {
-      world             = getWorld(volume, parameters);
-      mCachedState      = dataState;
-      mCachedParameters = parameters;
-      mCachedWorld      = world;
+      world        = getWorld(volume, parameters);
+      mCachedWorld = world;
     }
     Camera                   camera = getCamera(volume.mHeight, cameraTransform);
-    ospray::cpp::FrameBuffer frame  = renderFrame(world, camera.mOsprayCamera, parameters);
-    renderedImage                   = extractImageData(frame, camera, volume.mHeight, parameters);
-    renderedImage.mValid            = !mRenderingCancelled;
+    ospray::cpp::FrameBuffer frame =
+        renderFrame(world, camera.mOsprayCamera, cameraTransform, parameters, dataState);
+    renderedImage          = extractImageData(frame, camera, volume.mHeight, parameters);
+    renderedImage.mValid   = !mRenderingCancelled;
+    mCachedCameraTransform = cameraTransform;
+    mCachedState           = dataState;
+    mCachedParameters      = parameters;
   } catch (const std::exception&) { renderedImage.mValid = false; }
   return renderedImage;
 }
@@ -416,8 +424,9 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ospray::cpp::FrameBuffer OSPRayRenderer::renderFrame(
-    ospray::cpp::World& world, ospray::cpp::Camera& camera, const Parameters& parameters) {
+ospray::cpp::FrameBuffer OSPRayRenderer::renderFrame(ospray::cpp::World& world,
+    ospray::cpp::Camera& camera, const glm::mat4& cameraTransform, const Parameters& parameters,
+    const DataManager::State& dataState) {
   ospray::cpp::Renderer renderer("volume_depth");
   renderer.setParam("aoSamples", 0);
   renderer.setParam("shadows", false);
@@ -428,26 +437,31 @@ ospray::cpp::FrameBuffer OSPRayRenderer::renderFrame(
   renderer.setParam("numScalarFilters", (int)parameters.mScalarFilters.size());
   renderer.commit();
 
-  int channels = OSP_FB_COLOR;
-  if (parameters.mDepthMode != DepthMode::eNone) {
-    channels |= OSP_FB_DEPTH;
-  }
+  if (!(cameraTransform == mCachedCameraTransform && dataState == mCachedState &&
+          parameters == mCachedParameters)) {
+    int channels = OSP_FB_COLOR | OSP_FB_ACCUM;
+    if (parameters.mDepthMode != DepthMode::eNone) {
+      channels |= OSP_FB_DEPTH;
+    }
 
-  ospray::cpp::FrameBuffer framebuffer(
-      parameters.mResolution, parameters.mResolution, OSP_FB_RGBA32F, channels);
-  framebuffer.clear();
-  framebuffer.commit();
+    mCachedFrameBuffer = ospray::cpp::FrameBuffer(
+        parameters.mResolution, parameters.mResolution, OSP_FB_RGBA32F, channels);
+    mCachedFrameBuffer.clear();
+    mCachedFrameBuffer.commit();
+    mFrameBufferAccumulationPasses = 0;
+  }
 
   {
     std::scoped_lock lock(mRenderFutureMutex);
-    mRenderFuture = framebuffer.renderFrame(renderer, camera, world);
+    mRenderFuture = mCachedFrameBuffer.renderFrame(renderer, camera, world);
+    mFrameBufferAccumulationPasses++;
   }
   mRenderFuture->wait();
   {
     std::scoped_lock lock(mRenderFutureMutex);
     mRenderFuture.reset();
   }
-  return framebuffer;
+  return mCachedFrameBuffer;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

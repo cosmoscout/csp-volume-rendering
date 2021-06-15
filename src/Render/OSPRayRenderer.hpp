@@ -48,7 +48,11 @@ class OSPRayRenderer : public Renderer {
 
   std::map<DataManager::State, std::map<int, std::shared_future<Volume>>> mCachedVolumes;
 
-  ospray::cpp::World mCachedWorld;
+  ospray::cpp::World       mCachedWorld;
+  ospray::cpp::FrameBuffer mCachedFrameBuffer;
+  int                      mFrameBufferAccumulationPasses;
+
+  glm::mat4          mCachedCameraTransform;
   DataManager::State mCachedState;
   Parameters         mCachedParameters;
 
@@ -68,12 +72,13 @@ class OSPRayRenderer : public Renderer {
       const Volume& volume, const Parameters& parameters);
   ospray::cpp::World       getWorld(const Volume& volume, const Parameters& parameters);
   OSPRayRenderer::Camera   getCamera(float volumeHeight, glm::mat4 observerTransform);
-  ospray::cpp::FrameBuffer renderFrame(
-      ospray::cpp::World& world, ospray::cpp::Camera& camera, const Parameters& parameters);
-  Renderer::RenderedImage extractImageData(ospray::cpp::FrameBuffer& frame, const Camera& camera,
-      float volumeHeight, const Parameters& parameters);
-  std::vector<float>      normalizeDepthData(std::vector<float> data, const Camera& camera,
-           float volumeHeight, const Parameters& parameters);
+  ospray::cpp::FrameBuffer renderFrame(ospray::cpp::World& world, ospray::cpp::Camera& camera,
+      const glm::mat4& cameraTransform, const Parameters& parameters,
+      const DataManager::State& dataState);
+  Renderer::RenderedImage  extractImageData(ospray::cpp::FrameBuffer& frame, const Camera& camera,
+       float volumeHeight, const Parameters& parameters);
+  std::vector<float>       normalizeDepthData(std::vector<float> data, const Camera& camera,
+            float volumeHeight, const Parameters& parameters);
 };
 
 } // namespace csp::volumerendering

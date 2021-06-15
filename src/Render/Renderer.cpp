@@ -56,6 +56,13 @@ void Renderer::setDepthMode(DepthMode depthMode) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void Renderer::setMaxRenderPasses(int maxRenderPasses) {
+  std::scoped_lock lock(mParameterMutex);
+  mParameters.mRendering.mMaxPasses = maxRenderPasses;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void Renderer::setDenoiseColor(bool denoiseColor) {
   std::scoped_lock lock(mParameterMutex);
   mParameters.mDenoiseColor = denoiseColor;

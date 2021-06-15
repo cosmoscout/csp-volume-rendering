@@ -38,6 +38,9 @@ class Plugin : public cs::core::PluginBase {
     cs::utils::DefaultProperty<std::string> mActiveScalar{""};
 
     // Rendering settings
+    struct Rendering {
+      cs::utils::DefaultProperty<int> mMaxPasses{10};
+    } mRendering;
     cs::utils::DefaultProperty<bool>        mRequestImages{true};
     cs::utils::DefaultProperty<int>         mResolution{256};
     cs::utils::DefaultProperty<float>       mSamplingRate{0.05f};
