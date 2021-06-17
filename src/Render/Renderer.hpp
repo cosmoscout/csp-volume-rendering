@@ -101,51 +101,68 @@ class Renderer {
   virtual void cancelRendering() = 0;
 
  protected:
-  struct PathlineParameters {
-    bool                      mEnable;
-    float                     mLineOpacity;
-    float                     mLineSize;
-    std::vector<ScalarFilter> mScalarFilters;
-
-    bool operator==(const PathlineParameters& other) const {
-      return mEnable == other.mEnable && mLineOpacity == other.mLineOpacity &&
-             mLineSize == other.mLineSize && mScalarFilters == other.mScalarFilters;
-    }
-  };
-
   struct Parameters {
-    struct Rendering {
-      int mMaxPasses;
-    } mRendering;
+    struct World {
+      DepthMode mDepthMode;
 
-    int       mResolution;
-    float     mSamplingRate;
-    float     mDensityScale;
-    DepthMode mDepthMode;
+      struct Lights {
+        bool      mShading;
+        float     mAmbientStrength;
+        glm::vec3 mSunDirection;
+        float     mSunStrength;
+
+        bool operator==(const Lights& other) const {
+          // If shading is deactivated, other parameters can be ignored
+          return mShading == other.mShading &&
+                 (!mShading || (mAmbientStrength == other.mAmbientStrength &&
+                                   mSunDirection == other.mSunDirection &&
+                                   mSunStrength == other.mSunStrength));
+        }
+      } mLights;
+
+      struct Volume {
+        std::vector<glm::vec4> mTransferFunction;
+        float                  mDensityScale;
+
+        bool operator==(const Volume& other) const {
+          return mDensityScale == other.mDensityScale &&
+                 mTransferFunction == other.mTransferFunction;
+        }
+      } mVolume;
+
+      struct Pathlines {
+        bool                      mEnable;
+        float                     mLineOpacity;
+        float                     mLineSize;
+        std::vector<ScalarFilter> mScalarFilters;
+
+        bool operator==(const Pathlines& other) const {
+          return mEnable == other.mEnable && mLineOpacity == other.mLineOpacity &&
+                 mLineSize == other.mLineSize && mScalarFilters == other.mScalarFilters;
+        }
+      } mPathlines;
+
+      bool operator==(const World& other) const {
+        return mDepthMode == other.mDepthMode && mLights == other.mLights &&
+               mVolume == other.mVolume && mPathlines == other.mPathlines;
+      }
+    } mWorld;
+
+    int mMaxRenderPasses;
+
+    int   mResolution;
+    float mSamplingRate;
 
     bool mDenoiseColor;
     bool mDenoiseDepth;
 
-    std::vector<glm::vec4>    mTransferFunction;
     std::vector<ScalarFilter> mScalarFilters;
 
-    bool      mShading;
-    float     mAmbientLight;
-    glm::vec3 mSunDirection;
-    float     mSunStrength;
-
-    PathlineParameters mPathlineParameters;
-
     bool operator==(const Parameters& other) const {
-      return mResolution == other.mResolution && mSamplingRate == other.mSamplingRate &&
-             mDensityScale == other.mDensityScale && mDepthMode == other.mDepthMode &&
-             mDenoiseColor == other.mDenoiseColor && mDenoiseDepth == other.mDenoiseDepth &&
-             mTransferFunction == other.mTransferFunction &&
-             mScalarFilters == other.mScalarFilters && mShading == other.mShading &&
-             mAmbientLight == other.mAmbientLight &&
-             // If shading is deactivated sun direction can be ignored
-             (mSunDirection == other.mSunDirection || !mShading) &&
-             mSunStrength == other.mSunStrength && mPathlineParameters == other.mPathlineParameters;
+      return mMaxRenderPasses == other.mMaxRenderPasses && mResolution == other.mResolution &&
+             mSamplingRate == other.mSamplingRate && mDenoiseColor == other.mDenoiseColor &&
+             mDenoiseDepth == other.mDenoiseDepth && mScalarFilters == other.mScalarFilters &&
+             mWorld == other.mWorld;
     }
   };
 

@@ -51,14 +51,14 @@ void Renderer::setSamplingRate(float samplingRate) {
 
 void Renderer::setDepthMode(DepthMode depthMode) {
   std::scoped_lock lock(mParameterMutex);
-  mParameters.mDepthMode = depthMode;
+  mParameters.mWorld.mDepthMode = depthMode;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Renderer::setMaxRenderPasses(int maxRenderPasses) {
   std::scoped_lock lock(mParameterMutex);
-  mParameters.mRendering.mMaxPasses = maxRenderPasses;
+  mParameters.mMaxRenderPasses = maxRenderPasses;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -79,14 +79,14 @@ void Renderer::setDenoiseDepth(bool denoiseDepth) {
 
 void Renderer::setTransferFunction(std::vector<glm::vec4> transferFunction) {
   std::scoped_lock lock(mParameterMutex);
-  mParameters.mTransferFunction = transferFunction;
+  mParameters.mWorld.mVolume.mTransferFunction = transferFunction;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Renderer::setDensityScale(float densityScale) {
   std::scoped_lock lock(mParameterMutex);
-  mParameters.mDensityScale = densityScale;
+  mParameters.mWorld.mVolume.mDensityScale = densityScale;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -100,56 +100,56 @@ void Renderer::setScalarFilters(std::vector<ScalarFilter> filters) {
 
 void Renderer::setShading(bool shading) {
   std::scoped_lock lock(mParameterMutex);
-  mParameters.mShading = shading;
+  mParameters.mWorld.mLights.mShading = shading;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Renderer::setAmbientLight(float strength) {
   std::scoped_lock lock(mParameterMutex);
-  mParameters.mAmbientLight = strength;
+  mParameters.mWorld.mLights.mAmbientStrength = strength;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Renderer::setSunDirection(glm::vec3 sunDirection) {
   std::scoped_lock lock(mParameterMutex);
-  mParameters.mSunDirection = sunDirection;
+  mParameters.mWorld.mLights.mSunDirection = sunDirection;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Renderer::setSunStrength(float strength) {
   std::scoped_lock lock(mParameterMutex);
-  mParameters.mSunStrength = strength;
+  mParameters.mWorld.mLights.mSunStrength = strength;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Renderer::setPathlinesEnabled(bool enable) {
   std::scoped_lock lock(mParameterMutex);
-  mParameters.mPathlineParameters.mEnable = enable;
+  mParameters.mWorld.mPathlines.mEnable = enable;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Renderer::setPathlineOpacity(float value) {
   std::scoped_lock lock(mParameterMutex);
-  mParameters.mPathlineParameters.mLineOpacity = value;
+  mParameters.mWorld.mPathlines.mLineOpacity = value;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Renderer::setPathlineSize(float value) {
   std::scoped_lock lock(mParameterMutex);
-  mParameters.mPathlineParameters.mLineSize = value;
+  mParameters.mWorld.mPathlines.mLineSize = value;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Renderer::setPathlineScalarFilters(std::vector<ScalarFilter> const& value) {
   std::scoped_lock lock(mParameterMutex);
-  mParameters.mPathlineParameters.mScalarFilters = value;
+  mParameters.mWorld.mPathlines.mScalarFilters = value;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

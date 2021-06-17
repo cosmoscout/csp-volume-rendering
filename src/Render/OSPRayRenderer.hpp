@@ -51,6 +51,7 @@ class OSPRayRenderer : public Renderer {
     ospray::cpp::Volume   mOsprayData;
     float                 mHeight;
     std::array<double, 2> mScalarBounds;
+    int                   mLod;
   };
 
   struct Camera {
@@ -59,17 +60,41 @@ class OSPRayRenderer : public Renderer {
     glm::mat4           mTransformationMatrix;
   };
 
-  std::map<DataManager::State, std::map<int, std::shared_future<Volume>>> mCachedVolumes;
+  int mFrameBufferAccumulationPasses;
 
-  ospray::cpp::World       mCachedWorld;
-  ospray::cpp::FrameBuffer mCachedFrameBuffer;
-  int                      mFrameBufferAccumulationPasses;
+  struct Cache {
+    std::map<DataManager::State, std::map<int, std::shared_future<Volume>>> mVolumes;
 
-  glm::mat4          mCachedCameraTransform;
-  DataManager::State mCachedState;
-  Parameters         mCachedParameters;
+    Camera                       mCamera;
+    ospray::cpp::FrameBuffer     mFrameBuffer;
+    ospray::cpp::World           mWorld;
+    ospray::cpp::Geometry        mPathlines;
+    ospray::cpp::GeometricModel  mPathlinesModel;
+    ospray::cpp::Volume          mVolume;
+    ospray::cpp::VolumetricModel mVolumeModel;
+    ospray::cpp::Geometry        mCore;
+    ospray::cpp::GeometricModel  mCoreModel;
+    ospray::cpp::Geometry        mClip;
+    ospray::cpp::GeometricModel  mClipModel;
+    ospray::cpp::Group           mGroup;
+    ospray::cpp::Instance        mInstance;
+    ospray::cpp::Light           mAmbientLight;
+    ospray::cpp::Light           mSunLight;
 
-  std::optional<ospray::cpp::GeometricModel> mPathlinesModel;
+    struct State {
+      glm::mat4          mCameraTransform;
+      Parameters         mParameters;
+      DataManager::State mDataState;
+      int                mVolumeLod;
+
+      bool operator==(const State& other) const {
+        return mCameraTransform == other.mCameraTransform && mParameters == other.mParameters &&
+               mDataState == other.mDataState && mVolumeLod == other.mVolumeLod;
+      }
+    } mState;
+
+    Cache();
+  } mCache;
 
   std::optional<ospray::cpp::Future> mRenderFuture;
   bool                               mRenderingCancelled;
@@ -83,11 +108,11 @@ class OSPRayRenderer : public Renderer {
   float                         getHeight(vtkSmartPointer<vtkDataSet> data);
   ospray::cpp::TransferFunction getTransferFunction(
       const Volume& volume, const Parameters& parameters);
-  ospray::cpp::World       getWorld(const Volume& volume, const Parameters& parameters);
+  void updateWorld(
+      const Volume& volume, const Parameters& parameters, const DataManager::State& dataState);
   OSPRayRenderer::Camera   getCamera(float volumeHeight, glm::mat4 observerTransform);
   ospray::cpp::FrameBuffer renderFrame(ospray::cpp::World& world, ospray::cpp::Camera& camera,
-      const glm::mat4& cameraTransform, const Parameters& parameters,
-      const DataManager::State& dataState);
+      Parameters const& parameters, bool resetAccumulation);
   Renderer::RenderedImage  extractImageData(ospray::cpp::FrameBuffer& frame, const Camera& camera,
        float volumeHeight, const Parameters& parameters);
   std::vector<float>       normalizeDepthData(std::vector<float> data, const Camera& camera,
