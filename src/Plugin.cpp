@@ -87,6 +87,20 @@ NLOHMANN_JSON_SERIALIZE_ENUM(DepthMode, {
                                             {DepthMode::eMultiThreshold, "multiThreshold"},
                                         })
 
+void from_json(nlohmann::json const& j, Plugin::Settings::Pathlines& o) {
+  cs::core::Settings::deserialize(j, "path", o.mPath);
+  cs::core::Settings::deserialize(j, "enabled", o.mEnabled);
+  cs::core::Settings::deserialize(j, "opacity", o.mLineOpacity);
+  cs::core::Settings::deserialize(j, "size", o.mLineSize);
+}
+
+void to_json(nlohmann::json& j, Plugin::Settings::Pathlines const& o) {
+  cs::core::Settings::serialize(j, "path", o.mPath);
+  cs::core::Settings::serialize(j, "enabled", o.mEnabled);
+  cs::core::Settings::serialize(j, "opacity", o.mLineOpacity);
+  cs::core::Settings::serialize(j, "size", o.mLineSize);
+}
+
 void from_json(nlohmann::json const& j, Plugin::Settings& o) {
   // Data settings
   cs::core::Settings::deserialize(j, "volumeDataPath", o.mVolumeDataPath);
@@ -119,6 +133,8 @@ void from_json(nlohmann::json const& j, Plugin::Settings& o) {
   cs::core::Settings::deserialize(j, "position", o.mPosition);
   cs::core::Settings::deserialize(j, "scale", o.mScale);
   cs::core::Settings::deserialize(j, "rotation", o.mRotation);
+
+  cs::core::Settings::deserialize(j, "pathlines", o.mPathlines);
 }
 
 void to_json(nlohmann::json& j, Plugin::Settings const& o) {
@@ -153,6 +169,8 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
   cs::core::Settings::serialize(j, "position", o.mPosition);
   cs::core::Settings::serialize(j, "scale", o.mScale);
   cs::core::Settings::serialize(j, "rotation", o.mRotation);
+
+  cs::core::Settings::serialize(j, "pathlines", o.mPathlines);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -271,12 +289,12 @@ void Plugin::onLoad() {
 
   switch (mPluginSettings.mVolumeDataType.get()) {
   case VolumeFileType::eVtk:
-    mDataManager = std::make_shared<VtkDataManager>(
-        mPluginSettings.mVolumeDataPath.get(), mPluginSettings.mVolumeDataPattern.get());
+    mDataManager = std::make_shared<VtkDataManager>(mPluginSettings.mVolumeDataPath.get(),
+        mPluginSettings.mVolumeDataPattern.get(), mPluginSettings.mPathlines.mPath.get());
     break;
   case VolumeFileType::eNetCdf:
-    mDataManager = std::make_shared<NetCdfDataManager>(
-        mPluginSettings.mVolumeDataPath.get(), mPluginSettings.mVolumeDataPattern.get());
+    mDataManager = std::make_shared<NetCdfDataManager>(mPluginSettings.mVolumeDataPath.get(),
+        mPluginSettings.mVolumeDataPattern.get(), mPluginSettings.mPathlines.mPath.get());
     break;
   default:
     logger().error("Invalid volume data type given in settings! Should be 'vtk'.");

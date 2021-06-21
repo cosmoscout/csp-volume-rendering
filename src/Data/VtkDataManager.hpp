@@ -18,7 +18,7 @@ class VtkDataManager : public DataManager {
  public:
   /// Create a DataManager that can read files in the vtk data format.
   /// All files in 'path' matching 'filenamePattern' can be accessed using the DataManager.
-  VtkDataManager(std::string path, std::string filenamePattern);
+  VtkDataManager(std::string path, std::string filenamePattern, std::string pathlinesPath);
 
  protected:
   vtkSmartPointer<vtkDataSet> loadDataImpl(Timestep timestep, Lod lod) override;

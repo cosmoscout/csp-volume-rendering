@@ -27,8 +27,8 @@ const char* DataManagerException::what() const noexcept {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-DataManager::DataManager(std::string path, std::string filenamePattern)
-    : mPathlines("C:\\pathlines.vtk") {
+DataManager::DataManager(std::string path, std::string filenamePattern, std::string pathlinesPath)
+    : mPathlines(pathlinesPath) {
   std::regex patternRegex;
   try {
     patternRegex = std::regex(".*" + filenamePattern);

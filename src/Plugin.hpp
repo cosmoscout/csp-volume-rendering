@@ -65,6 +65,7 @@ class Plugin : public cs::core::PluginBase {
     cs::utils::DefaultProperty<glm::dquat> mRotation{glm::dquat(1, 0, 0, 0)};
 
     struct Pathlines {
+      cs::utils::Property<std::string>  mPath;
       cs::utils::DefaultProperty<bool>  mEnabled{true};
       cs::utils::DefaultProperty<float> mLineOpacity{1.f};
       cs::utils::DefaultProperty<float> mLineSize{1.f};

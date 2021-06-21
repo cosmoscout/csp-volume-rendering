@@ -17,8 +17,9 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-VtkDataManager::VtkDataManager(std::string path, std::string filenamePattern)
-    : DataManager(path, filenamePattern) {
+VtkDataManager::VtkDataManager(
+    std::string path, std::string filenamePattern, std::string pathlinesPath)
+    : DataManager(path, filenamePattern, pathlinesPath) {
   initState();
 }
 

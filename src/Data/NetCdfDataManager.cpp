@@ -14,8 +14,9 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-NetCdfDataManager::NetCdfDataManager(std::string path, std::string filenamePattern)
-    : DataManager(path, filenamePattern) {
+NetCdfDataManager::NetCdfDataManager(
+    std::string path, std::string filenamePattern, std::string pathlinesPath)
+    : DataManager(path, filenamePattern, pathlinesPath) {
   initState();
 }
 

@@ -128,7 +128,7 @@ class DataManager {
 
   cs::utils::Signal<Scalar const&> mOnScalarRangeUpdated;
 
-  DataManager(std::string path, std::string filenamePattern);
+  DataManager(std::string path, std::string filenamePattern, std::string pathlinesPath);
 
   void initState();
   void initScalars();
