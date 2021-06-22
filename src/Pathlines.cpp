@@ -107,6 +107,51 @@ std::vector<rkcommon::math::vec4f> Pathlines::getColors(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+std::vector<rkcommon::math::vec2f> Pathlines::getTexCoords(
+    std::string const& xScalarId, std::string const& yScalarId) const {
+  std::array<std::string, 2> scalarIds = {xScalarId, yScalarId};
+  std::array<Scalar, 2>      scalars;
+  scalars[0] = *std::find_if(
+      mScalars.begin(), mScalars.end(), [xScalarId](Scalar s) { return s.getId() == xScalarId; });
+  scalars[1] = *std::find_if(
+      mScalars.begin(), mScalars.end(), [yScalarId](Scalar s) { return s.getId() == yScalarId; });
+
+  std::vector<rkcommon::math::vec2f> texCoords(mData->GetNumberOfPoints());
+
+  for (int axis = 0; axis < scalars.size(); axis++) {
+    double min = mScalarRanges.find(scalarIds[axis])->second[0];
+    double max = mScalarRanges.find(scalarIds[axis])->second[1];
+    switch (scalars[axis].mType) {
+    case ScalarType::ePointData: {
+      for (int i = 0; i < mData->GetNumberOfPoints(); i++) {
+        double* value = mData->GetPointData()->GetScalars(scalars[axis].mName.c_str())->GetTuple(i);
+        texCoords[i][axis] = (float)((*value - min) / (max - min));
+      }
+      break;
+    }
+    case ScalarType::eCellData: {
+      auto lineIter = vtk::TakeSmartPointer(mData->GetLines()->NewIterator());
+      for (lineIter->GoToFirstCell(); !lineIter->IsDoneWithTraversal(); lineIter->GoToNextCell()) {
+        double* value = mData->GetCellData()
+                            ->GetScalars(scalars[axis].mName.c_str())
+                            ->GetTuple(lineIter->GetCurrentCellId());
+
+        vtkSmartPointer<vtkIdList> idList = vtkSmartPointer<vtkIdList>::New();
+        lineIter->GetCurrentCell(idList);
+        for (auto point = idList->begin(); point != idList->end() - 1; point++) {
+          texCoords[(uint32_t)*point][axis] = (float)((*value - min) / (max - min));
+        }
+      }
+      break;
+    }
+    }
+  }
+
+  return texCoords;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 std::vector<uint32_t> Pathlines::getIndices(std::vector<ScalarFilter> const& filters) const {
   std::vector<std::pair<Scalar, ScalarFilter>> pointFilters;
   std::vector<std::pair<Scalar, ScalarFilter>> cellFilters;

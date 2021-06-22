@@ -30,6 +30,8 @@ class Pathlines {
   std::vector<rkcommon::math::vec4f> getVertices(float lineSize) const;
   std::vector<rkcommon::math::vec4f> getColors(
       std::string const& scalarId, float lineOpacity) const;
+  std::vector<rkcommon::math::vec2f> getTexCoords(
+      std::string const& xScalarId, std::string const& yScalarId) const;
   std::vector<uint32_t> getIndices(std::vector<ScalarFilter> const& filters) const;
 
  private:
