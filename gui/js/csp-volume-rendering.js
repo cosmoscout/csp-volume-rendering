@@ -23,7 +23,8 @@
       CosmoScout.gui.initSlider("volumeRendering.setSunStrength", 0, 10, 0.1, [1]);
       CosmoScout.gui.initSlider("volumeRendering.setDensityScale", 0, 10, 0.1, [1]);
       CosmoScout.gui.initSlider("volumeRendering.setPathlineOpacity", 0, 1, 0.05, [1]);
-      CosmoScout.gui.initSlider("volumeRendering.setPathlineSize", 1, 10, 1, [1]);
+      CosmoScout.gui.initSlider("volumeRendering.setPathlineSize", 1, 20, 1, [1]);
+      CosmoScout.gui.initSlider("volumeRendering.setPathlineLength", 0, 250, 1, [250]);
 
       // Trigger "setTimestep" callback on "update" event
       const timestepSlider =

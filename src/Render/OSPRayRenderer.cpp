@@ -240,20 +240,55 @@ void OSPRayRenderer::updateWorld(
     } else {
       std::vector<rkcommon::math::vec4f> vertices =
           mDataManager->getPathlines().getVertices(parameters.mWorld.mPathlines.mLineSize);
-      std::vector<rkcommon::math::vec4f> colors = mDataManager->getPathlines().getColors(
-          "point_temperature", parameters.mWorld.mPathlines.mLineOpacity);
+      std::vector<rkcommon::math::vec2f> texCoords =
+          mDataManager->getPathlines().getTexCoords("point_temperature", "point_ParticleAge");
 
       mCache.mPathlines.setParam("type", OSP_FLAT);
       mCache.mPathlines.setParam("basis", OSP_LINEAR);
       mCache.mPathlines.setParam("vertex.position_radius", ospray::cpp::Data(vertices));
-      mCache.mPathlines.setParam("vertex.color", ospray::cpp::Data(colors));
+      mCache.mPathlines.setParam("vertex.texcoord", ospray::cpp::Data(texCoords));
       mCache.mPathlines.setParam("index", ospray::cpp::Data(indices));
       mCache.mPathlines.commit();
 
       updateGroup = true;
-
-      mCache.mPathlinesModel.commit();
     }
+  }
+
+  if (parameters.mWorld.mPathlines.mEnable &&
+      !(parameters.mWorld.mPathlinesTexture == mCache.mState.mParameters.mWorld.mPathlinesTexture &&
+          parameters.mWorld.mPathlines == mCache.mState.mParameters.mWorld.mPathlines)) {
+    std::vector<uint8_t> pixels(256 * 256 * 4);
+    for (int x = 0; x < 256; x++) {
+      for (int y = 0; y < 256; y++) {
+        // TODO Get max age from somewhere else
+        float age = ((float)y / 256.f) * 109.f;
+        if (age < parameters.mWorld.mPathlinesTexture.mLength) {
+          pixels[4 * (y * 256 + x) + 0] = x < 128 ? x * 2 : 255;
+          pixels[4 * (y * 256 + x) + 1] = 255 - std::abs((x - 128) * 2);
+          pixels[4 * (y * 256 + x) + 2] = x > 128 ? 255 - (x - 128) * 2 : 255;
+          pixels[4 * (y * 256 + x) + 3] = 255;
+        } else {
+          pixels[4 * (y * 256 + x) + 0] = 0;
+          pixels[4 * (y * 256 + x) + 1] = 0;
+          pixels[4 * (y * 256 + x) + 2] = 0;
+          pixels[4 * (y * 256 + x) + 3] = 0;
+        }
+      }
+    }
+    ospray::cpp::Data texData(pixels.data(), OSP_VEC4UC, rkcommon::math::vec2i{256, 256});
+
+    ospray::cpp::Texture tex("texture2d");
+    tex.setParam("format", OSPTextureFormat::OSP_TEXTURE_RGBA8);
+    tex.setParam("data", texData);
+    tex.commit();
+
+    ospray::cpp::Material mat("scivis", "obj");
+    mat.setParam("map_kd", tex);
+    mat.setParam("d", 1.f);
+    mat.commit();
+
+    mCache.mPathlinesModel.setParam("material", mat);
+    mCache.mPathlinesModel.commit();
   }
 
   if (!(parameters.mWorld.mDepthMode == mCache.mState.mParameters.mWorld.mDepthMode &&

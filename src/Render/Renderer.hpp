@@ -86,6 +86,7 @@ class Renderer {
   void setPathlineOpacity(float value);
   void setPathlineSize(float value);
   void setPathlineScalarFilters(std::vector<ScalarFilter> const& value);
+  void setPathlineLength(float value);
 
   /// Starts asynchronously rendering an image of the volume for the given camera perspective.
   /// The rendering process will use all parameters set before calling this method
@@ -142,9 +143,18 @@ class Renderer {
         }
       } mPathlines;
 
+      struct PathlinesTexture {
+        float mLength;
+
+        bool operator==(const PathlinesTexture& other) const {
+          return mLength == other.mLength;
+        }
+      } mPathlinesTexture;
+
       bool operator==(const World& other) const {
         return mDepthMode == other.mDepthMode && mLights == other.mLights &&
-               mVolume == other.mVolume && mPathlines == other.mPathlines;
+               mVolume == other.mVolume && mPathlines == other.mPathlines &&
+               mPathlinesTexture == other.mPathlinesTexture;
       }
     } mWorld;
 

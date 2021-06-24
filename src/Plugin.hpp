@@ -69,6 +69,7 @@ class Plugin : public cs::core::PluginBase {
       cs::utils::DefaultProperty<bool>  mEnabled{true};
       cs::utils::DefaultProperty<float> mLineOpacity{1.f};
       cs::utils::DefaultProperty<float> mLineSize{1.f};
+      cs::utils::DefaultProperty<float> mLength{250.f};
     } mPathlines;
   };
 

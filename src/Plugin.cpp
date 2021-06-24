@@ -479,6 +479,10 @@ void Plugin::registerUICallbacks() {
       "Sets the size of the rendered pathlines.",
       std::function([this](double value) { mPluginSettings.mPathlines.mLineSize = (float)value; }));
 
+  mGuiManager->getGui()->registerCallback("volumeRendering.setPathlineLength",
+      "Sets the length of the rendered pathlines.",
+      std::function([this](double value) { mPluginSettings.mPathlines.mLength = (float)value; }));
+
   mGuiManager->getGui()->registerCallback("volumeRendering.setPathlinesScalarFilters",
       "Sets filters for selecting which parts of the pathlines should be rendered.",
       std::function([this](std::string jsonString) {
@@ -689,6 +693,12 @@ void Plugin::connectSettings() {
     mRenderer->setPathlineSize(value);
     mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setPathlineSize", value);
+  });
+  mPluginSettings.mPathlines.mLength.connectAndTouch([this](float value) {
+    mRenderedFrames.clear();
+    mRenderer->setPathlineLength(value);
+    mParametersDirty = true;
+    mGuiManager->setSliderValue("volumeRendering.setPathlineLength", value);
   });
 
   // Connect to data manager properties
