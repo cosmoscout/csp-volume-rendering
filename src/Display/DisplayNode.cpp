@@ -37,7 +37,7 @@ DisplayNode::DisplayNode(VolumeShape shape, std::shared_ptr<cs::core::Settings> 
   VistaSceneGraph* pSG = GetVistaSystem()->GetGraphicsManager()->GetSceneGraph();
   mVistaNode.reset(pSG->NewOpenGLNode(pSG->GetRoot(), this));
   VistaOpenSGMaterialTools::SetSortKeyOnSubtree(
-      mVistaNode.get(), static_cast<int>(cs::utils::DrawOrder::eTransparentItems));
+      mVistaNode.get(), static_cast<int>(cs::utils::DrawOrder::eTransparentItems) + 10);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
