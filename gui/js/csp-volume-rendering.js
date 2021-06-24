@@ -26,7 +26,8 @@
       CosmoScout.gui.initSlider("volumeRendering.setPathlineSize", 1, 10, 1, [1]);
 
       // Trigger "setTimestep" callback on "update" event
-      var timestepSlider = document.querySelector(`[data-callback="volumeRendering.setTimestep"]`);
+      const timestepSlider =
+          document.querySelector(`[data-callback="volumeRendering.setTimestep"]`);
       timestepSlider.dataset.event = "update";
 
       this.progressBar = document.getElementById("volumeRendering.progressBar");
@@ -142,6 +143,13 @@
         }
       });
       CosmoScout.gui.initSliderRange("volumeRendering.setTimestep", range, [this.timesteps[0]]);
+
+      const timestepSlider =
+          document.querySelector(`[data-callback="volumeRendering.setTimestep"]`);
+      timestepSlider.noUiSlider.on("update", (values, handle, unencoded) => {
+        this._parcoordsPathlines.pc.brushExtents(
+            {"InjectionStepId_start": [unencoded - 0.5, unencoded + 0.5]});
+      });
     }
 
     /**
