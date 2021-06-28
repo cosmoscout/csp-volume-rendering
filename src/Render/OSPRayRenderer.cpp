@@ -74,6 +74,12 @@ void OSPRayRenderer::cancelRendering() {
 
 Renderer::RenderedImage OSPRayRenderer::getFrameImpl(
     glm::mat4 cameraTransform, Parameters parameters, DataManager::State dataState) {
+  // Shift filter attribute indices by one, because the scalar list used by the renderer is shifted
+  // by one so that the active scalar can be placed at index 0.
+  for (ScalarFilter& filter : parameters.mScalarFilters) {
+    filter.mAttrIndex += 1;
+  }
+
   mRenderingCancelled = false;
   RenderedImage renderedImage;
   try {

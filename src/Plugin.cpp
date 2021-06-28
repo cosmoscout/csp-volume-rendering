@@ -462,7 +462,6 @@ void Plugin::registerUICallbacks() {
       "Sets filters for selecting which parts of the volume should be rendered.",
       std::function([this](std::string jsonString) {
         std::vector<Scalar> scalars = mDataManager->pScalars.get();
-        scalars.insert(scalars.begin(), mDataManager->getState().mScalar);
         std::vector<ScalarFilter> filters = parseScalarFilters(jsonString, scalars);
         mRenderedFrames.clear();
         mRenderer->setScalarFilters(filters);
