@@ -111,14 +111,27 @@ std::vector<rkcommon::math::vec2f> Pathlines::getTexCoords(
     std::string const& xScalarId, std::string const& yScalarId) const {
   std::array<std::string, 2> scalarIds = {xScalarId, yScalarId};
   std::array<Scalar, 2>      scalars;
-  scalars[0] = *std::find_if(
+  auto                       xScalar = std::find_if(
       mScalars.begin(), mScalars.end(), [xScalarId](Scalar s) { return s.getId() == xScalarId; });
-  scalars[1] = *std::find_if(
+  if (xScalar != mScalars.end()) {
+    scalars[0] = *xScalar;
+  }
+  auto yScalar = std::find_if(
       mScalars.begin(), mScalars.end(), [yScalarId](Scalar s) { return s.getId() == yScalarId; });
+  if (yScalar != mScalars.end()) {
+    scalars[1] = *yScalar;
+  }
 
   std::vector<rkcommon::math::vec2f> texCoords(mData->GetNumberOfPoints());
 
   for (int axis = 0; axis < scalars.size(); axis++) {
+    if (scalarIds[axis] == "") {
+      for (int i = 0; i < texCoords.size(); i++) {
+        texCoords[i][axis] = 0.5;
+      }
+      continue;
+    }
+
     double min = mScalarRanges.find(scalarIds[axis])->second[0];
     double max = mScalarRanges.find(scalarIds[axis])->second[1];
     switch (scalars[axis].mType) {

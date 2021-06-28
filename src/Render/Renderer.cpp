@@ -161,6 +161,13 @@ void Renderer::setPathlineLength(float value) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void Renderer::setPathlineActiveScalar(std::string const& value) {
+  std::scoped_lock lock(mParameterMutex);
+  mParameters.mWorld.mPathlines.mActiveScalar = value;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 std::future<Renderer::RenderedImage> Renderer::getFrame(glm::mat4 cameraTransform) {
   std::scoped_lock lock(mParameterMutex);
   return std::async(std::launch::async, &Renderer::getFrameImpl, this, cameraTransform, mParameters,

@@ -92,6 +92,8 @@ void from_json(nlohmann::json const& j, Plugin::Settings::Pathlines& o) {
   cs::core::Settings::deserialize(j, "enabled", o.mEnabled);
   cs::core::Settings::deserialize(j, "opacity", o.mLineOpacity);
   cs::core::Settings::deserialize(j, "size", o.mLineSize);
+  cs::core::Settings::deserialize(j, "length", o.mLength);
+  cs::core::Settings::deserialize(j, "activeScalar", o.mActiveScalar);
 }
 
 void to_json(nlohmann::json& j, Plugin::Settings::Pathlines const& o) {
@@ -99,6 +101,8 @@ void to_json(nlohmann::json& j, Plugin::Settings::Pathlines const& o) {
   cs::core::Settings::serialize(j, "enabled", o.mEnabled);
   cs::core::Settings::serialize(j, "opacity", o.mLineOpacity);
   cs::core::Settings::serialize(j, "size", o.mLineSize);
+  cs::core::Settings::serialize(j, "length", o.mLength);
+  cs::core::Settings::serialize(j, "activeScalar", o.mActiveScalar);
 }
 
 void from_json(nlohmann::json const& j, Plugin::Settings& o) {
@@ -483,6 +487,17 @@ void Plugin::registerUICallbacks() {
       "Sets the length of the rendered pathlines.",
       std::function([this](double value) { mPluginSettings.mPathlines.mLength = (float)value; }));
 
+  mGuiManager->getGui()->registerCallback("volumeRendering.setPathlineActiveScalar",
+      "Sets the active scalar for coloring the pathlines.",
+      std::function([this](std::string value) {
+        if (std::find_if(mDataManager->getPathlines().getScalars().begin(),
+                mDataManager->getPathlines().getScalars().end(), [value](Scalar s) {
+                  return s.getId() == value;
+                }) != mDataManager->pScalars.get().end()) {
+          mPluginSettings.mPathlines.mActiveScalar = value;
+        }
+      }));
+
   mGuiManager->getGui()->registerCallback("volumeRendering.setPathlinesScalarFilters",
       "Sets filters for selecting which parts of the pathlines should be rendered.",
       std::function([this](std::string jsonString) {
@@ -699,6 +714,11 @@ void Plugin::connectSettings() {
     mRenderer->setPathlineLength(value);
     mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setPathlineLength", value);
+  });
+  mPluginSettings.mPathlines.mActiveScalar.connectAndTouch([this](std::string value) {
+    mRenderedFrames.clear();
+    mRenderer->setPathlineActiveScalar(value);
+    mParametersDirty = true;
   });
 
   // Connect to data manager properties

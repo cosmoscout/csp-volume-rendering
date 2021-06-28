@@ -87,6 +87,7 @@ class Renderer {
   void setPathlineSize(float value);
   void setPathlineScalarFilters(std::vector<ScalarFilter> const& value);
   void setPathlineLength(float value);
+  void setPathlineActiveScalar(std::string const& value);
 
   /// Starts asynchronously rendering an image of the volume for the given camera perspective.
   /// The rendering process will use all parameters set before calling this method
@@ -136,10 +137,12 @@ class Renderer {
         float                     mLineOpacity;
         float                     mLineSize;
         std::vector<ScalarFilter> mScalarFilters;
+        std::string               mActiveScalar;
 
         bool operator==(const Pathlines& other) const {
           return mEnable == other.mEnable && mLineOpacity == other.mLineOpacity &&
-                 mLineSize == other.mLineSize && mScalarFilters == other.mScalarFilters;
+                 mLineSize == other.mLineSize && mScalarFilters == other.mScalarFilters &&
+                 mActiveScalar == other.mActiveScalar;
         }
       } mPathlines;
 

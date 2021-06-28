@@ -155,6 +155,8 @@
     }
 
     _updateMinMax(dimension) {
+      CosmoScout.callbacks.volumeRendering.setPathlineActiveScalar(
+          "point_" + dimension.replace("_start", "").replace("_end", ""));
       this.activeBrushLabel.innerText = dimension;
       this.activeBrush                = dimension;
       this.brushMin.disabled          = false;

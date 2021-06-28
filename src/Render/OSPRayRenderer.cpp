@@ -240,8 +240,8 @@ void OSPRayRenderer::updateWorld(
     } else {
       std::vector<rkcommon::math::vec4f> vertices =
           mDataManager->getPathlines().getVertices(parameters.mWorld.mPathlines.mLineSize);
-      std::vector<rkcommon::math::vec2f> texCoords =
-          mDataManager->getPathlines().getTexCoords("point_temperature", "point_ParticleAge");
+      std::vector<rkcommon::math::vec2f> texCoords = mDataManager->getPathlines().getTexCoords(
+          parameters.mWorld.mPathlines.mActiveScalar, "point_ParticleAge");
 
       mCache.mPathlines.setParam("type", OSP_FLAT);
       mCache.mPathlines.setParam("basis", OSP_LINEAR);
