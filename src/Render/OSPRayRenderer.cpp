@@ -221,6 +221,16 @@ void OSPRayRenderer::updateWorld(
   ospray::cpp::TransferFunction transferFunction = getTransferFunction(volume, parameters);
 
   if (!(dataState == mCache.mState.mDataState && volume.mLod == mCache.mState.mVolumeLod)) {
+    DataManager::State anomalyState = dataState;
+    anomalyState.mScalar =
+        *std::find_if(mDataManager->pScalars.get().begin(), mDataManager->pScalars.get().end(),
+            [](Scalar s) { return s.getId() == "cell_temperature anomaly"; });
+    Volume anomalyVolume = getVolume(anomalyState);
+
+    mCache.mCoreTexture.setParam("volume", anomalyVolume.mOsprayData);
+    mCache.mCoreTexture.commit();
+    mCache.mCoreMaterial.commit();
+
     mCache.mVolumeModel.setParam("volume", volume.mOsprayData);
     updateGroup = true;
   }
@@ -589,16 +599,35 @@ OSPRayRenderer::Cache::Cache()
     , mVolumeModel(mVolume)
     , mCore("sphere")
     , mCoreModel(mCore)
+    , mCoreTexture("volume")
+    , mCoreMaterial("scivis", "obj")
     , mClip("plane")
     , mClipModel(mClip)
     , mInstance(mGroup)
     , mAmbientLight("ambient")
     , mSunLight("distant") {
   mCore.setParam("sphere.position", ospray::cpp::Data(rkcommon::math::vec3f(0, 0, 0)));
-  mCore.setParam("radius", 3470.f);
+  mCore.setParam("radius", 3500.f);
   mCore.commit();
 
-  mCoreModel.setParam("color", ospray::cpp::Data(rkcommon::math::vec4f(.25f, .25f, .25f, 1.f)));
+  std::vector<rkcommon::math::vec3f> color = {
+      rkcommon::math::vec3f(0.f, 0.f, 0.f), rkcommon::math::vec3f(1.f, 1.f, 1.f)};
+  std::vector<float> opacity = {1.f, 1.f};
+
+  rkcommon::math::vec2f valueRange = {-1200.f, 1200.f};
+
+  ospray::cpp::TransferFunction transferFunction("piecewiseLinear");
+  transferFunction.setParam("color", ospray::cpp::Data(color));
+  transferFunction.setParam("opacity", ospray::cpp::Data(opacity));
+  transferFunction.setParam("valueRange", valueRange);
+  transferFunction.commit();
+
+  // Commits have to be done after volume is set
+  mCoreTexture.setParam("transferFunction", transferFunction);
+
+  mCoreMaterial.setParam("map_kd", mCoreTexture);
+
+  mCoreModel.setParam("material", mCoreMaterial);
   mCoreModel.commit();
 
   mClip.setParam("plane.coefficients", ospray::cpp::Data(rkcommon::math::vec4f(0, 0, -1, 0)));
