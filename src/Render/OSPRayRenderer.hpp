@@ -105,8 +105,8 @@ class OSPRayRenderer : public Renderer {
   RenderedImage getFrameImpl(
       glm::mat4 cameraTransform, Parameters parameters, DataManager::State dataState) override;
 
-  const Volume&                 getVolume(DataManager::State state);
-  Volume                        loadVolume(DataManager::State state);
+  const Volume&                 getVolume(DataManager::State state, std::optional<int> maxLod);
+  Volume                        loadVolume(DataManager::State state, int lod);
   float                         getHeight(vtkSmartPointer<vtkDataSet> data);
   ospray::cpp::TransferFunction getTransferFunction(
       const Volume& volume, const Parameters& parameters);

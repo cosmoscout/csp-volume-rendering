@@ -55,8 +55,9 @@ float OSPRayRenderer::getProgress() {
 
 void OSPRayRenderer::preloadData(DataManager::State state) {
   if (mCache.mVolumes.find(state) == mCache.mVolumes.end()) {
-    mCache.mVolumes[state][mDataManager->getMaxLod(state)] =
-        std::async(std::launch::async, [this, state]() { return loadVolume(state); });
+    int lod = mDataManager->getMinLod(state);
+    mCache.mVolumes[state][lod] =
+        std::async(std::launch::async, [this, state, lod]() { return loadVolume(state, lod); });
   }
 }
 
@@ -83,7 +84,7 @@ Renderer::RenderedImage OSPRayRenderer::getFrameImpl(
   mRenderingCancelled = false;
   RenderedImage renderedImage;
   try {
-    const Volume& volume = getVolume(dataState);
+    const Volume& volume = getVolume(dataState, parameters.mMaxLod);
     Cache::State  state{cameraTransform, parameters, dataState, volume.mLod};
     if (mCache.mState == state && mFrameBufferAccumulationPasses >= parameters.mMaxRenderPasses) {
       renderedImage.mValid = false;
@@ -109,38 +110,35 @@ Renderer::RenderedImage OSPRayRenderer::getFrameImpl(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const OSPRayRenderer::Volume& OSPRayRenderer::getVolume(DataManager::State state) {
-  int         maxLod     = mDataManager->getMaxLod(state);
+const OSPRayRenderer::Volume& OSPRayRenderer::getVolume(
+    DataManager::State state, std::optional<int> maxLod) {
+  int         lod        = mDataManager->getMaxLod(state, maxLod);
   auto const& stateCache = mCache.mVolumes.find(state);
   if (stateCache == mCache.mVolumes.end()) {
-    mCache.mVolumes[state][maxLod] = std::async(std::launch::deferred, [this, state, maxLod]() {
-      Volume v = loadVolume(state);
-      v.mLod   = maxLod;
-      return v;
-    });
+    mCache.mVolumes[state][lod] =
+        std::async(std::launch::deferred, [this, state, lod]() { return loadVolume(state, lod); });
   } else {
-    auto const& cachedVolume = stateCache->second.find(maxLod);
+    auto const& cachedVolume = stateCache->second.find(lod);
     if (cachedVolume == stateCache->second.end()) {
-      mCache.mVolumes[state][maxLod] = std::async(std::launch::async, [this, state, maxLod]() {
-        Volume v = loadVolume(state);
-        v.mLod   = maxLod;
-        return v;
-      });
+      mCache.mVolumes[state][lod] =
+          std::async(std::launch::async, [this, state, lod]() { return loadVolume(state, lod); });
     }
     for (auto const& cacheEntry : stateCache->second) {
       if (cacheEntry.second.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        maxLod = cacheEntry.first;
+        if (cacheEntry.first <= maxLod) {
+          lod = cacheEntry.first;
+        }
       }
     }
   }
-  return mCache.mVolumes[state][maxLod].get();
+  return mCache.mVolumes[state][lod].get();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-OSPRayRenderer::Volume OSPRayRenderer::loadVolume(DataManager::State state) {
+OSPRayRenderer::Volume OSPRayRenderer::loadVolume(DataManager::State state, int lod) {
   Volume                      volume;
-  vtkSmartPointer<vtkDataSet> volumeData = mDataManager->getData(state);
+  vtkSmartPointer<vtkDataSet> volumeData = mDataManager->getData(state, lod);
   switch (mStructure) {
   case VolumeStructure::eUnstructured:
     volume.mOsprayData = OSPRayUtility::createOSPRayVolume(
@@ -165,6 +163,7 @@ OSPRayRenderer::Volume OSPRayRenderer::loadVolume(DataManager::State state) {
   }
   volume.mHeight       = getHeight(volumeData);
   volume.mScalarBounds = mDataManager->getScalarRange(state.mScalar);
+  volume.mLod          = lod;
   return volume;
 }
 
@@ -225,7 +224,7 @@ void OSPRayRenderer::updateWorld(
     anomalyState.mScalar =
         *std::find_if(mDataManager->pScalars.get().begin(), mDataManager->pScalars.get().end(),
             [](Scalar s) { return s.getId() == "cell_temperature anomaly"; });
-    Volume anomalyVolume = getVolume(anomalyState);
+    Volume anomalyVolume = getVolume(anomalyState, volume.mLod);
 
     mCache.mCoreTexture.setParam("volume", anomalyVolume.mOsprayData);
     mCache.mCoreTexture.commit();

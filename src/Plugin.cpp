@@ -461,10 +461,22 @@ void Plugin::registerUICallbacks() {
   mGuiManager->getGui()->registerCallback("volumeRendering.setVolumeScalarFilters",
       "Sets filters for selecting which parts of the volume should be rendered.",
       std::function([this](std::string jsonString) {
-        std::vector<Scalar> scalars = mDataManager->pScalars.get();
+        std::vector<Scalar>       scalars = mDataManager->pScalars.get();
         std::vector<ScalarFilter> filters = parseScalarFilters(jsonString, scalars);
         mRenderedFrames.clear();
         mRenderer->setScalarFilters(filters);
+        mParametersDirty = true;
+      }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setTimestepAnimating",
+      "Specifies, whether timesteps are currently animated (increasing automatically).",
+      std::function([this](bool value) {
+        mRenderedFrames.clear();
+        if (value) {
+          mRenderer->setMaxLod(mDataManager->getMinLod(mDataManager->getState()));
+        } else {
+          mRenderer->clearMaxLod();
+        }
         mParametersDirty = true;
       }));
 
@@ -492,7 +504,7 @@ void Plugin::registerUICallbacks() {
         if (std::find_if(mDataManager->getPathlines().getScalars().begin(),
                 mDataManager->getPathlines().getScalars().end(), [value](Scalar s) {
                   return s.getId() == value;
-                }) != mDataManager->pScalars.get().end()) {
+                }) != mDataManager->getPathlines().getScalars().end()) {
           mPluginSettings.mPathlines.mActiveScalar = value;
         }
       }));

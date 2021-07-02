@@ -15,7 +15,7 @@
      */
     init() {
       CosmoScout.gui.initInputs();
-      CosmoScout.gui.initSlider("volumeRendering.setAnimationSpeed", 10, 1000, 10, [100]);
+      CosmoScout.gui.initSlider("volumeRendering.setAnimationSpeed", 1, 100, 1, [10]);
       CosmoScout.gui.initSlider("volumeRendering.setResolution", 32, 2048, 32, [256]);
       CosmoScout.gui.initSliderRange("volumeRendering.setSamplingRate",
           {"min": 0.001, "25%": 0.01, "50%": 0.1, "75%": 1, "max": 10}, [0.005]);
@@ -72,6 +72,7 @@
         clearInterval(this.playHandle);
         playButtonIcon.html("play_arrow");
         this.playing = false;
+        CosmoScout.callbacks.volumeRendering.setTimestepAnimating(false);
       } else {
         const timeSlider =
             document.querySelector(`[data-callback="volumeRendering.setTimestep"]`).noUiSlider;
@@ -98,6 +99,7 @@
         }, 100);
         playButtonIcon.html("pause");
         this.playing = true;
+        CosmoScout.callbacks.volumeRendering.setTimestepAnimating(true);
       }
     }
 

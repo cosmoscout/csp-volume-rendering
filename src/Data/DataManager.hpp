@@ -90,16 +90,17 @@ class DataManager {
   /// May block, if the requested data is not yet loaded.
   /// If isReady() returns false, the data may have no active scalar.
   /// Will throw an std::exception if the data is null.
-  vtkSmartPointer<vtkDataSet> getData();
-  /// Returns the data for the given state.
-  /// May block, if the requested data is not yet loaded.
-  /// Will throw an std::exception if the data is null.
-  vtkSmartPointer<vtkDataSet> getData(State state);
+  /// If present, lod has to be a level of detail value, that is available for the requested state.
+  vtkSmartPointer<vtkDataSet> getData(std::optional<State> state = {}, std::optional<int> lod = {});
+
   /// Returns the current state.
   /// If isReady() returns false, the scalar won't be set yet.
   State getState();
   /// Returns the maximum level of detail, that can instantly be returned for the given state.
-  int getMaxLod(State state);
+  /// Allows to optionally specify an upper bound for the level of detail.
+  int getMaxLod(State state, std::optional<int> max = {});
+  /// Returns the minimum level of detail, that can instantly be returned for the given state.
+  int getMinLod(State state);
 
   Pathlines const& getPathlines() const;
 
@@ -133,7 +134,8 @@ class DataManager {
   void initState();
   void initScalars();
 
-  std::shared_future<vtkSmartPointer<vtkDataSet>> getFromCache(Timestep timestep);
+  std::shared_future<vtkSmartPointer<vtkDataSet>> getFromCache(
+      Timestep timestep, std::optional<Lod> lod = {});
 
   void                                loadData(Timestep timestep, Lod lod);
   virtual vtkSmartPointer<vtkDataSet> loadDataImpl(Timestep timestep, Lod lod) = 0;

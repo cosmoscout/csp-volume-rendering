@@ -63,6 +63,19 @@ void Renderer::setMaxRenderPasses(int maxRenderPasses) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void Renderer::setMaxLod(int maxLod) {
+  std::scoped_lock lock(mParameterMutex);
+  mParameters.mMaxLod = maxLod;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Renderer::clearMaxLod() {
+  std::scoped_lock lock(mParameterMutex);
+  mParameters.mMaxLod = std::nullopt;
+}
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void Renderer::setDenoiseColor(bool denoiseColor) {
   std::scoped_lock lock(mParameterMutex);
   mParameters.mDenoiseColor = denoiseColor;

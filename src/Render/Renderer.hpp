@@ -59,6 +59,9 @@ class Renderer {
   /// Sets the maximum number of render passes for constant rendering parameters.
   void setMaxRenderPasses(int maxRenderPasses);
 
+  void setMaxLod(int maxLod);
+  void clearMaxLod();
+
   /// Enables or disables denoising of the color image.
   void setDenoiseColor(bool denoiseColor);
   /// Enables or disables denoising of the depth image.
@@ -163,6 +166,8 @@ class Renderer {
 
     int mMaxRenderPasses;
 
+    std::optional<int> mMaxLod;
+
     int   mResolution;
     float mSamplingRate;
 
@@ -172,10 +177,10 @@ class Renderer {
     std::vector<ScalarFilter> mScalarFilters;
 
     bool operator==(const Parameters& other) const {
-      return mMaxRenderPasses == other.mMaxRenderPasses && mResolution == other.mResolution &&
-             mSamplingRate == other.mSamplingRate && mDenoiseColor == other.mDenoiseColor &&
-             mDenoiseDepth == other.mDenoiseDepth && mScalarFilters == other.mScalarFilters &&
-             mWorld == other.mWorld;
+      return mMaxRenderPasses == other.mMaxRenderPasses && mMaxLod == other.mMaxLod &&
+             mResolution == other.mResolution && mSamplingRate == other.mSamplingRate &&
+             mDenoiseColor == other.mDenoiseColor && mDenoiseDepth == other.mDenoiseDepth &&
+             mScalarFilters == other.mScalarFilters && mWorld == other.mWorld;
     }
   };
 

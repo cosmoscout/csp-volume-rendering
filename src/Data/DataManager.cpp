@@ -173,15 +173,14 @@ void DataManager::setActiveScalar(std::string scalarId) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-vtkSmartPointer<vtkDataSet> DataManager::getData() {
-  return getData(getState());
-}
+vtkSmartPointer<vtkDataSet> DataManager::getData(
+    std::optional<State> optState, std::optional<int> optLod) {
+  State state = optState.value_or(getState());
+  Lod   lod   = optLod.value_or(getMaxLod(state));
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-vtkSmartPointer<vtkDataSet> DataManager::getData(State state) {
-  std::shared_future<vtkSmartPointer<vtkDataSet>> futureData = getFromCache(state.mTimestep);
-  vtkSmartPointer<vtkDataSet>                     dataset    = futureData.get();
+  std::shared_future<vtkSmartPointer<vtkDataSet>> futureData =
+      getFromCache(state.mTimestep, optLod);
+  vtkSmartPointer<vtkDataSet> dataset = futureData.get();
   if (!dataset) {
     logger().error("Loaded data is null! Is the data type correctly set in the settings?");
     throw std::runtime_error("Loaded data is null.");
@@ -209,7 +208,7 @@ DataManager::State DataManager::getState() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int DataManager::getMaxLod(State state) {
+int DataManager::getMaxLod(State state, std::optional<int> max) {
   std::scoped_lock lock(mDataMutex);
   auto             cacheEntry = mCache.find(state.mTimestep);
   if (cacheEntry == mCache.end()) {
@@ -217,11 +216,33 @@ int DataManager::getMaxLod(State state) {
   }
   Lod maxLod = 0;
   for (auto const& lod : cacheEntry->second) {
-    if (lod.second.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+    if (lod.second.wait_for(std::chrono::seconds(0)) == std::future_status::ready &&
+        lod.first > maxLod) {
+      if (max.has_value() && lod.first > max.value()) {
+        continue;
+      }
       maxLod = lod.first;
     }
   }
   return maxLod;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int DataManager::getMinLod(State state) {
+  std::scoped_lock lock(mDataMutex);
+  auto             cacheEntry = mCache.find(state.mTimestep);
+  if (cacheEntry == mCache.end()) {
+    return 0;
+  }
+  Lod minLod = std::numeric_limits<int>::max();
+  for (auto const& lod : cacheEntry->second) {
+    if (lod.second.wait_for(std::chrono::seconds(0)) == std::future_status::ready &&
+        lod.first < minLod) {
+      minLod = lod.first;
+    }
+  }
+  return minLod;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -294,9 +315,10 @@ void DataManager::initScalars() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::shared_future<vtkSmartPointer<vtkDataSet>> DataManager::getFromCache(Timestep timestep) {
-  auto lods   = mFiles.find(timestep)->second;
-  Lod  maxLod = getMaxLod({timestep, mActiveScalar});
+std::shared_future<vtkSmartPointer<vtkDataSet>> DataManager::getFromCache(
+    Timestep timestep, std::optional<Lod> optLod) {
+  auto lods = mFiles.find(timestep)->second;
+  Lod  lod  = optLod.value_or(getMaxLod({timestep, mActiveScalar}));
 
   std::scoped_lock lock(mDataMutex);
   auto             cacheEntry = mCache.find(timestep);
@@ -305,7 +327,7 @@ std::shared_future<vtkSmartPointer<vtkDataSet>> DataManager::getFromCache(Timest
     loadData(timestep, lod);
     return mCache[timestep][lod];
   }
-  std::thread loadNext([this, maxLod, lods, timestep]() {
+  std::thread loadNext([this, lod, lods, timestep]() {
     {
       std::unique_lock<std::mutex> cvLock(mStateMutex);
       if (mTimestepCv.wait_for(cvLock, std::chrono::seconds(2),
@@ -315,14 +337,14 @@ std::shared_future<vtkSmartPointer<vtkDataSet>> DataManager::getFromCache(Timest
     }
     std::scoped_lock lock(mDataMutex);
     auto             cacheEntry = mCache.find(timestep);
-    auto             loadingLod = cacheEntry->second.upper_bound(maxLod);
-    auto             nextLod    = lods.upper_bound(maxLod);
+    auto             loadingLod = cacheEntry->second.upper_bound(lod);
+    auto             nextLod    = lods.upper_bound(lod);
     if (loadingLod == cacheEntry->second.end() && nextLod != lods.end()) {
       loadData(timestep, nextLod->first);
     }
   });
   loadNext.detach();
-  return mCache[timestep][maxLod];
+  return mCache[timestep][lod];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
