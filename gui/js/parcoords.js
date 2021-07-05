@@ -53,7 +53,7 @@
         this.pc.brushExtents({[this.activeBrush]: [min, this.brushMax.value]});
       });
 
-      this.heightOffset = 120;
+      this.heightOffset = 165;
 
       this.data                                    = d3.csvParse(csv);
       this.data                                    = d3.shuffle(this.data);
