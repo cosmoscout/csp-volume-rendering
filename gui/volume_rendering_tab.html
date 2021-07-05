@@ -115,6 +115,38 @@
 
       <div class="row">
         <div class="col-5">
+          Density scale
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setDensityScale">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-lighting"
+         data-toggle="collapse" data-target="#collapseVolume-lighting" aria-expanded="false"
+         aria-controls="collapseVolume-lighting" type="button">
+      <i class="material-icons">lightbulb</i>
+      <span>Lighting</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-lighting"
+         aria-labelledby="headingVolume-lighting" data-parent="#volumeRenderingTab-accordion">
+      <div class="row">
+        <div class="col-7 offset-5">
+          <label class="checklabel">
+            <input type="checkbox" data-callback="volumeRendering.setEnableLighting" />
+            <i class="material-icons"></i>
+            <span>Enable lighting</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
           Sun strength
         </div>
         <div class="col-7">
@@ -125,10 +157,10 @@
 
       <div class="row">
         <div class="col-5">
-          Density scale
+          Ambient strength
         </div>
         <div class="col-7">
-          <div data-callback="volumeRendering.setDensityScale">
+          <div data-callback="volumeRendering.setAmbientStrength">
           </div>
         </div>
       </div>

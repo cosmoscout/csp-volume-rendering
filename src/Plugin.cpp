@@ -87,6 +87,18 @@ NLOHMANN_JSON_SERIALIZE_ENUM(DepthMode, {
                                             {DepthMode::eMultiThreshold, "multiThreshold"},
                                         })
 
+void from_json(nlohmann::json const& j, Plugin::Settings::Lighting& o) {
+  cs::core::Settings::deserialize(j, "enabled", o.mEnabled);
+  cs::core::Settings::deserialize(j, "sunStrength", o.mSunStrength);
+  cs::core::Settings::deserialize(j, "ambientStrength", o.mSunStrength);
+}
+
+void to_json(nlohmann::json& j, Plugin::Settings::Lighting const& o) {
+  cs::core::Settings::serialize(j, "enabled", o.mEnabled);
+  cs::core::Settings::serialize(j, "sunStrength", o.mSunStrength);
+  cs::core::Settings::serialize(j, "ambientStrength", o.mSunStrength);
+}
+
 void from_json(nlohmann::json const& j, Plugin::Settings::Pathlines& o) {
   cs::core::Settings::deserialize(j, "path", o.mPath);
   cs::core::Settings::deserialize(j, "enabled", o.mEnabled);
@@ -118,7 +130,6 @@ void from_json(nlohmann::json const& j, Plugin::Settings& o) {
   cs::core::Settings::deserialize(j, "requestImages", o.mRequestImages);
   cs::core::Settings::deserialize(j, "resolution", o.mResolution);
   cs::core::Settings::deserialize(j, "samplingRate", o.mSamplingRate);
-  cs::core::Settings::deserialize(j, "sunStrength", o.mSunStrength);
   cs::core::Settings::deserialize(j, "densityScale", o.mDensityScale);
   cs::core::Settings::deserialize(j, "denoiseColor", o.mDenoiseColor);
   cs::core::Settings::deserialize(j, "denoiseDepth", o.mDenoiseDepth);
@@ -138,6 +149,9 @@ void from_json(nlohmann::json const& j, Plugin::Settings& o) {
   cs::core::Settings::deserialize(j, "scale", o.mScale);
   cs::core::Settings::deserialize(j, "rotation", o.mRotation);
 
+  if (j.contains("lighting")) {
+    cs::core::Settings::deserialize(j, "lighting", o.mLighting);
+  }
   cs::core::Settings::deserialize(j, "pathlines", o.mPathlines);
 }
 
@@ -154,7 +168,6 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
   cs::core::Settings::serialize(j, "requestImages", o.mRequestImages);
   cs::core::Settings::serialize(j, "resolution", o.mResolution);
   cs::core::Settings::serialize(j, "samplingRate", o.mSamplingRate);
-  cs::core::Settings::serialize(j, "sunStrength", o.mSunStrength);
   cs::core::Settings::serialize(j, "densityScale", o.mDensityScale);
   cs::core::Settings::serialize(j, "denoiseColor", o.mDenoiseColor);
   cs::core::Settings::serialize(j, "denoiseDepth", o.mDenoiseDepth);
@@ -174,6 +187,7 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
   cs::core::Settings::serialize(j, "scale", o.mScale);
   cs::core::Settings::serialize(j, "rotation", o.mRotation);
 
+  cs::core::Settings::serialize(j, "lighting", o.mLighting);
   cs::core::Settings::serialize(j, "pathlines", o.mPathlines);
 }
 
@@ -230,8 +244,6 @@ void Plugin::deInit() {
 
   mAllSettings->onLoad().disconnect(mOnLoadConnection);
   mAllSettings->onSave().disconnect(mOnSaveConnection);
-  mAllSettings->mGraphics.pEnableLighting.disconnect(mLightingConnection);
-  mAllSettings->mGraphics.pAmbientBrightness.disconnect(mAmbientConnection);
 
   logger().info("Unloading done.");
 }
@@ -365,9 +377,19 @@ void Plugin::registerUICallbacks() {
       "Sets the sampling rate for volume rendering.",
       std::function([this](double value) { mPluginSettings.mSamplingRate = (float)value; }));
 
+  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableLighting",
+      "Enables/Disables shading.",
+      std::function([this](bool value) { mPluginSettings.mLighting.mEnabled = value; }));
+
   mGuiManager->getGui()->registerCallback("volumeRendering.setSunStrength",
-      "Sets the strength of the sun when shading is enabled.",
-      std::function([this](double value) { mPluginSettings.mSunStrength = (float)value; }));
+      "Sets the strength of the sun when shading is enabled.", std::function([this](double value) {
+        mPluginSettings.mLighting.mSunStrength = (float)value;
+      }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setAmbientStrength",
+      "Sets the strength of the ambient light when shading is enabled.",
+      std::function(
+          [this](double value) { mPluginSettings.mLighting.mAmbientStrength = (float)value; }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setDensityScale",
       "Sets the density scale of the volume.",
@@ -563,19 +585,6 @@ void Plugin::registerUICallbacks() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Plugin::connectSettings() {
-  // Connect to global CosmoScout graphics settings
-  mLightingConnection =
-      mAllSettings->mGraphics.pEnableLighting.connectAndTouch([this](bool enable) {
-        mRenderedFrames.clear();
-        mRenderer->setShading(enable);
-        mParametersDirty = true;
-      });
-  mAmbientConnection =
-      mAllSettings->mGraphics.pAmbientBrightness.connectAndTouch([this](float value) {
-        mRenderedFrames.clear();
-        mRenderer->setAmbientLight(value);
-        mParametersDirty = true;
-      });
 
   // Connect to plugin settings
   // Data settings
@@ -614,12 +623,6 @@ void Plugin::connectSettings() {
     mRenderer->setMaxRenderPasses(value);
     mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setMaxRenderPasses", value);
-  });
-  mPluginSettings.mSunStrength.connectAndTouch([this](float value) {
-    mRenderedFrames.clear();
-    mRenderer->setSunStrength(value);
-    mParametersDirty = true;
-    mGuiManager->setSliderValue("volumeRendering.setSunStrength", value);
   });
   mPluginSettings.mDensityScale.connectAndTouch([this](float value) {
     mRenderedFrames.clear();
@@ -660,6 +663,26 @@ void Plugin::connectSettings() {
   mPluginSettings.mTransferFunction.connectAndTouch([this](std::string name) {
     std::string code = "CosmoScout.volumeRendering.loadTransferFunction('" + name + "');";
     mGuiManager->addScriptToGui(code);
+  });
+
+  // Lighting settings
+  mPluginSettings.mLighting.mEnabled.connectAndTouch([this](bool enable) {
+    mRenderedFrames.clear();
+    mRenderer->setShading(enable);
+    mParametersDirty = true;
+    mGuiManager->setCheckboxValue("volumeRendering.setEnableLighting", enable);
+  });
+  mPluginSettings.mLighting.mSunStrength.connectAndTouch([this](float value) {
+    mRenderedFrames.clear();
+    mRenderer->setSunStrength(value);
+    mParametersDirty = true;
+    mGuiManager->setSliderValue("volumeRendering.setSunStrength", value);
+  });
+  mPluginSettings.mLighting.mAmbientStrength.connectAndTouch([this](float value) {
+    mRenderedFrames.clear();
+    mRenderer->setAmbientLight(value);
+    mParametersDirty = true;
+    mGuiManager->setSliderValue("volumeRendering.setAmbientStrength", value);
   });
 
   // Display settings

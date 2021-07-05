@@ -44,12 +44,17 @@ class Plugin : public cs::core::PluginBase {
     cs::utils::DefaultProperty<bool>        mRequestImages{true};
     cs::utils::DefaultProperty<int>         mResolution{256};
     cs::utils::DefaultProperty<float>       mSamplingRate{0.05f};
-    cs::utils::DefaultProperty<float>       mSunStrength{1.f};
     cs::utils::DefaultProperty<float>       mDensityScale{1.f};
     cs::utils::DefaultProperty<bool>        mDenoiseColor{true};
     cs::utils::DefaultProperty<bool>        mDenoiseDepth{true};
     cs::utils::DefaultProperty<DepthMode>   mDepthMode{DepthMode::eNone};
     cs::utils::DefaultProperty<std::string> mTransferFunction{"BlackBody.json"};
+
+    struct Lighting {
+      cs::utils::DefaultProperty<bool>  mEnabled{false};
+      cs::utils::DefaultProperty<float> mSunStrength{1.f};
+      cs::utils::DefaultProperty<float> mAmbientStrength{.5f};
+    } mLighting;
 
     // Display settings
     cs::utils::DefaultProperty<bool>        mPredictiveRendering{false};
@@ -115,9 +120,6 @@ class Plugin : public cs::core::PluginBase {
 
   int mOnLoadConnection = -1;
   int mOnSaveConnection = -1;
-
-  int mLightingConnection = -1;
-  int mAmbientConnection  = -1;
 
   int              mLastFrameInterval;
   std::vector<int> mFrameIntervals;
