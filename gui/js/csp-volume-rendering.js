@@ -54,6 +54,28 @@
                 CosmoScout.callbacks.volumeRendering.setPathlineActiveScalar(
                     "point_" + dimension.replace("_start", "").replace("_end", ""));
               });
+
+      const copyToPathlinesWrapper = document.createElement("div");
+      copyToPathlinesWrapper.classList.add("row");
+      copyToPathlinesWrapper.innerHTML = `
+        <div class="col-12">
+          <button class="waves-effect waves-light block btn glass text">Copy to pathlines</button>
+        </div>
+      `;
+      copyToPathlinesWrapper.querySelector(".btn").addEventListener(
+          "click", () => { this.copyParcoords(this._parcoordsVolume, this._parcoordsPathlines); });
+      this._parcoordsVolume.parcoordsControls.appendChild(copyToPathlinesWrapper);
+    }
+
+    copyParcoords(fromParcoords, toParcoords) {
+      let brushState = fromParcoords.exportBrushState();
+      brushState     = Object.keys(brushState).reduce((accum, k) => {
+        let state           = accum;
+        state[k + "_start"] = brushState[k];
+        state[k + "_end"]   = brushState[k];
+        return state;
+      }, {});
+      toParcoords.pc.brushExtents(brushState);
     }
 
     /**
