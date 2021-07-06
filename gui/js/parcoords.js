@@ -2,12 +2,13 @@
 
 (() => {
   class Parcoords {
-    constructor(rootId, name, csv, callback) {
+    constructor(rootId, name, csv, callback, activeScalarCallback) {
       const root     = document.getElementById(rootId);
       const template = CosmoScout.gui.loadTemplateContent("volumeRendering-parcoords");
       root.appendChild(template);
       root.parcoords = this;
 
+      this.activeScalarCallback  = activeScalarCallback;
       this.id                    = rootId;
       this.parcoords             = root.querySelector(".parcoords");
       this.parcoordsControls     = root.querySelector(".parcoordsControls");
@@ -155,8 +156,9 @@
     }
 
     _updateMinMax(dimension) {
-      CosmoScout.callbacks.volumeRendering.setPathlineActiveScalar(
-          "point_" + dimension.replace("_start", "").replace("_end", ""));
+      if (typeof this.activeScalarCallback === "function") {
+        this.activeScalarCallback(dimension);
+      }
       this.activeBrushLabel.innerText = dimension;
       this.activeBrush                = dimension;
       this.brushMin.disabled          = false;
@@ -201,8 +203,8 @@
     /**
      * TODO
      */
-    create(rootId, name, csv, callback) {
-      const parcoords = new Parcoords(rootId, name, csv, callback);
+    create(rootId, name, csv, callback, activeScalarCallback) {
+      const parcoords = new Parcoords(rootId, name, csv, callback, activeScalarCallback);
       parcoords.setAvailableBrushStates(this._availableFiles);
       this._editors.push(parcoords);
 

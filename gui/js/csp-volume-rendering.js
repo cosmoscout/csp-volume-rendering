@@ -44,11 +44,16 @@
             CosmoScout.callbacks.volumeRendering.setVolumeScalarFilters(
                 JSON.stringify(this.pc.brushExtents()));
           });
-      this._parcoordsPathlines = CosmoScout.parcoords.create(
-          "volumeRendering-parcoordsPathlines", "Pathlines", csvData2, function(brushed, args) {
-            CosmoScout.callbacks.volumeRendering.setPathlinesScalarFilters(
-                JSON.stringify(this.pc.brushExtents()));
-          });
+      this._parcoordsPathlines =
+          CosmoScout.parcoords.create("volumeRendering-parcoordsPathlines", "Pathlines", csvData2,
+              function(brushed, args) {
+                CosmoScout.callbacks.volumeRendering.setPathlinesScalarFilters(
+                    JSON.stringify(this.pc.brushExtents()));
+              },
+              function(dimension) {
+                CosmoScout.callbacks.volumeRendering.setPathlineActiveScalar(
+                    "point_" + dimension.replace("_start", "").replace("_end", ""));
+              });
     }
 
     /**
