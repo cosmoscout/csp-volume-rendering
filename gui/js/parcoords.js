@@ -2,16 +2,18 @@
 
 (() => {
   class Parcoords {
-    constructor(rootId, name, csv, callback) {
+    constructor(rootId, name, csv, callback, activeScalarCallback) {
       const root     = document.getElementById(rootId);
       const template = CosmoScout.gui.loadTemplateContent("volumeRendering-parcoords");
       root.appendChild(template);
       root.parcoords = this;
 
+      this.activeScalarCallback  = activeScalarCallback;
       this.id                    = rootId;
       this.parcoords             = root.querySelector(".parcoords");
+      this.parcoordsWidget       = root.querySelector(".parcoordsWidget");
       this.parcoordsControls     = root.querySelector(".parcoordsControls");
-      this.parcoordsParent       = this.parcoordsControls.parentNode;
+      this.parcoordsParent       = this.parcoordsWidget.parentNode;
       this.parcoordsUndockButton = root.querySelector(".parcoordsUndockButton");
       this.popout           = CosmoScout.gui.loadTemplateContent("volumeRendering-parcoordsPopout");
       this.popout.innerHTML = this.popout.innerHTML.replace("%NAME%", name);
@@ -53,7 +55,7 @@
         this.pc.brushExtents({[this.activeBrush]: [min, this.brushMax.value]});
       });
 
-      this.heightOffset = 165;
+      this.heightOffset = 47;
 
       this.data                                    = d3.csvParse(csv);
       this.data                                    = d3.shuffle(this.data);
@@ -91,7 +93,8 @@
         for (const mut of mutations) {
           if (mut.type === "attributes") {
             if (mut.attributeName === "style") {
-              this.setHeight(target.clientHeight - this.heightOffset);
+              this.setHeight(
+                  target.clientHeight - this.heightOffset - this.parcoordsControls.clientHeight);
             }
           }
         }
@@ -124,19 +127,24 @@
     undock() {
       this.parcoordsUndockButton.hidden = true;
       this.popout.classList.add("visible");
-      this.parcoordsControls = this.parcoordsParent.removeChild(this.parcoordsControls);
-      this.popoutContent.appendChild(this.parcoordsControls);
-      this.setHeight(this.popoutWrapper.clientHeight - this.heightOffset);
+      this.parcoordsWidget = this.parcoordsParent.removeChild(this.parcoordsWidget);
+      this.popoutContent.appendChild(this.parcoordsWidget);
+      this.setHeight(this.popoutWrapper.clientHeight - this.heightOffset -
+                     this.parcoordsControls.clientHeight);
     }
 
     dock() {
       this.parcoordsUndockButton.hidden = false;
-      this.parcoordsControls            = this.popoutContent.removeChild(this.parcoordsControls);
-      this.parcoordsParent.appendChild(this.parcoordsControls);
+      this.parcoordsWidget              = this.popoutContent.removeChild(this.parcoordsWidget);
+      this.parcoordsParent.appendChild(this.parcoordsWidget);
       this.setHeight(200);
     }
 
     setHeight(height) {
+      const scrollbarHeight =
+        this.parcoords.parentNode.offsetHeight - this.parcoords.parentNode.clientHeight;
+      height -= scrollbarHeight;
+
       // BrushExtents are deleted when resizing, so they have to be carried over manually
       const brushExtents = this.exportBrushState();
       // The range of the yscale is used to determine the height with which the axes will be
@@ -155,8 +163,9 @@
     }
 
     _updateMinMax(dimension) {
-      CosmoScout.callbacks.volumeRendering.setPathlineActiveScalar(
-          "point_" + dimension.replace("_start", "").replace("_end", ""));
+      if (typeof this.activeScalarCallback === "function") {
+        this.activeScalarCallback(dimension);
+      }
       this.activeBrushLabel.innerText = dimension;
       this.activeBrush                = dimension;
       this.brushMin.disabled          = false;
@@ -201,8 +210,8 @@
     /**
      * TODO
      */
-    create(rootId, name, csv, callback) {
-      const parcoords = new Parcoords(rootId, name, csv, callback);
+    create(rootId, name, csv, callback, activeScalarCallback) {
+      const parcoords = new Parcoords(rootId, name, csv, callback, activeScalarCallback);
       parcoords.setAvailableBrushStates(this._availableFiles);
       this._editors.push(parcoords);
 
