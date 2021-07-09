@@ -8,7 +8,7 @@
 
 #include "../logger.hpp"
 
-#include "../../../src/cs-utils/filesystem.hpp"
+#include "../../../../src/cs-utils/filesystem.hpp"
 
 #include <vtkCellData.h>
 #include <vtkPointData.h>
@@ -176,7 +176,6 @@ void DataManager::setActiveScalar(std::string scalarId) {
 vtkSmartPointer<vtkDataSet> DataManager::getData(
     std::optional<State> optState, std::optional<int> optLod) {
   State state = optState.value_or(getState());
-  Lod   lod   = optLod.value_or(getMaxLod(state));
 
   std::shared_future<vtkSmartPointer<vtkDataSet>> futureData =
       getFromCache(state.mTimestep, optLod);

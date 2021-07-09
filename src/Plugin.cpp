@@ -223,8 +223,11 @@ void Plugin::init() {
 
   onLoad();
   registerUICallbacks();
+  logger().info("TEST 1");
   initUI();
+  logger().info("TEST 2");
   connectSettings();
+  logger().info("TEST 3");
 
   // Init buffers for predictive rendering
   mFrameIntervals.resize(mFrameIntervalsLength);
@@ -801,7 +804,7 @@ void Plugin::initUI() {
       "Volume Rendering", "blur_circular", "../share/resources/gui/volume_rendering_tab.html");
   mGuiManager->addScriptToGuiFromJS(
       "../share/resources/gui/third-party/js/parcoords.standalone.js");
-  mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/mantle_spherical_resample_0.js");
+  mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/mantle_resample_100.js");
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/pathlines.js");
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/parcoords.js");
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");

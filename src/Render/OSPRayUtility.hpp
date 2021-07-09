@@ -53,7 +53,7 @@ std::vector<float> grayscaleToDepth(const std::vector<float>& grayscale);
 /// Denoises the given image using OIDN. The image has to contain at least three channels, the exact
 /// number has to be given as the channelCount parameter. However, only the first three channels are
 /// used while denoising.
-std::vector<float> denoiseImage(std::vector<float>& image, int channelCount, int resolution);
+void denoiseImage(std::vector<float>& image, int channelCount, int resolution);
 
 } // namespace csp::volumerendering::OSPRayUtility
 

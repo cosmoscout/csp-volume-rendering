@@ -92,6 +92,12 @@ void Renderer::setDenoiseDepth(bool denoiseDepth) {
 
 void Renderer::setTransferFunction(std::vector<glm::vec4> transferFunction) {
   std::scoped_lock lock(mParameterMutex);
+
+  for (auto& c: transferFunction)
+  {
+    c.a = std::pow(c.a, 10.0f);
+  }
+
   mParameters.mWorld.mVolume.mTransferFunction = transferFunction;
 }
 

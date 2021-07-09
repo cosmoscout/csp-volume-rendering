@@ -525,16 +525,15 @@ Renderer::RenderedImage OSPRayRenderer::extractImageData(ospray::cpp::FrameBuffe
   std::future<std::vector<float>> futureDepth;
   if (parameters.mDenoiseColor) {
     futureColor = std::async(std::launch::deferred, [parameters, &colorData]() {
-      std::vector<float> data = OSPRayUtility::denoiseImage(colorData, 4, parameters.mResolution);
-      return data;
+      OSPRayUtility::denoiseImage(colorData, 4, parameters.mResolution);
+      return colorData;
     });
   }
   if (parameters.mWorld.mDepthMode != DepthMode::eNone && parameters.mDenoiseDepth) {
     futureDepth = std::async(std::launch::deferred, [parameters, &depthData]() {
       std::vector<float> depthGrayscale = OSPRayUtility::depthToGrayscale(depthData);
-      std::vector<float> denoised =
-          OSPRayUtility::denoiseImage(depthGrayscale, 3, parameters.mResolution);
-      std::vector<float> data = OSPRayUtility::grayscaleToDepth(denoised);
+      OSPRayUtility::denoiseImage(depthGrayscale, 3, parameters.mResolution);
+      std::vector<float> data = OSPRayUtility::grayscaleToDepth(depthGrayscale);
       return data;
     });
   }
@@ -635,7 +634,7 @@ OSPRayRenderer::Cache::Cache()
   mClipModel.commit();
 
   mGroup.setParam("volume", ospray::cpp::Data(mVolumeModel));
-  mGroup.setParam("clippingGeometry", ospray::cpp::Data(mClipModel));
+  //mGroup.setParam("clippingGeometry", ospray::cpp::Data(mClipModel));
 
   std::vector<ospray::cpp::Light> lights{mAmbientLight, mSunLight};
   mWorld.setParam("instance", ospray::cpp::Data(mInstance));

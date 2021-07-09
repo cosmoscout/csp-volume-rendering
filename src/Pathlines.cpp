@@ -124,9 +124,9 @@ std::vector<rkcommon::math::vec2f> Pathlines::getTexCoords(
 
   std::vector<rkcommon::math::vec2f> texCoords(mData->GetNumberOfPoints());
 
-  for (int axis = 0; axis < scalars.size(); axis++) {
+  for (size_t axis = 0; axis < scalars.size(); axis++) {
     if (scalarIds[axis] == "") {
-      for (int i = 0; i < texCoords.size(); i++) {
+      for (size_t i = 0; i < texCoords.size(); i++) {
         texCoords[i][axis] = 0.5;
       }
       continue;
