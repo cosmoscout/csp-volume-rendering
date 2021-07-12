@@ -58,10 +58,6 @@
                 if (me._enablePathlinesParcoordsCheckbox.checked) {
                   me.setPathlinesScalarFilters(this.pc.brushExtents());
                 }
-              },
-              function(dimension) {
-                CosmoScout.callbacks.volumeRendering.setPathlineActiveScalar(
-                    "point_" + dimension.replace("_start", "").replace("_end", ""));
               });
 
       this._enablePathlinesParcoordsCheckbox.addEventListener("change", (e) => {
