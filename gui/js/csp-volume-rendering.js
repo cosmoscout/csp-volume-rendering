@@ -29,9 +29,8 @@
       CosmoScout.gui.initSlider("volumeRendering.setAmbientStrength", 0, 1, 0.01, [0.5]);
 
       // Trigger "setTimestep" callback on "update" event
-      const timestepSlider =
-          document.querySelector(`[data-callback="volumeRendering.setTimestep"]`);
-      timestepSlider.dataset.event = "update";
+      this.timestepSlider = document.querySelector(`[data-callback="volumeRendering.setTimestep"]`);
+      this.timestepSlider.dataset.event = "update";
 
       this.progressBar = document.getElementById("volumeRendering.progressBar");
 
@@ -39,21 +38,43 @@
           document.getElementById("volumeRendering.tfEditor"), this.setTransferFunction,
           {fitToData: true});
 
+      this._enablePathlinesParcoordsCheckbox =
+          document.querySelector(`[data-callback="volumeRendering.setEnablePathlinesParcoords"]`);
+
+      const me              = this;
       this._parcoordsVolume = CosmoScout.parcoords.create(
           "volumeRendering-parcoordsVolume", "Volume", csvData, function(brushed, args) {
             CosmoScout.callbacks.volumeRendering.setVolumeScalarFilters(
                 JSON.stringify(this.pc.brushExtents()));
+            if (!me._enablePathlinesParcoordsCheckbox.checked) {
+              me.setPathlinesScalarFilters(this.pc.brushExtents(), true);
+            }
           });
+      this._parcoordsPathlinesContainer =
+          document.getElementById("volumeRendering-parcoordsPathlines");
       this._parcoordsPathlines =
           CosmoScout.parcoords.create("volumeRendering-parcoordsPathlines", "Pathlines", csvData2,
               function(brushed, args) {
-                CosmoScout.callbacks.volumeRendering.setPathlinesScalarFilters(
-                    JSON.stringify(this.pc.brushExtents()));
+                if (me._enablePathlinesParcoordsCheckbox.checked) {
+                  me.setPathlinesScalarFilters(this.pc.brushExtents());
+                }
               },
               function(dimension) {
                 CosmoScout.callbacks.volumeRendering.setPathlineActiveScalar(
                     "point_" + dimension.replace("_start", "").replace("_end", ""));
               });
+
+      this._enablePathlinesParcoordsCheckbox.addEventListener("change", (e) => {
+        if (e.target.checked) {
+          this.setPathlinesScalarFilters(this._parcoordsPathlines.pc.brushExtents());
+        } else {
+          this.setPathlinesScalarFilters(this._parcoordsVolume.pc.brushExtents(), true);
+          if (!this._parcoordsPathlines.docked) {
+            this._parcoordsPathlines.dock();
+          }
+        }
+        this._parcoordsPathlinesContainer.hidden = !e.target.checked;
+      });
 
       const copyToPathlinesWrapper = document.createElement("div");
       copyToPathlinesWrapper.classList.add("row");
@@ -65,6 +86,22 @@
       copyToPathlinesWrapper.querySelector(".btn").addEventListener(
           "click", () => { this.copyParcoords(this._parcoordsVolume, this._parcoordsPathlines); });
       this._parcoordsVolume.parcoordsControls.appendChild(copyToPathlinesWrapper);
+    }
+
+    setPathlinesScalarFilters(brushState, fromVolume = false) {
+      if (fromVolume) {
+        const timestep                      = Number(this.timestepSlider.noUiSlider.get());
+        brushState                          = Object.keys(brushState).reduce((accum, k) => {
+          let state           = accum;
+          state[k + "_start"] = brushState[k];
+          state[k + "_end"]   = brushState[k];
+          return state;
+        }, {});
+        brushState["InjectionStepId_start"] = {
+          "selection": {"scaled": [timestep + 0.5, timestep - 9.5]}
+        };
+      }
+      CosmoScout.callbacks.volumeRendering.setPathlinesScalarFilters(JSON.stringify(brushState));
     }
 
     copyParcoords(fromParcoords, toParcoords) {
@@ -103,9 +140,7 @@
         this.playing = false;
         CosmoScout.callbacks.volumeRendering.setTimestepAnimating(false);
       } else {
-        const timeSlider =
-            document.querySelector(`[data-callback="volumeRendering.setTimestep"]`).noUiSlider;
-        this.time       = parseInt(timeSlider.get());
+        this.time       = parseInt(this.timestepSlider.noUiSlider.get());
         let prevNext    = this.time;
         this.playHandle = setInterval(() => {
           // reverse() changes the original array, so it is called twice to return the array to the
@@ -175,12 +210,12 @@
         }
       });
       CosmoScout.gui.initSliderRange("volumeRendering.setTimestep", range, [this.timesteps[0]]);
-
-      const timestepSlider =
-          document.querySelector(`[data-callback="volumeRendering.setTimestep"]`);
-      timestepSlider.noUiSlider.on("update", (values, handle, unencoded) => {
+      this.timestepSlider.noUiSlider.on("update", (values, handle, unencoded) => {
         this._parcoordsPathlines.pc.brushExtents(
-            {"InjectionStepId_start": [unencoded - 0.5, unencoded + 0.5]});
+            {"InjectionStepId_start": [unencoded - 9.5, unencoded + 0.5]});
+        if (!this._enablePathlinesParcoordsCheckbox.checked) {
+          this.setPathlinesScalarFilters(this._parcoordsVolume.pc.brushExtents(), true);
+        }
       });
     }
 

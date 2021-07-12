@@ -39,6 +39,7 @@
       this.brushMax         = this.parcoordsControls.querySelector(".parcoordsBrushMax");
       this.activeBrushLabel = this.parcoordsControls.querySelector(".parcoordsActiveBrushLabel");
       this.activeBrush      = "";
+      this.docked           = true;
 
       this.brushMin.addEventListener("change", () => {
         let max = this.brushMax.value;
@@ -125,6 +126,7 @@
     }
 
     undock() {
+      this.docked                       = false;
       this.parcoordsUndockButton.hidden = true;
       this.popout.classList.add("visible");
       this.parcoordsWidget = this.parcoordsParent.removeChild(this.parcoordsWidget);
@@ -134,15 +136,17 @@
     }
 
     dock() {
+      this.docked                       = true;
       this.parcoordsUndockButton.hidden = false;
-      this.parcoordsWidget              = this.popoutContent.removeChild(this.parcoordsWidget);
+      this.popout.classList.remove("visible");
+      this.parcoordsWidget = this.popoutContent.removeChild(this.parcoordsWidget);
       this.parcoordsParent.appendChild(this.parcoordsWidget);
       this.setHeight(200);
     }
 
     setHeight(height) {
       const scrollbarHeight =
-        this.parcoords.parentNode.offsetHeight - this.parcoords.parentNode.clientHeight;
+          this.parcoords.parentNode.offsetHeight - this.parcoords.parentNode.clientHeight;
       height -= scrollbarHeight;
 
       // BrushExtents are deleted when resizing, so they have to be carried over manually

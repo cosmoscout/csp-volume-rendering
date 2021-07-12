@@ -541,6 +541,12 @@ void Plugin::registerUICallbacks() {
         mParametersDirty = true;
       }));
 
+  mGuiManager->getGui()->registerCallback("volumeRendering.setEnablePathlinesParcoords",
+      "Use a separate parallel coordinate diagram for the pathlines.",
+      std::function([](bool value) {
+        // Callback is only registered to suppress warnings
+      }));
+
   // Parcoords
   mGuiManager->getGui()->registerCallback("parcoords.importBrushState",
       "Import a saved parcoords brush state.",
