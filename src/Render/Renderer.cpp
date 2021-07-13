@@ -181,7 +181,7 @@ void Renderer::setPathlineActiveScalar(std::string const& value) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::future<Renderer::RenderedImage> Renderer::getFrame(glm::mat4 cameraTransform) {
+std::future<Renderer::RenderedImage> Renderer::getFrame(glm::mat4 const& cameraTransform) {
   std::scoped_lock lock(mParameterMutex);
   return std::async(std::launch::async, &Renderer::getFrameImpl, this, cameraTransform, mParameters,
       mDataManager->getState());

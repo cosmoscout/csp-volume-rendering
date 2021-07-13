@@ -903,9 +903,10 @@ void Plugin::receiveFrame() {
   mRenderingFrame.mColorImage          = renderedImage.mColorData;
   mRenderingFrame.mDepthImage          = renderedImage.mDepthData;
   mRenderingFrame.mModelViewProjection = renderedImage.mMVP;
-  mRenderedFrames.push_back(mRenderingFrame);
 
-  displayFrame(mRenderingFrame);
+  mRenderedFrames.push_back(std::move(mRenderingFrame));
+
+  displayFrame(mRenderedFrames.back());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

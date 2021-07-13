@@ -76,7 +76,7 @@ void OSPRayRenderer::cancelRendering() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Renderer::RenderedImage OSPRayRenderer::getFrameImpl(
-    glm::mat4 cameraTransform, Parameters parameters, DataManager::State dataState) {
+    glm::mat4 const& cameraTransform, Parameters parameters, DataManager::State const& dataState) {
   // Shift filter attribute indices by one, because the scalar list used by the renderer is shifted
   // by one so that the active scalar can be placed at index 0.
   for (ScalarFilter& filter : parameters.mScalarFilters) {
@@ -86,7 +86,7 @@ Renderer::RenderedImage OSPRayRenderer::getFrameImpl(
   mRenderingCancelled = false;
   RenderedImage renderedImage;
   try {
-    const Volume& volume = getVolume(dataState, parameters.mMaxLod);
+    Volume const& volume = getVolume(dataState, parameters.mMaxLod);
     Cache::State  state{cameraTransform, parameters, dataState, volume.mLod};
     if (mCache.mState == state && mFrameBufferAccumulationPasses >= parameters.mMaxRenderPasses) {
       renderedImage.mValid = false;
@@ -112,8 +112,8 @@ Renderer::RenderedImage OSPRayRenderer::getFrameImpl(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const OSPRayRenderer::Volume& OSPRayRenderer::getVolume(
-    DataManager::State state, std::optional<int> maxLod) {
+OSPRayRenderer::Volume const& OSPRayRenderer::getVolume(
+    DataManager::State const& state, std::optional<int> const& maxLod) {
   int         lod        = mDataManager->getMaxLod(state, maxLod);
   auto const& stateCache = mCache.mVolumes.find(state);
   if (stateCache == mCache.mVolumes.end()) {
@@ -138,7 +138,7 @@ const OSPRayRenderer::Volume& OSPRayRenderer::getVolume(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-OSPRayRenderer::Volume OSPRayRenderer::loadVolume(DataManager::State state, int lod) {
+OSPRayRenderer::Volume OSPRayRenderer::loadVolume(DataManager::State const& state, int lod) {
   Volume                      volume;
   vtkSmartPointer<vtkDataSet> volumeData = mDataManager->getData(state, lod);
   switch (mStructure) {
@@ -204,7 +204,7 @@ float OSPRayRenderer::getHeight(vtkSmartPointer<vtkDataSet> data) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ospray::cpp::TransferFunction OSPRayRenderer::getTransferFunction(
-    const Volume& volume, const Parameters& parameters) {
+    Volume const& volume, Parameters const& parameters) {
   if (parameters.mWorld.mVolume.mTransferFunction.size() > 0) {
     return OSPRayUtility::createOSPRayTransferFunction((float)volume.mScalarBounds[0],
         (float)volume.mScalarBounds[1], parameters.mWorld.mVolume.mTransferFunction);
@@ -216,7 +216,7 @@ ospray::cpp::TransferFunction OSPRayRenderer::getTransferFunction(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void OSPRayRenderer::updateWorld(
-    const Volume& volume, const Parameters& parameters, const DataManager::State& dataState) {
+    Volume const& volume, Parameters const& parameters, DataManager::State const& dataState) {
   bool updateGroup = false;
 
   ospray::cpp::TransferFunction transferFunction = getTransferFunction(volume, parameters);
@@ -470,8 +470,8 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ospray::cpp::FrameBuffer OSPRayRenderer::renderFrame(ospray::cpp::World& world,
-    ospray::cpp::Camera& camera, Parameters const& parameters, bool resetAccumulation) {
+ospray::cpp::FrameBuffer OSPRayRenderer::renderFrame(ospray::cpp::World const& world,
+    ospray::cpp::Camera const& camera, Parameters const& parameters, bool resetAccumulation) {
   ospray::cpp::Renderer renderer("volume_depth");
   renderer.setParam("aoSamples", 0);
   renderer.setParam("shadows", false);
@@ -510,9 +510,9 @@ ospray::cpp::FrameBuffer OSPRayRenderer::renderFrame(ospray::cpp::World& world,
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Renderer::RenderedImage OSPRayRenderer::extractImageData(ospray::cpp::FrameBuffer& frame,
-    const Camera& camera, float volumeHeight, const Parameters& parameters) {
-  float*             colorFrame = (float*)frame.map(OSP_FB_COLOR);
+Renderer::RenderedImage OSPRayRenderer::extractImageData(ospray::cpp::FrameBuffer const& frame,
+    Camera const& camera, float volumeHeight, Parameters const& parameters) {
+  float* colorFrame = (float*)frame.map(OSP_FB_COLOR);
   std::vector<float> colorData(
       colorFrame, colorFrame + 4 * parameters.mResolution * parameters.mResolution);
   frame.unmap(colorFrame);
@@ -520,35 +520,32 @@ Renderer::RenderedImage OSPRayRenderer::extractImageData(ospray::cpp::FrameBuffe
 
   if (parameters.mWorld.mDepthMode != DepthMode::eNone) {
     float* depthFrame = (float*)frame.map(OSP_FB_DEPTH);
-    depthData         = std::vector<float>(depthFrame, depthFrame + depthData.size());
+    depthData = std::vector<float>(depthFrame, depthFrame + depthData.size());
     frame.unmap(depthFrame);
   }
 
-  depthData = normalizeDepthData(depthData, camera, volumeHeight, parameters);
+  normalizeDepthData(depthData, camera, volumeHeight, parameters);
 
-  std::future<std::vector<float>> futureColor;
-  std::future<std::vector<float>> futureDepth;
+  std::thread colorDenoising;
+  std::thread depthDenoising;
   if (parameters.mDenoiseColor) {
-    futureColor = std::async(std::launch::deferred, [parameters, &colorData]() {
-      std::vector<float> data = OSPRayUtility::denoiseImage(colorData, 4, parameters.mResolution);
-      return data;
+    colorDenoising = std::thread([parameters, &colorData]() {
+      OSPRayUtility::denoiseImage(colorData, 4, parameters.mResolution);
     });
   }
   if (parameters.mWorld.mDepthMode != DepthMode::eNone && parameters.mDenoiseDepth) {
-    futureDepth = std::async(std::launch::deferred, [parameters, &depthData]() {
+    depthDenoising = std::thread([parameters, &depthData]() {
       std::vector<float> depthGrayscale = OSPRayUtility::depthToGrayscale(depthData);
-      std::vector<float> denoised =
-          OSPRayUtility::denoiseImage(depthGrayscale, 3, parameters.mResolution);
-      std::vector<float> data = OSPRayUtility::grayscaleToDepth(denoised);
-      return data;
+      OSPRayUtility::denoiseImage(depthGrayscale, 3, parameters.mResolution);
+      depthData = OSPRayUtility::grayscaleToDepth(depthGrayscale);
     });
   }
 
   if (parameters.mDenoiseColor) {
-    colorData = futureColor.get();
+    colorDenoising.join();
   }
   if (parameters.mWorld.mDepthMode != DepthMode::eNone && parameters.mDenoiseDepth) {
-    depthData = futureDepth.get();
+    depthDenoising.join();
   }
 
   std::vector<uint8_t> colorDataInt(4 * parameters.mResolution * parameters.mResolution);
@@ -561,19 +558,18 @@ Renderer::RenderedImage OSPRayRenderer::extractImageData(ospray::cpp::FrameBuffe
   renderedImage.mDepthData = depthData;
   renderedImage.mMVP       = camera.mTransformationMatrix;
   renderedImage.mValid     = true;
-  return renderedImage;
+  return std::move(renderedImage);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::vector<float> OSPRayRenderer::normalizeDepthData(std::vector<float> data, const Camera& camera,
-    float volumeHeight, const Parameters& parameters) {
-  std::vector<float> depthData(parameters.mResolution * parameters.mResolution);
-
-  for (size_t i = 0; i < depthData.size(); i++) {
+void OSPRayRenderer::normalizeDepthData(std::vector<float>& data, Camera const& camera,
+    float volumeHeight, Parameters const& parameters) {
+  glm::mat4 camInv = glm::inverse(camera.mTransformationMatrix);
+  for (size_t i = 0; i < data.size(); i++) {
     float val = data[i];
     if (val == INFINITY) {
-      depthData[i] = -camera.mTransformationMatrix[3][2] / camera.mTransformationMatrix[2][2];
+      data[i] = -camera.mTransformationMatrix[3][2] / camera.mTransformationMatrix[2][2];
     } else {
       val /= volumeHeight;
       int       x          = i % parameters.mResolution;
@@ -581,17 +577,15 @@ std::vector<float> OSPRayRenderer::normalizeDepthData(std::vector<float> data, c
       int       y          = (int)(i / parameters.mResolution);
       float     ndcY       = ((float)y / parameters.mResolution - 0.5f) * 2;
       glm::vec4 posPixClip = glm::vec4(ndcX, ndcY, 0, 1);
-      glm::vec4 posPix     = glm::inverse(camera.mTransformationMatrix) * posPixClip;
+      glm::vec4 posPix     = camInv * posPixClip;
       glm::vec3 posPixNorm = glm::vec3(posPix) * (1 / posPix.w);
       glm::vec3 pos =
           val * glm::normalize(posPixNorm - camera.mPositionRotated) + camera.mPositionRotated;
       glm::vec4 posClip     = camera.mTransformationMatrix * glm::vec4(pos, 1);
       glm::vec3 posClipNorm = glm::vec3(posClip) * (1 / posClip.w);
-      depthData[i]          = posClipNorm.z;
+      data[i]               = posClipNorm.z;
     }
   }
-
-  return depthData;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

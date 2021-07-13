@@ -27,6 +27,10 @@
 #include <future>
 #include <thread>
 
+namespace {
+oidn::DeviceRef oidnDevice;
+}
+
 namespace csp::volumerendering::OSPRayUtility {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -67,6 +71,12 @@ void initOSPRay() {
   ospDeviceRelease(dev);
 
   ospLoadModule("volume_depth");
+
+  oidnDevice = oidn::newDevice();
+  oidnDevice.setErrorFunction([](void* userPtr, oidn::Error e, const char* errorDetails) {
+    oidnLogger().error(errorDetails);
+  });
+  oidnDevice.commit();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -250,13 +260,13 @@ ospray::cpp::TransferFunction createOSPRayTransferFunction() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ospray::cpp::TransferFunction createOSPRayTransferFunction(
-    float min, float max, std::vector<glm::vec4> colors) {
+    float min, float max, std::vector<glm::vec4> const& colors) {
   std::vector<rkcommon::math::vec3f> color;
   std::vector<float>                 opacity;
 
   for (glm::vec4 c : colors) {
-    color.push_back(rkcommon::math::vec3f(c[0], c[1], c[2]));
-    opacity.push_back(c[3]);
+    color.emplace_back(c[0], c[1], c[2]);
+    opacity.push_back(std::pow(c[3], 10));
   }
 
   rkcommon::math::vec2f valueRange = {min, max};
@@ -271,7 +281,7 @@ ospray::cpp::TransferFunction createOSPRayTransferFunction(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::vector<float> depthToGrayscale(const std::vector<float>& depth) {
+std::vector<float> depthToGrayscale(std::vector<float> const& depth) {
   std::vector<float> grayscale;
   grayscale.reserve(depth.size() * 3);
 
@@ -286,7 +296,7 @@ std::vector<float> depthToGrayscale(const std::vector<float>& depth) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::vector<float> grayscaleToDepth(const std::vector<float>& grayscale) {
+std::vector<float> grayscaleToDepth(std::vector<float> const& grayscale) {
   std::vector<float> depth;
   depth.reserve(grayscale.size() / 3);
 
@@ -299,14 +309,8 @@ std::vector<float> grayscaleToDepth(const std::vector<float>& grayscale) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::vector<float> denoiseImage(std::vector<float>& image, int channelCount, int resolution) {
-  oidn::DeviceRef device = oidn::newDevice();
-  device.setErrorFunction([](void* userPtr, oidn::Error e, const char* errorDetails) {
-    oidnLogger().error(errorDetails);
-  });
-  device.commit();
-
-  oidn::FilterRef filter = device.newFilter("RT");
+void denoiseImage(std::vector<float>& image, int channelCount, int resolution) {
+  oidn::FilterRef filter = oidnDevice.newFilter("RT");
   filter.setImage("color", image.data(), oidn::Format::Float3, resolution, resolution, 0,
       sizeof(float) * channelCount, sizeof(float) * channelCount * resolution);
   filter.setImage("output", image.data(), oidn::Format::Float3, resolution, resolution, 0,
@@ -314,8 +318,6 @@ std::vector<float> denoiseImage(std::vector<float>& image, int channelCount, int
   filter.commit();
 
   filter.execute();
-
-  return image;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

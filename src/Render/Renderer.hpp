@@ -96,7 +96,7 @@ class Renderer {
   /// The rendering process will use all parameters set before calling this method
   /// and will not be influenced by any later changes to the parameters.
   /// Returns a future that will eventually contain the rendered image.
-  std::future<Renderer::RenderedImage> getFrame(glm::mat4 cameraTransform);
+  std::future<Renderer::RenderedImage> getFrame(glm::mat4 const& cameraTransform);
   /// Returns the current progress of the rendering processon the range [0,1].
   /// Returns 1 if no image is currently being rendered.
   virtual float getProgress() = 0;
@@ -190,7 +190,7 @@ class Renderer {
   const VolumeShape     mShape;
 
   virtual RenderedImage getFrameImpl(
-      glm::mat4 cameraTransform, Parameters parameters, DataManager::State dataState) = 0;
+      glm::mat4 const& cameraTransform, Parameters parameters, DataManager::State const& dataState) = 0;
 
  private:
   std::mutex mParameterMutex;
