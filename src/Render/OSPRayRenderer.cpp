@@ -58,6 +58,12 @@ void OSPRayRenderer::preloadData(DataManager::State state) {
     int lod = mDataManager->getMinLod(state);
     mCache.mVolumes[state][lod] =
         std::async(std::launch::async, [this, state, lod]() { return loadVolume(state, lod); });
+    DataManager::State anomalyState = state;
+    anomalyState.mScalar =
+        *std::find_if(mDataManager->pScalars.get().begin(), mDataManager->pScalars.get().end(),
+            [](Scalar s) { return s.getId() == "cell_temperature anomaly"; });
+    mCache.mVolumes[anomalyState][lod] = std::async(
+        std::launch::async, [this, anomalyState, lod]() { return loadVolume(anomalyState, lod); });
   }
 }
 
