@@ -634,7 +634,6 @@ OSPRayRenderer::Cache::Cache()
   mClipModel.commit();
 
   mGroup.setParam("volume", ospray::cpp::Data(mVolumeModel));
-  mGroup.setParam("clippingGeometry", ospray::cpp::Data(mClipModel));
 
   std::vector<ospray::cpp::Light> lights{mAmbientLight, mSunLight};
   mWorld.setParam("instance", ospray::cpp::Data(mInstance));
