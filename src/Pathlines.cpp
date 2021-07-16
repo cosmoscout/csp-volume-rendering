@@ -124,9 +124,9 @@ std::vector<rkcommon::math::vec2f> Pathlines::getTexCoords(
 
   std::vector<rkcommon::math::vec2f> texCoords(mData->GetNumberOfPoints());
 
-  for (int axis = 0; axis < scalars.size(); axis++) {
+  for (size_t axis = 0; axis < scalars.size(); axis++) {
     if (scalarIds[axis] == "") {
-      for (int i = 0; i < texCoords.size(); i++) {
+      for (size_t i = 0; i < texCoords.size(); i++) {
         texCoords[i][axis] = 0.5;
       }
       continue;
@@ -180,8 +180,7 @@ std::vector<uint32_t> Pathlines::getIndices(std::vector<ScalarFilter> const& fil
     }
   }
 
-  std::vector<uint32_t> indices(mData->GetNumberOfPoints() - mData->GetNumberOfLines());
-  int                   indicesIndex = 0;
+  std::vector<uint32_t> indices;
 
   auto lineIter = vtk::TakeSmartPointer(mData->GetLines()->NewIterator());
   for (lineIter->GoToFirstCell(); !lineIter->IsDoneWithTraversal(); lineIter->GoToNextCell()) {
@@ -190,11 +189,10 @@ std::vector<uint32_t> Pathlines::getIndices(std::vector<ScalarFilter> const& fil
     }
     vtkSmartPointer<vtkIdList> idList = vtkSmartPointer<vtkIdList>::New();
     lineIter->GetCurrentCell(idList);
-    for (auto index = idList->begin(); index != idList->end() - 1; index++) {
-      indices[indicesIndex++] = (uint32_t)*index;
+    for (auto index = idList->begin(); index < idList->end()-1; index++) {
+      indices.push_back((uint32_t)*index);
     }
   }
-  indices.resize(indicesIndex);
 
   return indices;
 }

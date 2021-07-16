@@ -8,7 +8,7 @@
 
 #include "../logger.hpp"
 
-#include "../../../src/cs-utils/filesystem.hpp"
+#include "../../../../src/cs-utils/filesystem.hpp"
 
 #include <vtkCellData.h>
 #include <vtkPointData.h>
@@ -176,7 +176,6 @@ void DataManager::setActiveScalar(std::string scalarId) {
 vtkSmartPointer<vtkDataSet> DataManager::getData(
     std::optional<State> optState, std::optional<int> optLod) {
   State state = optState.value_or(getState());
-  Lod   lod   = optLod.value_or(getMaxLod(state));
 
   std::shared_future<vtkSmartPointer<vtkDataSet>> futureData =
       getFromCache(state.mTimestep, optLod);
@@ -361,34 +360,42 @@ void DataManager::loadData(Timestep timestep, Lod lod) {
           timer = std::chrono::high_resolution_clock::now();
           data  = loadDataImpl(timestep, lod);
         }
-        std::vector<Scalar> updatedScalars;
+
+        std::map<Scalar, std::array<std::optional<double>, 2>> updatedScalars;
+        std::vector<Scalar>                                    scalars;
         {
-          std::scoped_lock lock(mStateMutex, mScalarsMutex);
-          for (auto const& scalar : pScalars.get()) {
-            bool                  rangeUpdated = false;
-            std::array<double, 2> range;
-            switch (scalar.mType) {
-            case ScalarType::ePointData:
-              data->GetPointData()->GetScalars(scalar.mName.c_str())->GetRange(range.data());
-              break;
-            case ScalarType::eCellData:
-              data->GetCellData()->GetScalars(scalar.mName.c_str())->GetRange(range.data());
-              break;
+          std::scoped_lock lock(mScalarsMutex);
+          scalars = pScalars.get();
+        }
+        for (auto const& scalar : scalars) {
+          std::array<double, 2> range;
+          switch (scalar.mType) {
+          case ScalarType::ePointData:
+            data->GetPointData()->GetScalars(scalar.mName.c_str())->GetRange(range.data());
+            break;
+          case ScalarType::eCellData:
+            data->GetCellData()->GetScalars(scalar.mName.c_str())->GetRange(range.data());
+            break;
+          }
+          if (range[0] < mScalarRanges[scalar.getId()][0]) {
+            updatedScalars[scalar][0] = range[0];
+          }
+          if (range[1] > mScalarRanges[scalar.getId()][1]) {
+            updatedScalars[scalar][1] = range[1];
+          }
+        }
+        {
+          std::scoped_lock lock(mStateMutex);
+          for (auto const& [scalar, value] : updatedScalars) {
+            if (value[0].has_value()) {
+              mScalarRanges[scalar.getId()][0] = value[0].value();
             }
-            if (range[0] < mScalarRanges[scalar.getId()][0]) {
-              mScalarRanges[scalar.getId()][0] = range[0];
-              rangeUpdated                     = true;
-            }
-            if (range[1] > mScalarRanges[scalar.getId()][1]) {
-              mScalarRanges[scalar.getId()][1] = range[1];
-              rangeUpdated                     = true;
-            }
-            if (rangeUpdated) {
-              updatedScalars.push_back(scalar);
+            if (value[1].has_value()) {
+              mScalarRanges[scalar.getId()][1] = value[1].value();
             }
           }
         }
-        for (auto const& scalar : updatedScalars) {
+        for (auto const& [scalar, value] : updatedScalars) {
           mOnScalarRangeUpdated.emit(scalar);
         }
 

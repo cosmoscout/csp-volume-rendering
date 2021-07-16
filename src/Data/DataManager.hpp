@@ -13,7 +13,7 @@
 #include "../Pathlines.hpp"
 #include "Scalar.hpp"
 
-#include "../../../src/cs-utils/Property.hpp"
+#include "../../../../src/cs-utils/Property.hpp"
 
 #include <vtkCellArray.h>
 #include <vtkDataSet.h>

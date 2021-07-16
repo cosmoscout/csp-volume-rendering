@@ -156,7 +156,7 @@ ospray::cpp::Volume createOSPRayVolume(
   std::vector<ospray::cpp::CopiedData> ospData(scalars.size());
   vtkSmartPointer<vtkDataArray>        vtkData;
 
-  for (int i = 0; i < scalars.size(); i++) {
+  for (size_t i = 0; i < scalars.size(); i++) {
     switch (scalars[i].mType) {
     case ScalarType::ePointData:
       vtkData = vtkVolume->GetPointData()->GetScalars(scalars[i].mName.c_str());
@@ -204,7 +204,7 @@ ospray::cpp::Volume createOSPRayVolume(
   vtkSmartPointer<vtkDataArray>        vtkData;
   rkcommon::math::vec3i                dim;
 
-  for (int i = 0; i < scalars.size(); i++) {
+  for (size_t i = 0; i < scalars.size(); i++) {
     switch (scalars[i].mType) {
     case ScalarType::ePointData:
       dim     = {dimensions[1], dimensions[2], dimensions[0]};
