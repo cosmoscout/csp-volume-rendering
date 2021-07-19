@@ -255,19 +255,16 @@ void OSPRayRenderer::updateWorld(
 
   bool pathlinesPresent = true;
   if (parameters.mWorld.mPathlines.mEnable &&
-      !(parameters.mWorld.mPathlines == mCache.mState.mParameters.mWorld.mPathlines &&
-          dataState.mScalar == mCache.mState.mDataState.mScalar)) {
+      !(parameters.mWorld.mPathlines == mCache.mState.mParameters.mWorld.mPathlines)) {
     std::vector<uint32_t> indices =
         mDataManager->getPathlines().getIndices(parameters.mWorld.mPathlines.mScalarFilters);
     if (indices.size() <= 0) {
       pathlinesPresent = false;
     } else {
-      std::string scalar = dataState.mScalar.getId();
-      cs::utils::replaceString(scalar, "cell_", "point_");
       std::vector<rkcommon::math::vec4f> vertices =
           mDataManager->getPathlines().getVertices(parameters.mWorld.mPathlines.mLineSize);
       std::vector<rkcommon::math::vec2f> texCoords =
-          mDataManager->getPathlines().getTexCoords(scalar, "point_ParticleAge");
+          mDataManager->getPathlines().getTexCoords("point_ParticleAge", "point_ParticleAge");
 
       mCache.mPathlines.setParam("type", OSP_FLAT);
       mCache.mPathlines.setParam("basis", OSP_LINEAR);
