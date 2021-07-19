@@ -86,6 +86,9 @@ class DataManager {
   /// Future calls to getData() will return data with this as the active scalar.
   void setActiveScalar(std::string scalarId);
 
+  /// Returns the volume data as a csv string.
+  std::string const& getCsvData();
+
   /// Returns the data for the current state.
   /// May block, if the requested data is not yet loaded.
   /// If isReady() returns false, the data may have no active scalar.
@@ -108,6 +111,8 @@ class DataManager {
   using Timestep = int;
   using Lod      = int;
 
+  std::string mCsvData;
+
   Timestep mCurrentTimestep;
   Scalar   mActiveScalar;
 
@@ -129,7 +134,8 @@ class DataManager {
 
   cs::utils::Signal<Scalar const&> mOnScalarRangeUpdated;
 
-  DataManager(std::string path, std::string filenamePattern, std::string pathlinesPath);
+  DataManager(std::string const& path, std::string const& filenamePattern,
+      std::string const& pathlinesPath);
 
   void initState();
   void initScalars();

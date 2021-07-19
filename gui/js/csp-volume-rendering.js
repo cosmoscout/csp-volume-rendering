@@ -40,10 +40,12 @@
 
       this._enablePathlinesParcoordsCheckbox =
           document.querySelector(`[data-callback="volumeRendering.setEnablePathlinesParcoords"]`);
+    }
 
+    initParcoords(volumeData, pathlinesData) {
       const me              = this;
       this._parcoordsVolume = CosmoScout.parcoords.create(
-          "volumeRendering-parcoordsVolume", "Volume", csvData, function(brushed, args) {
+          "volumeRendering-parcoordsVolume", "Volume", volumeData, function(brushed, args) {
             CosmoScout.callbacks.volumeRendering.setVolumeScalarFilters(
                 JSON.stringify(this.pc.brushExtents()));
             if (!me._enablePathlinesParcoordsCheckbox.checked) {
@@ -52,13 +54,12 @@
           });
       this._parcoordsPathlinesContainer =
           document.getElementById("volumeRendering-parcoordsPathlines");
-      this._parcoordsPathlines =
-          CosmoScout.parcoords.create("volumeRendering-parcoordsPathlines", "Pathlines", csvData2,
-              function(brushed, args) {
-                if (me._enablePathlinesParcoordsCheckbox.checked) {
-                  me.setPathlinesScalarFilters(this.pc.brushExtents());
-                }
-              });
+      this._parcoordsPathlines = CosmoScout.parcoords.create("volumeRendering-parcoordsPathlines",
+          "Pathlines", pathlinesData, function(brushed, args) {
+            if (me._enablePathlinesParcoordsCheckbox.checked) {
+              me.setPathlinesScalarFilters(this.pc.brushExtents());
+            }
+          });
 
       this._enablePathlinesParcoordsCheckbox.addEventListener("change", (e) => {
         if (e.target.checked) {

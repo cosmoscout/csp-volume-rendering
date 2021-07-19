@@ -20,12 +20,19 @@
 
 namespace csp::volumerendering {
 
+class PathlinesException : public std::exception {
+ public:
+  const char* what() const noexcept override;
+};
+
 class Pathlines {
  public:
   Pathlines(std::string const& file);
 
   std::vector<Scalar> const&                          getScalars() const;
   std::map<std::string, std::array<double, 2>> const& getScalarRanges() const;
+
+  std::string const& getCsvData() const;
 
   std::vector<rkcommon::math::vec4f> getVertices(float lineSize) const;
   std::vector<rkcommon::math::vec4f> getColors(
@@ -35,8 +42,10 @@ class Pathlines {
   std::vector<uint32_t> getIndices(std::vector<ScalarFilter> const& filters) const;
 
  private:
-  bool isCellValid(std::vector<std::pair<Scalar, ScalarFilter>> filters, vtkIdType cellId) const;
+  bool isCellValid(
+      std::vector<std::pair<Scalar, ScalarFilter>> const& filters, vtkIdType cellId) const;
 
+  std::string                                  mCsvData;
   vtkSmartPointer<vtkPolyData>                 mData;
   std::vector<Scalar>                          mScalars;
   std::map<std::string, std::array<double, 2>> mScalarRanges;

@@ -9,6 +9,7 @@
 #include "../logger.hpp"
 
 #include "../../../../src/cs-utils/filesystem.hpp"
+#include "../../../../src/cs-utils/utils.hpp"
 
 #include <vtkCellData.h>
 #include <vtkPointData.h>
@@ -27,7 +28,8 @@ const char* DataManagerException::what() const noexcept {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-DataManager::DataManager(std::string path, std::string filenamePattern, std::string pathlinesPath)
+DataManager::DataManager(
+    std::string const& path, std::string const& filenamePattern, std::string const& pathlinesPath)
     : mPathlines(pathlinesPath) {
   std::regex patternRegex;
   try {
@@ -54,6 +56,21 @@ DataManager::DataManager(std::string path, std::string filenamePattern, std::str
     files = cs::utils::filesystem::listFiles(path, patternRegex);
   } catch (const boost::filesystem::filesystem_error& e) {
     logger().error("Loading volume data from '{}' failed: {}", path, e.what());
+    throw DataManagerException();
+  }
+
+  std::string csvPattern = filenamePattern;
+  cs::utils::replaceString(csvPattern, boost::filesystem::extension(csvPattern), ".csv");
+  try {
+    std::set<std::string> files =
+        cs::utils::filesystem::listFiles(path, std::regex(".*" + csvPattern));
+    if (files.size() == 0) {
+      logger().error("No csv data found in '{}'!", path);
+      throw DataManagerException();
+    }
+    mCsvData = cs::utils::filesystem::loadToString(*files.begin());
+  } catch (const boost::filesystem::filesystem_error& e) {
+    logger().error("Loading csv data from '{}' failed: {}", path, e.what());
     throw DataManagerException();
   }
 
@@ -169,6 +186,12 @@ void DataManager::setActiveScalar(std::string scalarId) {
     logger().warn("'{}' is not a scalar in the current dataset. '{}' will be used instead.",
         scalarId, mActiveScalar.getId());
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::string const& DataManager::getCsvData() {
+  return mCsvData;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

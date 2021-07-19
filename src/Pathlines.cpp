@@ -8,6 +8,9 @@
 
 #include "logger.hpp"
 
+#include "../../../../src/cs-utils/filesystem.hpp"
+#include "../../../../src/cs-utils/utils.hpp"
+
 #include <vtkCellArrayIterator.h>
 #include <vtkCellData.h>
 #include <vtkDataSetReader.h>
@@ -17,7 +20,27 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const char* PathlinesException::what() const noexcept {
+  return "Failed to initialize Pathlines.";
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 Pathlines::Pathlines(std::string const& file) {
+  std::string csvFile = file;
+  cs::utils::replaceString(csvFile, boost::filesystem::extension(csvFile), ".csv");
+  try {
+    if (boost::filesystem::exists(csvFile)) {
+      mCsvData = cs::utils::filesystem::loadToString(csvFile);
+    } else {
+      logger().error("No csv pathline data found at '{}'!", csvFile);
+      throw PathlinesException();
+    }
+  } catch (const boost::filesystem::filesystem_error& e) {
+    logger().error("Loading csv pathline data from '{}' failed: {}", csvFile, e.what());
+    throw PathlinesException();
+  }
+
   vtkSmartPointer<vtkDataSetReader> reader = vtkSmartPointer<vtkDataSetReader>::New();
   reader->SetFileName(file.c_str());
   reader->ReadAllScalarsOn();
@@ -59,6 +82,12 @@ std::vector<Scalar> const& Pathlines::getScalars() const {
 
 std::map<std::string, std::array<double, 2>> const& Pathlines::getScalarRanges() const {
   return mScalarRanges;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::string const& Pathlines::getCsvData() const {
+  return mCsvData;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -189,7 +218,7 @@ std::vector<uint32_t> Pathlines::getIndices(std::vector<ScalarFilter> const& fil
     }
     vtkSmartPointer<vtkIdList> idList = vtkSmartPointer<vtkIdList>::New();
     lineIter->GetCurrentCell(idList);
-    for (auto index = idList->begin(); index < idList->end()-1; index++) {
+    for (auto index = idList->begin(); index < idList->end() - 1; index++) {
       indices.push_back((uint32_t)*index);
     }
   }
@@ -200,7 +229,7 @@ std::vector<uint32_t> Pathlines::getIndices(std::vector<ScalarFilter> const& fil
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool Pathlines::isCellValid(
-    std::vector<std::pair<Scalar, ScalarFilter>> filters, vtkIdType cellId) const {
+    std::vector<std::pair<Scalar, ScalarFilter>> const& filters, vtkIdType cellId) const {
   for (auto const& [scalar, filter] : filters) {
     double* value = mData->GetCellData()->GetScalars(scalar.mName.c_str())->GetTuple(cellId);
     if (*value < filter.mMin || *value > filter.mMax) {
