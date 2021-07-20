@@ -418,8 +418,8 @@ void DataManager::loadData(Timestep timestep, Lod lod) {
             }
           }
         }
-        for (auto const& [scalar, value] : updatedScalars) {
-          mOnScalarRangeUpdated.emit(scalar);
+        for (auto const& scalar : updatedScalars) {
+          mOnScalarRangeUpdated.emit(scalar.first);
         }
 
         logger().info("Finished loading data for timestep {}, level of detail {}. Took {}s.",
