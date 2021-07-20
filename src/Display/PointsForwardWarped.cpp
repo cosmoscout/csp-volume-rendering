@@ -27,9 +27,9 @@ namespace csp::volumerendering {
 
 PointsForwardWarped::PointsForwardWarped(
     VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor)
-    : DisplayNode(shape, settings, anchor, 256) {
-  pDepthValues.connectAndTouch(
-      [this](std::vector<float> depthValues) { createBuffers(depthValues); });
+    : DisplayNode(shape, settings, anchor)
+    , mDepthResolution(256) {
+  createBuffers();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -64,8 +64,14 @@ bool PointsForwardWarped::Do() {
   glUniformMatrix4fv(mShader.GetUniformLocation("uMatProjection"), 1, GL_FALSE, glMatP.data());
   glUniformMatrix4fv(
       mShader.GetUniformLocation("uMatTransform"), 1, GL_FALSE, glm::value_ptr(mTransform));
+  glUniformMatrix4fv(mShader.GetUniformLocation("uMatRendererProjection"), 1, GL_FALSE,
+      glm::value_ptr(mRendererProjection));
+  glUniformMatrix4fv(mShader.GetUniformLocation("uMatRendererProjectionInv"), 1, GL_FALSE,
+      glm::value_ptr(glm::inverse(mRendererProjection)));
   glUniformMatrix4fv(
       mShader.GetUniformLocation("uMatRendererMVP"), 1, GL_FALSE, glm::value_ptr(mRendererMVP));
+  glUniformMatrix4fv(mShader.GetUniformLocation("uMatRendererMVPInv"), 1, GL_FALSE,
+      glm::value_ptr(glm::inverse(mRendererMVP)));
 
   glm::mat4 matrix =
       glm::mat4(glMatP[0], glMatP[1], glMatP[2], glMatP[3], glMatP[4], glMatP[5], glMatP[6],
@@ -106,6 +112,7 @@ bool PointsForwardWarped::Do() {
       pointHeight > pointWidth ? pointHeight : pointWidth);
 
   mShader.SetUniform(mShader.GetUniformLocation("uTexture"), 0);
+  mShader.SetUniform(mShader.GetUniformLocation("uDepthTexture"), 1);
   mShader.SetUniform(mShader.GetUniformLocation("uRadii"), static_cast<float>(mRadii[0]),
       static_cast<float>(mRadii[0]), static_cast<float>(mRadii[0]));
   mShader.SetUniform(
@@ -114,6 +121,7 @@ bool PointsForwardWarped::Do() {
   mShader.SetUniform(mShader.GetUniformLocation("uDrawDepth"), mDrawDepth);
 
   mTexture.Bind(GL_TEXTURE0);
+  mDepthTexture.Bind(GL_TEXTURE1);
 
   glPushAttrib(GL_ENABLE_BIT);
   glEnable(GL_CULL_FACE);
@@ -129,6 +137,7 @@ bool PointsForwardWarped::Do() {
 
   // Clean up.
   mTexture.Unbind(GL_TEXTURE0);
+  mDepthTexture.Unbind(GL_TEXTURE1);
   mShader.Release();
   glPopAttrib();
 
@@ -137,7 +146,7 @@ bool PointsForwardWarped::Do() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void PointsForwardWarped::createBuffers(std::vector<float> depthValues) {
+void PointsForwardWarped::createBuffers() {
   std::vector<float>    vertices(mDepthResolution * mDepthResolution * 3);
   std::vector<unsigned> indices((mDepthResolution - 1) * (2 + 2 * mDepthResolution));
 
@@ -145,9 +154,7 @@ void PointsForwardWarped::createBuffers(std::vector<float> depthValues) {
     for (int y = 0; y < mDepthResolution; ++y) {
       vertices[(x * mDepthResolution + y) * 3 + 0] = 2.f / (mDepthResolution - 1) * x - 1.f;
       vertices[(x * mDepthResolution + y) * 3 + 1] = 2.f / (mDepthResolution - 1) * y - 1.f;
-      vertices[(x * mDepthResolution + y) * 3 + 2] =
-          depthValues[y * mDepthResolution / mDepthResolution * mDepthResolution +
-                      x * mDepthResolution / mDepthResolution];
+      vertices[(x * mDepthResolution + y) * 3 + 2] = 0.f;
     }
   }
 

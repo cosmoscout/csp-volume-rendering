@@ -193,16 +193,6 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool Plugin::Frame::operator==(const Frame& other) {
-  return mResolution == other.mResolution &&
-         glm::all(glm::epsilonEqual(mCameraTransform[0], other.mCameraTransform[0], 0.0001f)) &&
-         glm::all(glm::epsilonEqual(mCameraTransform[1], other.mCameraTransform[1], 0.0001f)) &&
-         glm::all(glm::epsilonEqual(mCameraTransform[2], other.mCameraTransform[2], 0.0001f)) &&
-         glm::all(glm::epsilonEqual(mCameraTransform[3], other.mCameraTransform[3], 0.0001f));
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 void Plugin::init() {
   logger().info("Loading plugin...");
 
@@ -287,7 +277,7 @@ void Plugin::update() {
     break;
   }
 
-  if (mPluginSettings.mReuseImages.get() && mRenderedFrames.size() > 0) {
+  if (mPluginSettings.mReuseImages.get() && mRenderedImages.size() > 0) {
     tryReuseFrame(mNextFrame.mCameraTransform);
   }
 
@@ -453,7 +443,7 @@ void Plugin::registerUICallbacks() {
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setTimestep",
       "Sets the timestep of the rendered volume images.", std::function([this](double value) {
-        mRenderedFrames.clear();
+        mRenderedImages.clear();
         mDataManager->setTimestep((int)std::lround(value));
         mParametersDirty = true;
       }));
@@ -474,7 +464,7 @@ void Plugin::registerUICallbacks() {
   mGuiManager->getGui()->registerCallback("volumeRendering.setTransferFunction",
       "Sets the transfer function for rendering the volume.",
       std::function([this](std::string json) {
-        mRenderedFrames.clear();
+        mRenderedImages.clear();
         cs::graphics::ColorMap colorMap(json);
         mRenderer->setTransferFunction(colorMap.getRawData());
         mParametersDirty = true;
@@ -485,7 +475,7 @@ void Plugin::registerUICallbacks() {
       std::function([this](std::string jsonString) {
         std::vector<Scalar>       scalars = mDataManager->pScalars.get();
         std::vector<ScalarFilter> filters = parseScalarFilters(jsonString, scalars);
-        mRenderedFrames.clear();
+        mRenderedImages.clear();
         mRenderer->setScalarFilters(filters);
         mParametersDirty = true;
       }));
@@ -493,7 +483,7 @@ void Plugin::registerUICallbacks() {
   mGuiManager->getGui()->registerCallback("volumeRendering.setTimestepAnimating",
       "Specifies, whether timesteps are currently animated (increasing automatically).",
       std::function([this](bool value) {
-        mRenderedFrames.clear();
+        mRenderedImages.clear();
         if (value) {
           mRenderer->setMaxLod(mDataManager->getMinLod(mDataManager->getState()));
         } else {
@@ -536,7 +526,7 @@ void Plugin::registerUICallbacks() {
       std::function([this](std::string jsonString) {
         std::vector<ScalarFilter> filters =
             parseScalarFilters(jsonString, mDataManager->getPathlines().getScalars());
-        mRenderedFrames.clear();
+        mRenderedImages.clear();
         mRenderer->setPathlineScalarFilters(filters);
         mParametersDirty = true;
       }));
@@ -595,7 +585,7 @@ void Plugin::connectSettings() {
   // Connect to plugin settings
   // Data settings
   mPluginSettings.mActiveScalar.connectAndTouch([this](std::string value) {
-    mRenderedFrames.clear();
+    mRenderedImages.clear();
     if (mDataManager->isReady()) {
       mDataManager->setActiveScalar(value);
       mParametersDirty = true;
@@ -612,44 +602,44 @@ void Plugin::connectSettings() {
     mGuiManager->setCheckboxValue("volumeRendering.setEnableRequestImages", enable);
   });
   mPluginSettings.mResolution.connectAndTouch([this](int value) {
-    mRenderedFrames.clear();
+    mRenderedImages.clear();
     mNextFrame.mResolution = value;
     mRenderer->setResolution(value);
     mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setResolution", value);
   });
   mPluginSettings.mSamplingRate.connectAndTouch([this](float value) {
-    mRenderedFrames.clear();
+    mRenderedImages.clear();
     mRenderer->setSamplingRate(value);
     mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setSamplingRate", value);
   });
   mPluginSettings.mRendering.mMaxPasses.connectAndTouch([this](int value) {
-    mRenderedFrames.clear();
+    mRenderedImages.clear();
     mRenderer->setMaxRenderPasses(value);
     mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setMaxRenderPasses", value);
   });
   mPluginSettings.mDensityScale.connectAndTouch([this](float value) {
-    mRenderedFrames.clear();
+    mRenderedImages.clear();
     mRenderer->setDensityScale(value);
     mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setDensityScale", value);
   });
   mPluginSettings.mDenoiseColor.connectAndTouch([this](bool enable) {
-    mRenderedFrames.clear();
+    mRenderedImages.clear();
     mRenderer->setDenoiseColor(enable);
     mParametersDirty = true;
     mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseColor", enable);
   });
   mPluginSettings.mDenoiseDepth.connectAndTouch([this](bool enable) {
-    mRenderedFrames.clear();
+    mRenderedImages.clear();
     mRenderer->setDenoiseDepth(enable);
     mParametersDirty = true;
     mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseDepth", enable);
   });
   mPluginSettings.mDepthMode.connectAndTouch([this](DepthMode drawMode) {
-    mRenderedFrames.clear();
+    mRenderedImages.clear();
     mRenderer->setDepthMode(drawMode);
     mParametersDirty = true;
     if (drawMode == DepthMode::eNone) {
@@ -673,19 +663,19 @@ void Plugin::connectSettings() {
 
   // Lighting settings
   mPluginSettings.mLighting.mEnabled.connectAndTouch([this](bool enable) {
-    mRenderedFrames.clear();
+    mRenderedImages.clear();
     mRenderer->setShading(enable);
     mParametersDirty = true;
     mGuiManager->setCheckboxValue("volumeRendering.setEnableLighting", enable);
   });
   mPluginSettings.mLighting.mSunStrength.connectAndTouch([this](float value) {
-    mRenderedFrames.clear();
+    mRenderedImages.clear();
     mRenderer->setSunStrength(value);
     mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setSunStrength", value);
   });
   mPluginSettings.mLighting.mAmbientStrength.connectAndTouch([this](float value) {
-    mRenderedFrames.clear();
+    mRenderedImages.clear();
     mRenderer->setAmbientLight(value);
     mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setAmbientStrength", value);
@@ -725,38 +715,39 @@ void Plugin::connectSettings() {
     } else if (displayMode == DisplayMode::ePoints) {
       mGuiManager->setRadioChecked("volumeRendering.setDisplayMode1");
     }
-    if (mDisplayedFrame.has_value()) {
-      displayFrame(*mDisplayedFrame, displayMode);
-    }
+    // TODO fix
+    /*if (mDisplayedImage.has_value()) {
+      displayFrame(mDisplayedImage, displayMode);
+    }*/
   });
 
   // Pathline settings
   mPluginSettings.mPathlines.mEnabled.connectAndTouch([this](bool enable) {
-    mRenderedFrames.clear();
+    mRenderedImages.clear();
     mRenderer->setPathlinesEnabled(enable);
     mParametersDirty = true;
     mGuiManager->setCheckboxValue("volumeRendering.setEnablePathlines", enable);
   });
   mPluginSettings.mPathlines.mLineOpacity.connectAndTouch([this](float value) {
-    mRenderedFrames.clear();
+    mRenderedImages.clear();
     mRenderer->setPathlineOpacity(value);
     mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setPathlineOpacity", value);
   });
   mPluginSettings.mPathlines.mLineSize.connectAndTouch([this](float value) {
-    mRenderedFrames.clear();
+    mRenderedImages.clear();
     mRenderer->setPathlineSize(value);
     mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setPathlineSize", value);
   });
   mPluginSettings.mPathlines.mLength.connectAndTouch([this](float value) {
-    mRenderedFrames.clear();
+    mRenderedImages.clear();
     mRenderer->setPathlineLength(value);
     mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setPathlineLength", value);
   });
   mPluginSettings.mPathlines.mActiveScalar.connectAndTouch([this](std::string value) {
-    mRenderedFrames.clear();
+    mRenderedImages.clear();
     mRenderer->setPathlineActiveScalar(value);
     mParametersDirty = true;
   });
@@ -895,19 +886,16 @@ void Plugin::receiveFrame() {
     mFrameIntervalsIndex = 0;
   }
 
-  Renderer::RenderedImage renderedImage = mFutureFrameData.get();
-  if (!renderedImage.mValid) {
+  std::unique_ptr<Renderer::RenderedImage> renderedImage = mFutureFrameData.get();
+  if (!renderedImage || !renderedImage->isValid()) {
     mFrameInvalid = true;
     return;
   }
 
-  mRenderingFrame.mColorImage          = renderedImage.mColorData;
-  mRenderingFrame.mDepthImage          = renderedImage.mDepthData;
-  mRenderingFrame.mModelViewProjection = renderedImage.mMVP;
+  // TODO copy rendered image if image caching is enabled
+  // mRenderedImages.push_back();
 
-  mRenderedFrames.push_back(std::move(mRenderingFrame));
-
-  displayFrame(mRenderedFrames.back());
+  displayFrame(std::move(renderedImage));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -923,7 +911,8 @@ float diffTranslations(glm::mat4 transformA, glm::mat4 transformB) {
 void Plugin::tryReuseFrame(glm::mat4 cameraTransform) {
   cs::utils::FrameTimings::ScopedTimer timer("Try reuse frame");
 
-  Frame bestFrame = mRenderedFrames.back();
+  // TODO fix
+  /*Renderer::RenderedImage bestFrame = mRenderedImages.back();
   float minDiff   = diffTranslations(cameraTransform, bestFrame.mCameraTransform);
   for (const Frame& f : mRenderedFrames) {
     float diff = diffTranslations(cameraTransform, f.mCameraTransform);
@@ -934,7 +923,7 @@ void Plugin::tryReuseFrame(glm::mat4 cameraTransform) {
   }
   if (mDisplayedFrame.has_value() && !(bestFrame == *mDisplayedFrame) && minDiff > 0) {
     displayFrame(bestFrame);
-  }
+  }*/
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -959,22 +948,24 @@ std::vector<ScalarFilter> csp::volumerendering::Plugin::parseScalarFilters(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Plugin::displayFrame(Frame& frame) {
-  displayFrame(frame, mPluginSettings.mDisplayMode.get());
+void Plugin::displayFrame(std::unique_ptr<Renderer::RenderedImage> frame) {
+  displayFrame(std::move(frame), mPluginSettings.mDisplayMode.get());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Plugin::displayFrame(Frame& frame, DisplayMode displayMode) {
+void Plugin::displayFrame(std::unique_ptr<Renderer::RenderedImage> frame, DisplayMode displayMode) {
   cs::utils::FrameTimings::ScopedTimer timer("Display volume frame");
 
   std::shared_ptr<DisplayNode> displayNode = mDisplayNodes.find(displayMode)->second;
-  displayNode->setTexture(frame.mColorImage, frame.mResolution, frame.mResolution);
-  displayNode->setDepthTexture(frame.mDepthImage, frame.mResolution, frame.mResolution);
-  displayNode->setTransform(glm::toMat4(glm::toQuat(frame.mCameraTransform)));
-  displayNode->setMVPMatrix(frame.mModelViewProjection);
+  displayNode->setTexture(frame->getColorData(), frame->getResolution(), frame->getResolution());
+  displayNode->setDepthTexture(
+      frame->getDepthData(), frame->getResolution(), frame->getResolution());
+  displayNode->setTransform(glm::toMat4(glm::toQuat(frame->getCameraTransform())));
+  displayNode->setRendererMatrices(frame->getModelView(), frame->getProjection());
 
-  mDisplayedFrame = frame;
+  // TODO fix
+  // mDisplayedImage = frame;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

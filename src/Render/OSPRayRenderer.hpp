@@ -57,7 +57,32 @@ class OSPRayRenderer : public Renderer {
   struct Camera {
     ospray::cpp::Camera mOsprayCamera;
     glm::vec3           mPositionRotated;
-    glm::mat4           mTransformationMatrix;
+    glm::mat4           mModelView;
+    glm::mat4           mProjection;
+  };
+
+  class RenderedImage : public Renderer::RenderedImage {
+   public:
+    RenderedImage(ospray::cpp::FrameBuffer frame, Camera const& camera, float volumeHeight,
+        Parameters const& parameters, glm::mat4 const& cameraTransform);
+    ~RenderedImage() override;
+
+    RenderedImage(RenderedImage const& other) = delete;
+    RenderedImage& operator=(RenderedImage const& other) = delete;
+
+    RenderedImage(RenderedImage&& other);
+    RenderedImage& operator=(RenderedImage&& other) = delete;
+
+    float* getColorData() const override;
+    float* getDepthData() const override;
+
+   private:
+    float* mColorData;
+    float* mDepthData;
+
+    std::optional<std::vector<float>> mDefaultDepth;
+
+    ospray::cpp::FrameBuffer mFrame;
   };
 
   int mFrameBufferAccumulationPasses;
@@ -102,8 +127,8 @@ class OSPRayRenderer : public Renderer {
   bool                               mRenderingCancelled;
   std::mutex                         mRenderFutureMutex;
 
-  RenderedImage getFrameImpl(glm::mat4 const& cameraTransform, Parameters parameters,
-      DataManager::State const& dataState) override;
+  std::unique_ptr<Renderer::RenderedImage> getFrameImpl(glm::mat4 const& cameraTransform,
+      Parameters parameters, DataManager::State const& dataState) override;
 
   const Volume& getVolume(DataManager::State const& state, std::optional<int> const& maxLod);
   Volume        loadVolume(DataManager::State const& state, int lod);
@@ -115,10 +140,6 @@ class OSPRayRenderer : public Renderer {
   OSPRayRenderer::Camera   getCamera(float volumeHeight, glm::mat4 observerTransform);
   ospray::cpp::FrameBuffer renderFrame(ospray::cpp::World const& world,
       ospray::cpp::Camera const& camera, Parameters const& parameters, bool resetAccumulation);
-  Renderer::RenderedImage  extractImageData(ospray::cpp::FrameBuffer const& frame,
-       Camera const& camera, float volumeHeight, Parameters const& parameters);
-  void normalizeDepthData(std::vector<float>& data, Camera const& camera, float volumeHeight,
-      Parameters const& parameters);
 };
 
 } // namespace csp::volumerendering

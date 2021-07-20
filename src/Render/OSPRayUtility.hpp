@@ -45,15 +45,15 @@ ospray::cpp::TransferFunction createOSPRayTransferFunction(
 
 /// Converts an image with one channel of depth values in the range [-1,1] to an RGB image (three
 /// channels with ranges [0,1]) representing the depth as grayscale.
-std::vector<float> depthToGrayscale(std::vector<float> const& depth);
+std::vector<float> depthToGrayscale(float* depth, int resolution);
 /// Converts an grayscale RGB image (three channels with ranges [0,1]) to a depth image with one
 /// channel (range [-1,1]). It is assumed that all pixels of the RGB image have the same value on
 /// all three channels.
-std::vector<float> grayscaleToDepth(std::vector<float> const& grayscale);
+void grayscaleToDepth(std::vector<float> const& grayscale, float* output);
 /// Denoises the given image in-place using OIDN. The image has to contain at least three channels,
 /// the exact number has to be given as the channelCount parameter. However, only the first three
 /// channels are used while denoising.
-void denoiseImage(std::vector<float>& image, int channelCount, int resolution);
+void denoiseImage(float* image, int channelCount, int resolution);
 
 } // namespace csp::volumerendering::OSPRayUtility
 

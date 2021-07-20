@@ -25,12 +25,11 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-DisplayNode::DisplayNode(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings,
-    std::string anchor, int depthResolution)
+DisplayNode::DisplayNode(
+    VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor)
     : mShape(shape)
     , mTexture(GL_TEXTURE_2D)
-    , pDepthValues(std::vector<float>(depthResolution * depthResolution))
-    , mDepthResolution(depthResolution)
+    , mDepthTexture(GL_TEXTURE_2D)
     , mShaderDirty(true) {
   settings->initAnchor(*this, anchor);
 
@@ -55,15 +54,24 @@ void DisplayNode::setEnabled(bool enabled) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void DisplayNode::setTexture(std::vector<uint8_t>& texture, int width, int height) {
-  mTexture.UploadTexture(width, height, texture.data(), false, GL_RGBA);
+void DisplayNode::setTexture(uint8_t* texture, int width, int height) {
+  mTexture.UploadTexture(width, height, texture, false, GL_RGBA);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void DisplayNode::setDepthTexture(std::vector<float>& texture, int width, int height) {
-  mDepthResolution = width;
-  pDepthValues.set(texture);
+void DisplayNode::setTexture(float* texture, int width, int height) {
+  mTexture.UploadTexture(width, height, texture, false, GL_RGBA, GL_FLOAT);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void DisplayNode::setDepthTexture(float* texture, int width, int height) {
+  // VistaTexture does not support upload with different internal format than GL_RGBA8, so we upload
+  // the texture manually.
+  mDepthTexture.Bind();
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, width, height, 0, GL_RED, GL_FLOAT, texture);
+  glTexParameteri(mDepthTexture.GetTarget(), GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -74,8 +82,10 @@ void DisplayNode::setTransform(glm::mat4 transform) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void DisplayNode::setMVPMatrix(glm::mat4 mvp) {
-  mRendererMVP = std::move(mvp);
+void DisplayNode::setRendererMatrices(glm::mat4 modelView, glm::mat4 projection) {
+  mRendererModelView  = std::move(modelView);
+  mRendererProjection = std::move(projection);
+  mRendererMVP        = mRendererProjection * mRendererModelView;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

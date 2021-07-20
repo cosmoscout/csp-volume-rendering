@@ -281,11 +281,12 @@ ospray::cpp::TransferFunction createOSPRayTransferFunction(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::vector<float> depthToGrayscale(std::vector<float> const& depth) {
+std::vector<float> depthToGrayscale(float* depth, int resolution) {
   std::vector<float> grayscale;
-  grayscale.reserve(depth.size() * 3);
+  grayscale.reserve(resolution * resolution * 3);
 
-  for (const float& val : depth) {
+  for (int i = 0; i < resolution * resolution; i++) {
+    float val = depth[i];
     for (int i = 0; i < 3; i++) {
       grayscale.push_back((val + 1) / 2);
     }
@@ -296,24 +297,19 @@ std::vector<float> depthToGrayscale(std::vector<float> const& depth) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::vector<float> grayscaleToDepth(std::vector<float> const& grayscale) {
-  std::vector<float> depth;
-  depth.reserve(grayscale.size() / 3);
-
+void grayscaleToDepth(std::vector<float> const& grayscale, float* output) {
   for (size_t i = 0; i < grayscale.size() / 3; i++) {
-    depth.push_back(grayscale[i * 3] * 2 - 1);
+    output[i] = grayscale[i * 3] * 2 - 1;
   }
-
-  return depth;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void denoiseImage(std::vector<float>& image, int channelCount, int resolution) {
+void denoiseImage(float* image, int channelCount, int resolution) {
   oidn::FilterRef filter = oidnDevice.newFilter("RT");
-  filter.setImage("color", image.data(), oidn::Format::Float3, resolution, resolution, 0,
+  filter.setImage("color", image, oidn::Format::Float3, resolution, resolution, 0,
       sizeof(float) * channelCount, sizeof(float) * channelCount * resolution);
-  filter.setImage("output", image.data(), oidn::Format::Float3, resolution, resolution, 0,
+  filter.setImage("output", image, oidn::Format::Float3, resolution, resolution, 0,
       sizeof(float) * channelCount, sizeof(float) * channelCount * resolution);
   filter.commit();
 

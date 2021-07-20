@@ -33,7 +33,7 @@ class Billboard : public DisplayNode {
   bool Do() override;
 
  private:
-  void createBuffers(std::vector<float> depthValues);
+  void createBuffers();
 
   VistaVertexArrayObject mVAO;
   VistaBufferObject      mVBO;

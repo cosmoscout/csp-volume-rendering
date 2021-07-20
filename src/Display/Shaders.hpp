@@ -14,11 +14,15 @@ namespace csp::volumerendering {
 const std::string BILLBOARD_VERT = R"(
 #version 330
 
+uniform sampler2D uDepthTexture;
 uniform vec3 uRadii;
 uniform mat4 uMatModelView;
 uniform mat4 uMatProjection;
 uniform mat4 uMatTransform;
+uniform mat4 uMatRendererProjection;
+uniform mat4 uMatRendererProjectionInv;
 uniform mat4 uMatRendererMVP;
+uniform mat4 uMatRendererMVPInv;
 uniform bool uUseDepth;
 
 // inputs
@@ -29,30 +33,49 @@ out vec2 vTexCoords;
 out vec3 vPosition;
 out float vDepth;
 
+float normalizeDepth(float cameraDistance, vec4 pos) {
+    if (isinf(cameraDistance)) {
+      return -uMatRendererMVP[3][2] / uMatRendererMVP[2][2];
+    }
+    pos = uMatRendererProjectionInv * pos;
+    pos /= pos.w;
+    pos = vec4(normalize(pos.xyz) * cameraDistance, 1);
+    pos = uMatRendererProjection * pos;
+    pos /= pos.w;
+    return pos.z;
+}
+
 void main()
 {
-   vDepth = (iPos.z + 1) / 2;
+    vec3 pos = iPos;
+    if (uUseDepth) {
+      pos.z = normalizeDepth(texture(uDepthTexture, (pos.xy + vec2(1)) / 2.f).r, vec4(pos, 1));
+    } else {
+      pos.z = 0;
+    }
+    vDepth = (pos.z + 1) / 2;
 
-   vTexCoords  = vec2((iPos.x + 1) / 2, (iPos.y + 1) / 2);
+    vTexCoords  = vec2((pos.x + 1) / 2, (pos.y + 1) / 2);
 
-   vec4 objSpacePos = vec4(iPos, 1);
-   if (!uUseDepth) {
-     objSpacePos.z = -uMatRendererMVP[3][2] / uMatRendererMVP[2][2];
-   }
+    vec4 objSpacePos = vec4(pos, 1);
+    /*if (!uUseDepth) {
+      objSpacePos.z = -uMatRendererMVP[3][2] / uMatRendererMVP[2][2];
+    }*/
 
-   objSpacePos = inverse(uMatRendererMVP) * objSpacePos;
-   vPosition   = objSpacePos.xyz / objSpacePos.w;
-   vPosition   = uRadii * vPosition;
-   vPosition   = (uMatTransform * vec4(vPosition, 1.0)).xyz;
-   vPosition   = (uMatModelView * vec4(vPosition, 1.0)).xyz;
-   gl_Position = uMatProjection * vec4(vPosition, 1);
+    objSpacePos = uMatRendererMVPInv * objSpacePos;
 
-   if (gl_Position.w > 0) {
-     gl_Position /= gl_Position.w;
-     if (gl_Position.z >= 1) {
-       gl_Position.z = 0.999999;
-     }
-   }
+    vPosition   = objSpacePos.xyz / objSpacePos.w;
+    vPosition   = uRadii * vPosition;
+    vPosition   = (uMatTransform * vec4(vPosition, 1.0)).xyz;
+    vPosition   = (uMatModelView * vec4(vPosition, 1.0)).xyz;
+    gl_Position = uMatProjection * vec4(vPosition, 1);
+
+    if (gl_Position.w > 0) {
+      gl_Position /= gl_Position.w;
+      if (gl_Position.z >= 1) {
+        gl_Position.z = 0.999999;
+      }
+    }
 }
 )";
 
@@ -62,6 +85,7 @@ const std::string BILLBOARD_FRAG = R"(
 #version 330
 
 uniform sampler2D uTexture;
+uniform sampler2D uDepthTexture;
 uniform float uFarClip;
 uniform bool uDrawDepth;
 
@@ -93,11 +117,15 @@ void main()
 const std::string POINTS_FORWARD_VERT = R"(
 #version 330
 
+uniform sampler2D uDepthTexture;
 uniform vec3 uRadii;
 uniform mat4 uMatModelView;
 uniform mat4 uMatProjection;
 uniform mat4 uMatTransform;
+uniform mat4 uMatRendererProjection;
+uniform mat4 uMatRendererProjectionInv;
 uniform mat4 uMatRendererMVP;
+uniform mat4 uMatRendererMVPInv;
 uniform bool uUseDepth;
 uniform int uBasePointSize;
 uniform float uBaseDepth;
@@ -110,18 +138,32 @@ out vec2 vTexCoords;
 out vec3 vPosition;
 out float vDepth;
 
+float normalizeDepth(float cameraDistance, vec4 pos) {
+    if (isinf(cameraDistance)) {
+      return -uMatRendererMVP[3][2] / uMatRendererMVP[2][2];
+    }
+    pos = uMatRendererProjectionInv * pos;
+    pos /= pos.w;
+    pos = vec4(normalize(pos.xyz) * cameraDistance, 1);
+    pos = uMatRendererProjection * pos;
+    pos /= pos.w;
+    return pos.z;
+}
+
 void main()
 {
-    vDepth = (iPos.z + 1) / 2;
+    vec3 pos = iPos;
+    pos.z = normalizeDepth(texture(uDepthTexture, (pos.xy + vec2(1)) / 2.f).r, vec4(pos, 1));
+    vDepth = (pos.z + 1) / 2;
 
-    vTexCoords  = vec2((iPos.x + 1) / 2, (iPos.y + 1) / 2);
+    vTexCoords  = vec2((pos.x + 1) / 2, (pos.y + 1) / 2);
 
-    vec4 objSpacePos = vec4(iPos, 1);
-    if (!uUseDepth) {
+    vec4 objSpacePos = vec4(pos, 1);
+    /*if (!uUseDepth) {
       objSpacePos.z = -uMatRendererMVP[3][2] / uMatRendererMVP[2][2];
-    }
+    }*/
 
-    objSpacePos = inverse(uMatRendererMVP) * objSpacePos;
+    objSpacePos = uMatRendererMVPInv * objSpacePos;
     vPosition   = objSpacePos.xyz / objSpacePos.w;
     vPosition   = uRadii * vPosition;
     vPosition   = (uMatTransform * vec4(vPosition, 1.0)).xyz;
@@ -157,16 +199,16 @@ layout(location = 0) out vec4 oColor;
 
 void main()
 {
-  oColor = texture(uTexture, vTexCoords);
-  if(oColor.a <= 0)
-  {
-    discard;
-  }
-  if (uDrawDepth) {
-    oColor = vec4(vDepth, vDepth, vDepth, 1);
-  }
+    oColor = texture(uTexture, vTexCoords);
+    if(oColor.a <= 0)
+    {
+      discard;
+    }
+    if (uDrawDepth) {
+      oColor = vec4(vDepth, vDepth, vDepth, 1);
+    }
 
-  gl_FragDepth = length(vPosition) / uFarClip;
+    gl_FragDepth = length(vPosition) / uFarClip;
 }
 )";
 

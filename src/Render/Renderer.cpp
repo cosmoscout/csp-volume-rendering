@@ -181,10 +181,57 @@ void Renderer::setPathlineActiveScalar(std::string const& value) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::future<Renderer::RenderedImage> Renderer::getFrame(glm::mat4 const& cameraTransform) {
+std::future<std::unique_ptr<Renderer::RenderedImage>> Renderer::getFrame(
+    glm::mat4 const& cameraTransform) {
   std::scoped_lock lock(mParameterMutex);
   return std::async(std::launch::async, &Renderer::getFrameImpl, this, cameraTransform, mParameters,
       mDataManager->getState());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+bool Renderer::RenderedImage::operator==(const RenderedImage& other) {
+  return mResolution == other.mResolution &&
+         glm::all(glm::epsilonEqual(mCameraTransform[0], other.mCameraTransform[0], 0.0001f)) &&
+         glm::all(glm::epsilonEqual(mCameraTransform[1], other.mCameraTransform[1], 0.0001f)) &&
+         glm::all(glm::epsilonEqual(mCameraTransform[2], other.mCameraTransform[2], 0.0001f)) &&
+         glm::all(glm::epsilonEqual(mCameraTransform[3], other.mCameraTransform[3], 0.0001f));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+bool Renderer::RenderedImage::isValid() const {
+  return mValid;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Renderer::RenderedImage::setValid(bool value) {
+  mValid = value;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int Renderer::RenderedImage::getResolution() const {
+  return mResolution;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+glm::mat4 const& Renderer::RenderedImage::getCameraTransform() const {
+  return mCameraTransform;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+glm::mat4 const& Renderer::RenderedImage::getModelView() const {
+  return mModelView;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+glm::mat4 const& Renderer::RenderedImage::getProjection() const {
+  return mProjection;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

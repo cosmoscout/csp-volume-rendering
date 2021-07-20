@@ -85,13 +85,8 @@ class Plugin : public cs::core::PluginBase {
 
  private:
   struct Frame {
-    glm::mat4            mCameraTransform;
-    glm::mat4            mModelViewProjection;
-    int                  mResolution;
-    std::vector<uint8_t> mColorImage;
-    std::vector<float>   mDepthImage;
-
-    bool operator==(const Frame& other);
+    glm::mat4 mCameraTransform;
+    int       mResolution;
   };
 
   enum class RenderState { eWaitForData, eIdle, ePaused, eRenderingImage };
@@ -109,8 +104,8 @@ class Plugin : public cs::core::PluginBase {
   void showRenderProgress();
 
   void receiveFrame();
-  void displayFrame(Frame& frame);
-  void displayFrame(Frame& frame, DisplayMode displayMode);
+  void displayFrame(std::unique_ptr<Renderer::RenderedImage> frame);
+  void displayFrame(std::unique_ptr<Renderer::RenderedImage> frame, DisplayMode displayMode);
   void tryReuseFrame(glm::mat4 cameraTransform);
 
   std::vector<ScalarFilter> parseScalarFilters(
@@ -136,17 +131,16 @@ class Plugin : public cs::core::PluginBase {
   std::map<DisplayMode, std::shared_ptr<DisplayNode>> mDisplayNodes;
   std::shared_ptr<DisplayNode>                        mActiveDisplay;
 
-  std::future<Renderer::RenderedImage> mFutureFrameData;
-
   RenderState mRenderState = RenderState::eWaitForData;
 
   bool mFrameInvalid;
   bool mParametersDirty;
 
-  Frame                mNextFrame;
-  Frame                mRenderingFrame;
-  std::optional<Frame> mDisplayedFrame;
-  std::vector<Frame>   mRenderedFrames;
+  Frame                                                 mNextFrame;
+  Frame                                                 mRenderingFrame;
+  std::future<std::unique_ptr<Renderer::RenderedImage>> mFutureFrameData;
+  //std::optional<Renderer::RenderedImage>                mDisplayedImage;
+  std::vector<Renderer::RenderedImage>                  mRenderedImages;
 };
 
 } // namespace csp::volumerendering

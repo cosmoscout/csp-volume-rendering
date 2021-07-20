@@ -29,16 +29,38 @@ class RendererException : public std::exception {
 class Renderer {
  public:
   /// A RenderedImage object contains all relevant information on a rendered image.
-  struct RenderedImage {
-    /// Contains the color values of the image as RGBA values.
-    std::vector<uint8_t> mColorData;
-    /// Contains the depth values of the image as float values in the range [-1,1].
-    std::vector<float> mDepthData;
-    /// Contains the model-view-projection matrix used by the renderer.
-    glm::mat4 mMVP;
+  class RenderedImage {
+   public:
+    virtual ~RenderedImage(){};
+
     /// Specifies, whether the other fields of this object contain valid information (true),
     /// or if there was an error resulting in invalid data (false).
-    bool mValid;
+    bool isValid() const;
+    void setValid(bool value);
+    /// Returns the resolution of the image.
+    int getResolution() const;
+    /// Returns the camera transform used by the renderer.
+    glm::mat4 const& getCameraTransform() const;
+    /// Returns the view matrix used by the renderer.
+    glm::mat4 const& getModelView() const;
+    /// Returns the projection matrix used by the renderer.
+    glm::mat4 const& getProjection() const;
+
+    /// Returns the color values of the image as RGBA values.
+    virtual float* getColorData() const = 0;
+    /// Returns the depth values of the image as float values in the range [-1,1].
+    virtual float* getDepthData() const = 0;
+
+    /// Assumes, that images from roughly the same camera perspective with the same resolution are
+    /// identical.
+    bool operator==(const RenderedImage& other);
+
+   protected:
+    bool      mValid = false;
+    int       mResolution;
+    glm::mat4 mCameraTransform;
+    glm::mat4 mModelView;
+    glm::mat4 mProjection;
   };
 
   /// Creates a Renderer for volumes of the given structure and shape.
@@ -96,7 +118,7 @@ class Renderer {
   /// The rendering process will use all parameters set before calling this method
   /// and will not be influenced by any later changes to the parameters.
   /// Returns a future that will eventually contain the rendered image.
-  std::future<Renderer::RenderedImage> getFrame(glm::mat4 const& cameraTransform);
+  std::future<std::unique_ptr<Renderer::RenderedImage>> getFrame(glm::mat4 const& cameraTransform);
   /// Returns the current progress of the rendering processon the range [0,1].
   /// Returns 1 if no image is currently being rendered.
   virtual float getProgress() = 0;
@@ -189,8 +211,8 @@ class Renderer {
   const VolumeStructure mStructure;
   const VolumeShape     mShape;
 
-  virtual RenderedImage getFrameImpl(
-      glm::mat4 const& cameraTransform, Parameters parameters, DataManager::State const& dataState) = 0;
+  virtual std::unique_ptr<RenderedImage> getFrameImpl(glm::mat4 const& cameraTransform,
+      Parameters parameters, DataManager::State const& dataState) = 0;
 
  private:
   std::mutex mParameterMutex;
