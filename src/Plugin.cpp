@@ -223,11 +223,8 @@ void Plugin::init() {
 
   onLoad();
   registerUICallbacks();
-  logger().info("TEST 1");
   initUI();
-  logger().info("TEST 2");
   connectSettings();
-  logger().info("TEST 3");
 
   // Init buffers for predictive rendering
   mFrameIntervals.resize(mFrameIntervalsLength);
