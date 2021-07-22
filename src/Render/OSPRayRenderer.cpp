@@ -561,7 +561,7 @@ Renderer::RenderedImage OSPRayRenderer::extractImageData(ospray::cpp::FrameBuffe
   renderedImage.mDepthData = depthData;
   renderedImage.mMVP       = camera.mTransformationMatrix;
   renderedImage.mValid     = true;
-  return std::move(renderedImage);
+  return renderedImage;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
