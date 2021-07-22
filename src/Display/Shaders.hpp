@@ -48,12 +48,12 @@ float normalizeDepth(float cameraDistance, vec4 pos) {
 void main()
 {
     vec3 pos = iPos;
+    vDepth = (normalizeDepth(texture(uDepthTexture, (pos.xy + vec2(1)) / 2.f).r, vec4(pos, 1)) + 1) / 2;
     if (uUseDepth) {
-      pos.z = normalizeDepth(texture(uDepthTexture, (pos.xy + vec2(1)) / 2.f).r, vec4(pos, 1));
+      pos.z = vDepth * 2 - 1;
     } else {
       pos.z = 0;
     }
-    vDepth = (pos.z + 1) / 2;
 
     vTexCoords  = vec2((pos.x + 1) / 2, (pos.y + 1) / 2);
 
@@ -153,8 +153,12 @@ float normalizeDepth(float cameraDistance, vec4 pos) {
 void main()
 {
     vec3 pos = iPos;
-    pos.z = normalizeDepth(texture(uDepthTexture, (pos.xy + vec2(1)) / 2.f).r, vec4(pos, 1));
-    vDepth = (pos.z + 1) / 2;
+    vDepth = (normalizeDepth(texture(uDepthTexture, (pos.xy + vec2(1)) / 2.f).r, vec4(pos, 1)) + 1) / 2;
+    if (uUseDepth) {
+      pos.z = vDepth * 2 - 1;
+    } else {
+      pos.z = 0;
+    }
 
     vTexCoords  = vec2((pos.x + 1) / 2, (pos.y + 1) / 2);
 
