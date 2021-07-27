@@ -562,13 +562,9 @@ OSPRayRenderer::Cache::Cache()
 
 OSPRayRenderer::RenderedImage::RenderedImage(ospray::cpp::FrameBuffer frame, Camera const& camera,
     float volumeHeight, Parameters const& parameters, glm::mat4 const& cameraTransform)
-    : mFrame(std::move(frame)) {
-  mValid           = true;
-  mResolution      = parameters.mResolution;
-  mCameraTransform = cameraTransform;
-  mModelView       = camera.mModelView;
-  mProjection      = camera.mProjection;
-
+    : Renderer::RenderedImage(
+          true, parameters.mResolution, cameraTransform, camera.mModelView, camera.mProjection)
+    , mFrame(std::move(frame)) {
   mColorData = (float*)mFrame.map(OSP_FB_COLOR);
   mDepthData = (float*)mFrame.map(OSP_FB_DEPTH);
 
@@ -615,13 +611,13 @@ OSPRayRenderer::RenderedImage::RenderedImage(RenderedImage&& other)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-float* OSPRayRenderer::RenderedImage::getColorData() const {
+float* OSPRayRenderer::RenderedImage::getColorData() {
   return mColorData;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-float* OSPRayRenderer::RenderedImage::getDepthData() const {
+float* OSPRayRenderer::RenderedImage::getDepthData() {
   return mDepthData;
 }
 

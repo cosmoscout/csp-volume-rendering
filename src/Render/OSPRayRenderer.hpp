@@ -73,14 +73,12 @@ class OSPRayRenderer : public Renderer {
     RenderedImage(RenderedImage&& other);
     RenderedImage& operator=(RenderedImage&& other) = delete;
 
-    float* getColorData() const override;
-    float* getDepthData() const override;
+    float* getColorData() override;
+    float* getDepthData() override;
 
    private:
     float* mColorData;
     float* mDepthData;
-
-    std::optional<std::vector<float>> mDefaultDepth;
 
     ospray::cpp::FrameBuffer mFrame;
   };

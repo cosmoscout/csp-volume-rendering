@@ -47,20 +47,50 @@ class Renderer {
     glm::mat4 const& getProjection() const;
 
     /// Returns the color values of the image as RGBA values.
-    virtual float* getColorData() const = 0;
+    virtual float* getColorData() = 0;
     /// Returns the depth values of the image as float values in the range [-1,1].
-    virtual float* getDepthData() const = 0;
+    virtual float* getDepthData() = 0;
 
     /// Assumes, that images from roughly the same camera perspective with the same resolution are
     /// identical.
     bool operator==(const RenderedImage& other);
 
    protected:
+    RenderedImage(bool valid, int resolution, glm::mat4 cameraTransform, glm::mat4 modelView,
+        glm::mat4 projection);
+    RenderedImage(RenderedImage const& other) = default;
+    RenderedImage& operator=(RenderedImage const& other) = default;
+
+    RenderedImage(RenderedImage&& other) = default;
+    RenderedImage& operator=(RenderedImage&& other) = default;
+
     bool      mValid = false;
     int       mResolution;
     glm::mat4 mCameraTransform;
     glm::mat4 mModelView;
     glm::mat4 mProjection;
+  };
+
+  class CopiedImage : public RenderedImage {
+   public:
+    CopiedImage() = delete;
+    ~CopiedImage() override{};
+
+    CopiedImage(RenderedImage& other);
+    CopiedImage& operator=(RenderedImage& other);
+
+    CopiedImage(CopiedImage const& other) = default;
+    CopiedImage& operator=(CopiedImage const& other) = default;
+
+    CopiedImage(CopiedImage&& other) = delete;
+    CopiedImage& operator=(CopiedImage&& other) = delete;
+
+    float* getColorData() override;
+    float* getDepthData() override;
+
+   private:
+    std::vector<float> mColorData;
+    std::vector<float> mDepthData;
   };
 
   /// Creates a Renderer for volumes of the given structure and shape.

@@ -139,8 +139,8 @@ class Plugin : public cs::core::PluginBase {
   Frame                                                 mNextFrame;
   Frame                                                 mRenderingFrame;
   std::future<std::unique_ptr<Renderer::RenderedImage>> mFutureFrameData;
-  //std::optional<Renderer::RenderedImage>                mDisplayedImage;
-  std::vector<Renderer::RenderedImage>                  mRenderedImages;
+  std::unique_ptr<Renderer::RenderedImage>              mDisplayedImage;
+  std::vector<std::unique_ptr<Renderer::RenderedImage>> mRenderedImages;
 };
 
 } // namespace csp::volumerendering

@@ -715,10 +715,11 @@ void Plugin::connectSettings() {
     } else if (displayMode == DisplayMode::ePoints) {
       mGuiManager->setRadioChecked("volumeRendering.setDisplayMode1");
     }
-    // TODO fix
-    /*if (mDisplayedImage.has_value()) {
-      displayFrame(mDisplayedImage, displayMode);
-    }*/
+    if (mDisplayedImage) {
+      displayFrame(std::move(mDisplayedImage), displayMode);
+    } else {
+      mParametersDirty = true;
+    }
   });
 
   // Pathline settings
@@ -892,9 +893,6 @@ void Plugin::receiveFrame() {
     return;
   }
 
-  // TODO copy rendered image if image caching is enabled
-  // mRenderedImages.push_back();
-
   displayFrame(std::move(renderedImage));
 }
 
@@ -911,19 +909,27 @@ float diffTranslations(glm::mat4 transformA, glm::mat4 transformB) {
 void Plugin::tryReuseFrame(glm::mat4 cameraTransform) {
   cs::utils::FrameTimings::ScopedTimer timer("Try reuse frame");
 
-  // TODO fix
-  /*Renderer::RenderedImage bestFrame = mRenderedImages.back();
-  float minDiff   = diffTranslations(cameraTransform, bestFrame.mCameraTransform);
-  for (const Frame& f : mRenderedFrames) {
-    float diff = diffTranslations(cameraTransform, f.mCameraTransform);
+  auto  bestFrame = mRenderedImages.rbegin();
+  float minDiff;
+  float currentDiff = INFINITY;
+  if (mDisplayedImage) {
+    minDiff     = diffTranslations(cameraTransform, mDisplayedImage->getCameraTransform());
+    currentDiff = minDiff;
+  } else {
+    minDiff = diffTranslations(cameraTransform, (*bestFrame)->getCameraTransform());
+  }
+  for (auto img = bestFrame; img != mRenderedImages.rend(); img++) {
+    float diff = diffTranslations(cameraTransform, (*img)->getCameraTransform());
     if (diff < minDiff) {
       minDiff   = diff;
-      bestFrame = f;
+      bestFrame = img;
     }
   }
-  if (mDisplayedFrame.has_value() && !(bestFrame == *mDisplayedFrame) && minDiff > 0) {
-    displayFrame(bestFrame);
-  }*/
+  if (minDiff < currentDiff - 0.01f) {
+    std::unique_ptr<Renderer::RenderedImage> image = std::move(*bestFrame);
+    mRenderedImages.erase(bestFrame.base() - 1);
+    displayFrame(std::move(image));
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -964,8 +970,14 @@ void Plugin::displayFrame(std::unique_ptr<Renderer::RenderedImage> frame, Displa
   displayNode->setTransform(glm::toMat4(glm::toQuat(frame->getCameraTransform())));
   displayNode->setRendererMatrices(frame->getModelView(), frame->getProjection());
 
-  // TODO fix
-  // mDisplayedImage = frame;
+  if (mDisplayedImage) {
+    mRenderedImages.push_back(std::move(mDisplayedImage));
+  }
+  if (mPluginSettings.mReuseImages.get()) {
+    mDisplayedImage = std::make_unique<Renderer::CopiedImage>(*frame);
+  } else {
+    mDisplayedImage.reset();
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -200,6 +200,17 @@ bool Renderer::RenderedImage::operator==(const RenderedImage& other) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+Renderer::RenderedImage::RenderedImage(bool valid, int resolution, glm::mat4 cameraTransform,
+    glm::mat4 modelView, glm::mat4 projection)
+    : mValid(valid)
+    , mResolution(resolution)
+    , mCameraTransform(cameraTransform)
+    , mModelView(modelView)
+    , mProjection(projection) {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 bool Renderer::RenderedImage::isValid() const {
   return mValid;
 }
@@ -232,6 +243,39 @@ glm::mat4 const& Renderer::RenderedImage::getModelView() const {
 
 glm::mat4 const& Renderer::RenderedImage::getProjection() const {
   return mProjection;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+Renderer::CopiedImage::CopiedImage(RenderedImage& other)
+    : RenderedImage(other)
+    , mColorData(other.getColorData(),
+          other.getColorData() + other.getResolution() * other.getResolution() * 4)
+    , mDepthData(other.getDepthData(),
+          other.getDepthData() + other.getResolution() * other.getResolution()) {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+Renderer::CopiedImage& Renderer::CopiedImage::operator=(RenderedImage& other) {
+  RenderedImage::operator=(other);
+  mColorData             = std::vector<float>(other.getColorData(),
+      other.getColorData() + other.getResolution() * other.getResolution() * 4);
+  mDepthData             = std::vector<float>(
+      other.getDepthData(), other.getDepthData() + other.getResolution() * other.getResolution());
+  return *this;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+float* Renderer::CopiedImage::getColorData() {
+  return mColorData.data();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+float* Renderer::CopiedImage::getDepthData() {
+  return mDepthData.data();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
