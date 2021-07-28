@@ -8,8 +8,8 @@
 
 #include "logger.hpp"
 
-#include "../../../../src/cs-utils/filesystem.hpp"
-#include "../../../../src/cs-utils/utils.hpp"
+#include "../../../src/cs-utils/filesystem.hpp"
+#include "../../../src/cs-utils/utils.hpp"
 
 #include <vtkCellArrayIterator.h>
 #include <vtkCellData.h>
