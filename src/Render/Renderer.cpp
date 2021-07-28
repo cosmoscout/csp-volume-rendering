@@ -190,7 +190,7 @@ std::future<std::unique_ptr<Renderer::RenderedImage>> Renderer::getFrame(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool Renderer::RenderedImage::operator==(const RenderedImage& other) {
+bool Renderer::RenderedImage::operator==(const RenderedImage& other) const {
   return mResolution == other.mResolution &&
          glm::all(glm::epsilonEqual(mCameraTransform[0], other.mCameraTransform[0], 0.0001f)) &&
          glm::all(glm::epsilonEqual(mCameraTransform[1], other.mCameraTransform[1], 0.0001f)) &&

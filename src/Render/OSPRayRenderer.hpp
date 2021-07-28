@@ -135,9 +135,9 @@ class OSPRayRenderer : public Renderer {
       Volume const& volume, Parameters const& parameters);
   void updateWorld(
       Volume const& volume, Parameters const& parameters, DataManager::State const& dataState);
-  OSPRayRenderer::Camera   getCamera(float volumeHeight, glm::mat4 observerTransform);
-  ospray::cpp::FrameBuffer renderFrame(ospray::cpp::World const& world,
-      ospray::cpp::Camera const& camera, Parameters const& parameters, bool resetAccumulation);
+  OSPRayRenderer::Camera getCamera(float volumeHeight, glm::mat4 observerTransform);
+  void renderFrame(ospray::cpp::World const& world, ospray::cpp::Camera const& camera,
+      Parameters const& parameters, bool resetAccumulation);
 };
 
 } // namespace csp::volumerendering

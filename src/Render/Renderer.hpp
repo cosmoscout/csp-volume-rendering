@@ -13,6 +13,7 @@
 #include "../../../../src/cs-utils/DefaultProperty.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/hash.hpp>
 
 #include <future>
 #include <string>
@@ -53,7 +54,7 @@ class Renderer {
 
     /// Assumes, that images from roughly the same camera perspective with the same resolution are
     /// identical.
-    bool operator==(const RenderedImage& other);
+    bool operator==(const RenderedImage& other) const;
 
    protected:
     RenderedImage(bool valid, int resolution, glm::mat4 cameraTransform, glm::mat4 modelView,
@@ -250,5 +251,19 @@ class Renderer {
 };
 
 } // namespace csp::volumerendering
+
+namespace std {
+
+template <>
+struct hash<csp::volumerendering::Renderer::RenderedImage> {
+  std::size_t operator()(csp::volumerendering::Renderer::RenderedImage const& image) {
+    size_t hash = 0u;
+    hash ^= std::hash<int>{}(image.getResolution());
+    hash ^= std::hash<glm::mat4>{}(image.getCameraTransform());
+    return hash;
+  }
+};
+
+} // namespace std
 
 #endif // CSP_VOLUME_RENDERING_RENDERER_HPP

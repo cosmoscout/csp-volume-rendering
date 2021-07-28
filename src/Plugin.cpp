@@ -909,7 +909,7 @@ float diffTranslations(glm::mat4 transformA, glm::mat4 transformB) {
 void Plugin::tryReuseFrame(glm::mat4 cameraTransform) {
   cs::utils::FrameTimings::ScopedTimer timer("Try reuse frame");
 
-  auto  bestFrame = mRenderedImages.rbegin();
+  auto  bestFrame = mRenderedImages.begin();
   float minDiff;
   float currentDiff = INFINITY;
   if (mDisplayedImage) {
@@ -918,16 +918,16 @@ void Plugin::tryReuseFrame(glm::mat4 cameraTransform) {
   } else {
     minDiff = diffTranslations(cameraTransform, (*bestFrame)->getCameraTransform());
   }
-  for (auto img = bestFrame; img != mRenderedImages.rend(); img++) {
+  for (auto img = bestFrame; img != mRenderedImages.end(); img++) {
     float diff = diffTranslations(cameraTransform, (*img)->getCameraTransform());
     if (diff < minDiff) {
       minDiff   = diff;
       bestFrame = img;
     }
   }
-  if (minDiff < currentDiff - 0.01f) {
-    std::unique_ptr<Renderer::RenderedImage> image = std::move(*bestFrame);
-    mRenderedImages.erase(bestFrame.base() - 1);
+  if (minDiff < currentDiff) {
+    std::unique_ptr<Renderer::RenderedImage> image =
+        std::move(mRenderedImages.extract(bestFrame).value());
     displayFrame(std::move(image));
   }
 }
@@ -971,7 +971,7 @@ void Plugin::displayFrame(std::unique_ptr<Renderer::RenderedImage> frame, Displa
   displayNode->setRendererMatrices(frame->getModelView(), frame->getProjection());
 
   if (mDisplayedImage) {
-    mRenderedImages.push_back(std::move(mDisplayedImage));
+    mRenderedImages.insert(std::move(mDisplayedImage));
   }
   if (mPluginSettings.mReuseImages.get()) {
     mDisplayedImage = std::make_unique<Renderer::CopiedImage>(*frame);

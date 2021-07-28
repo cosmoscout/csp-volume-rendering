@@ -23,6 +23,7 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <unordered_set>
 
 namespace csp::volumerendering {
 
@@ -136,11 +137,25 @@ class Plugin : public cs::core::PluginBase {
   bool mFrameInvalid;
   bool mParametersDirty;
 
+  struct ImagePtrHasher {
+    size_t operator()(std::unique_ptr<Renderer::RenderedImage> const& imagePtr) const {
+      return std::hash<Renderer::RenderedImage>{}(*imagePtr);
+    }
+  };
+
+  struct ImagePtrEqual {
+    bool operator()(std::unique_ptr<Renderer::RenderedImage> const& left,
+        std::unique_ptr<Renderer::RenderedImage> const&             right) const {
+      return *left == *right;
+    }
+  };
+
   Frame                                                 mNextFrame;
   Frame                                                 mRenderingFrame;
   std::future<std::unique_ptr<Renderer::RenderedImage>> mFutureFrameData;
   std::unique_ptr<Renderer::RenderedImage>              mDisplayedImage;
-  std::vector<std::unique_ptr<Renderer::RenderedImage>> mRenderedImages;
+  std::unordered_set<std::unique_ptr<Renderer::RenderedImage>, ImagePtrHasher, ImagePtrEqual>
+      mRenderedImages;
 };
 
 } // namespace csp::volumerendering

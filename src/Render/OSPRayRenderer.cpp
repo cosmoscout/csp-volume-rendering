@@ -104,10 +104,9 @@ std::unique_ptr<Renderer::RenderedImage> OSPRayRenderer::getFrameImpl(
             dataState == mCache.mState.mDataState && volume.mLod == mCache.mState.mVolumeLod)) {
       mCache.mCamera = getCamera(volume.mHeight, cameraTransform);
     }
-    ospray::cpp::FrameBuffer frame = renderFrame(
-        mCache.mWorld, mCache.mCamera.mOsprayCamera, parameters, !(mCache.mState == state));
+    renderFrame(mCache.mWorld, mCache.mCamera.mOsprayCamera, parameters, !(mCache.mState == state));
     RenderedImage renderedImage(
-        std::move(frame), mCache.mCamera, volume.mHeight, parameters, cameraTransform);
+        mCache.mFrameBuffer, mCache.mCamera, volume.mHeight, parameters, cameraTransform);
     renderedImage.setValid(!mRenderingCancelled);
     mCache.mState = state;
     return std::make_unique<RenderedImage>(std::move(renderedImage));
@@ -471,8 +470,8 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ospray::cpp::FrameBuffer OSPRayRenderer::renderFrame(ospray::cpp::World const& world,
-    ospray::cpp::Camera const& camera, Parameters const& parameters, bool resetAccumulation) {
+void OSPRayRenderer::renderFrame(ospray::cpp::World const& world, ospray::cpp::Camera const& camera,
+    Parameters const& parameters, bool resetAccumulation) {
   ospray::cpp::Renderer renderer("volume_depth");
   renderer.setParam("aoSamples", 0);
   renderer.setParam("shadows", false);
@@ -503,7 +502,6 @@ ospray::cpp::FrameBuffer OSPRayRenderer::renderFrame(ospray::cpp::World const& w
     std::scoped_lock lock(mRenderFutureMutex);
     mRenderFuture.reset();
   }
-  return mCache.mFrameBuffer;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
