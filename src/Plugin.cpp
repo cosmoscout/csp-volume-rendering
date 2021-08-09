@@ -443,9 +443,8 @@ void Plugin::registerUICallbacks() {
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setTimestep",
       "Sets the timestep of the rendered volume images.", std::function([this](double value) {
-        mRenderedImages.clear();
+        invalidateCache();
         mDataManager->setTimestep((int)std::lround(value));
-        mParametersDirty = true;
       }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.preloadTimestep",
@@ -464,10 +463,9 @@ void Plugin::registerUICallbacks() {
   mGuiManager->getGui()->registerCallback("volumeRendering.setTransferFunction",
       "Sets the transfer function for rendering the volume.",
       std::function([this](std::string json) {
-        mRenderedImages.clear();
+        invalidateCache();
         cs::graphics::ColorMap colorMap(json);
         mRenderer->setTransferFunction(colorMap.getRawData());
-        mParametersDirty = true;
       }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setVolumeScalarFilters",
@@ -475,21 +473,19 @@ void Plugin::registerUICallbacks() {
       std::function([this](std::string jsonString) {
         std::vector<Scalar>       scalars = mDataManager->pScalars.get();
         std::vector<ScalarFilter> filters = parseScalarFilters(jsonString, scalars);
-        mRenderedImages.clear();
+        invalidateCache();
         mRenderer->setScalarFilters(filters);
-        mParametersDirty = true;
       }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setTimestepAnimating",
       "Specifies, whether timesteps are currently animated (increasing automatically).",
       std::function([this](bool value) {
-        mRenderedImages.clear();
+        invalidateCache();
         if (value) {
           mRenderer->setMaxLod(mDataManager->getMinLod(mDataManager->getState()));
         } else {
           mRenderer->clearMaxLod();
         }
-        mParametersDirty = true;
       }));
 
   // Pathline settings
@@ -526,9 +522,8 @@ void Plugin::registerUICallbacks() {
       std::function([this](std::string jsonString) {
         std::vector<ScalarFilter> filters =
             parseScalarFilters(jsonString, mDataManager->getPathlines().getScalars());
-        mRenderedImages.clear();
+        invalidateCache();
         mRenderer->setPathlineScalarFilters(filters);
-        mParametersDirty = true;
       }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setEnablePathlinesParcoords",
@@ -585,10 +580,9 @@ void Plugin::connectSettings() {
   // Connect to plugin settings
   // Data settings
   mPluginSettings.mActiveScalar.connectAndTouch([this](std::string value) {
-    mRenderedImages.clear();
+    invalidateCache();
     if (mDataManager->isReady()) {
       mDataManager->setActiveScalar(value);
-      mParametersDirty = true;
       mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setXRange",
           mDataManager->getScalarRange(mDataManager->getState().mScalar.getId())[0],
           mDataManager->getScalarRange(mDataManager->getState().mScalar.getId())[1], true);
@@ -602,46 +596,39 @@ void Plugin::connectSettings() {
     mGuiManager->setCheckboxValue("volumeRendering.setEnableRequestImages", enable);
   });
   mPluginSettings.mResolution.connectAndTouch([this](int value) {
-    mRenderedImages.clear();
+    invalidateCache();
     mNextFrame.mResolution = value;
     mRenderer->setResolution(value);
-    mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setResolution", value);
   });
   mPluginSettings.mSamplingRate.connectAndTouch([this](float value) {
-    mRenderedImages.clear();
+    invalidateCache();
     mRenderer->setSamplingRate(value);
-    mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setSamplingRate", value);
   });
   mPluginSettings.mRendering.mMaxPasses.connectAndTouch([this](int value) {
-    mRenderedImages.clear();
+    invalidateCache();
     mRenderer->setMaxRenderPasses(value);
-    mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setMaxRenderPasses", value);
   });
   mPluginSettings.mDensityScale.connectAndTouch([this](float value) {
-    mRenderedImages.clear();
+    invalidateCache();
     mRenderer->setDensityScale(value);
-    mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setDensityScale", value);
   });
   mPluginSettings.mDenoiseColor.connectAndTouch([this](bool enable) {
-    mRenderedImages.clear();
+    invalidateCache();
     mRenderer->setDenoiseColor(enable);
-    mParametersDirty = true;
     mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseColor", enable);
   });
   mPluginSettings.mDenoiseDepth.connectAndTouch([this](bool enable) {
-    mRenderedImages.clear();
+    invalidateCache();
     mRenderer->setDenoiseDepth(enable);
-    mParametersDirty = true;
     mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseDepth", enable);
   });
   mPluginSettings.mDepthMode.connectAndTouch([this](DepthMode drawMode) {
-    mRenderedImages.clear();
+    invalidateCache();
     mRenderer->setDepthMode(drawMode);
-    mParametersDirty = true;
     if (drawMode == DepthMode::eNone) {
       mGuiManager->setRadioChecked("volumeRendering.setDepthMode0");
     } else if (drawMode == DepthMode::eIsosurface) {
@@ -663,21 +650,18 @@ void Plugin::connectSettings() {
 
   // Lighting settings
   mPluginSettings.mLighting.mEnabled.connectAndTouch([this](bool enable) {
-    mRenderedImages.clear();
+    invalidateCache();
     mRenderer->setShading(enable);
-    mParametersDirty = true;
     mGuiManager->setCheckboxValue("volumeRendering.setEnableLighting", enable);
   });
   mPluginSettings.mLighting.mSunStrength.connectAndTouch([this](float value) {
-    mRenderedImages.clear();
+    invalidateCache();
     mRenderer->setSunStrength(value);
-    mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setSunStrength", value);
   });
   mPluginSettings.mLighting.mAmbientStrength.connectAndTouch([this](float value) {
-    mRenderedImages.clear();
+    invalidateCache();
     mRenderer->setAmbientLight(value);
-    mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setAmbientStrength", value);
   });
 
@@ -718,39 +702,35 @@ void Plugin::connectSettings() {
     if (mDisplayedImage) {
       displayFrame(std::move(mDisplayedImage), displayMode);
     } else {
+      // TODO What to do here?
       mParametersDirty = true;
     }
   });
 
   // Pathline settings
   mPluginSettings.mPathlines.mEnabled.connectAndTouch([this](bool enable) {
-    mRenderedImages.clear();
+    invalidateCache();
     mRenderer->setPathlinesEnabled(enable);
-    mParametersDirty = true;
     mGuiManager->setCheckboxValue("volumeRendering.setEnablePathlines", enable);
   });
   mPluginSettings.mPathlines.mLineOpacity.connectAndTouch([this](float value) {
-    mRenderedImages.clear();
+    invalidateCache();
     mRenderer->setPathlineOpacity(value);
-    mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setPathlineOpacity", value);
   });
   mPluginSettings.mPathlines.mLineSize.connectAndTouch([this](float value) {
-    mRenderedImages.clear();
+    invalidateCache();
     mRenderer->setPathlineSize(value);
-    mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setPathlineSize", value);
   });
   mPluginSettings.mPathlines.mLength.connectAndTouch([this](float value) {
-    mRenderedImages.clear();
+    invalidateCache();
     mRenderer->setPathlineLength(value);
-    mParametersDirty = true;
     mGuiManager->setSliderValue("volumeRendering.setPathlineLength", value);
   });
   mPluginSettings.mPathlines.mActiveScalar.connectAndTouch([this](std::string value) {
-    mRenderedImages.clear();
+    invalidateCache();
     mRenderer->setPathlineActiveScalar(value);
-    mParametersDirty = true;
   });
 
   // Connect to data manager properties
@@ -930,6 +910,14 @@ void Plugin::tryReuseFrame(glm::mat4 cameraTransform) {
         std::move(mRenderedImages.extract(bestFrame).value());
     displayFrame(std::move(image));
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void csp::volumerendering::Plugin::invalidateCache() {
+  mRenderedImages.clear();
+  mDisplayedImage.reset();
+  mParametersDirty = true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

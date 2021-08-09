@@ -109,6 +109,8 @@ class Plugin : public cs::core::PluginBase {
   void displayFrame(std::unique_ptr<Renderer::RenderedImage> frame, DisplayMode displayMode);
   void tryReuseFrame(glm::mat4 cameraTransform);
 
+  void invalidateCache();
+
   std::vector<ScalarFilter> parseScalarFilters(
       std::string const& json, std::vector<Scalar> const& scalars);
 
