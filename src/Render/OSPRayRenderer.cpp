@@ -515,8 +515,6 @@ OSPRayRenderer::Cache::Cache()
     , mCoreModel(mCore)
     , mCoreTexture("volume")
     , mCoreMaterial("scivis", "obj")
-    , mClip("plane")
-    , mClipModel(mClip)
     , mInstance(mGroup)
     , mAmbientLight("ambient")
     , mSunLight("distant") {
@@ -543,11 +541,6 @@ OSPRayRenderer::Cache::Cache()
 
   mCoreModel.setParam("material", mCoreMaterial);
   mCoreModel.commit();
-
-  mClip.setParam("plane.coefficients", ospray::cpp::Data(rkcommon::math::vec4f(0, 0, -1, 0)));
-  mClip.commit();
-
-  mClipModel.commit();
 
   mGroup.setParam("volume", ospray::cpp::Data(mVolumeModel));
 

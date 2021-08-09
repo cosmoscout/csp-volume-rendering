@@ -99,8 +99,6 @@ class OSPRayRenderer : public Renderer {
     ospray::cpp::GeometricModel  mCoreModel;
     ospray::cpp::Texture         mCoreTexture;
     ospray::cpp::Material        mCoreMaterial;
-    ospray::cpp::Geometry        mClip;
-    ospray::cpp::GeometricModel  mClipModel;
     ospray::cpp::Group           mGroup;
     ospray::cpp::Instance        mInstance;
     ospray::cpp::Light           mAmbientLight;
