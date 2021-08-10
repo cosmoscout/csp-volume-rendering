@@ -28,9 +28,10 @@ const char* DataManagerException::what() const noexcept {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-DataManager::DataManager(
-    std::string const& path, std::string const& filenamePattern, std::string const& pathlinesPath)
-    : mPathlines(pathlinesPath) {
+DataManager::DataManager(std::string const& path, std::string const& filenamePattern,
+    std::unique_ptr<FileLoader> fileLoader, std::string const& pathlinesPath)
+    : mFileLoader(std::move(fileLoader))
+    , mPathlines(pathlinesPath) {
   std::regex patternRegex;
   try {
     patternRegex = std::regex(".*" + filenamePattern);
@@ -107,6 +108,14 @@ DataManager::DataManager(
     throw DataManagerException();
   }
   pTimesteps.set(timesteps);
+
+  Timestep timestep;
+  {
+    std::scoped_lock lock(mStateMutex);
+    timestep = pTimesteps.get()[0];
+  }
+  setTimestep(timestep);
+  mInitScalarsThread = std::thread(&DataManager::initScalars, this);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -276,13 +285,6 @@ Pathlines const& DataManager::getPathlines() const {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void DataManager::initState() {
-  Timestep timestep;
-  {
-    std::scoped_lock lock(mStateMutex);
-    timestep = pTimesteps.get()[0];
-  }
-  setTimestep(timestep);
-  mInitScalarsThread = std::thread(&DataManager::initScalars, this);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -381,7 +383,7 @@ void DataManager::loadData(Timestep timestep, Lod lod) {
         {
           std::scoped_lock lock(mReadMutex);
           timer = std::chrono::high_resolution_clock::now();
-          data  = loadDataImpl(timestep, lod);
+          data  = mFileLoader->loadDataImpl(mFiles[timestep][lod]);
         }
 
         std::map<Scalar, std::array<std::optional<double>, 2>> updatedScalars;

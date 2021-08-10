@@ -6,8 +6,8 @@
 
 #include "Plugin.hpp"
 
-#include "Data/NetCdfDataManager.hpp"
-#include "Data/VtkDataManager.hpp"
+#include "Data/NetCdfFileLoader.hpp"
+#include "Data/VtkFileLoader.hpp"
 #include "Display/Billboard.hpp"
 #include "Display/PointsForwardWarped.hpp"
 #include "Render/OSPRayRenderer.hpp"
@@ -295,12 +295,14 @@ void Plugin::onLoad() {
 
   switch (mPluginSettings.mVolumeDataType.get()) {
   case VolumeFileType::eVtk:
-    mDataManager = std::make_shared<VtkDataManager>(mPluginSettings.mVolumeDataPath.get(),
-        mPluginSettings.mVolumeDataPattern.get(), mPluginSettings.mPathlines.mPath.get());
+    mDataManager = std::make_shared<DataManager>(mPluginSettings.mVolumeDataPath.get(),
+        mPluginSettings.mVolumeDataPattern.get(), std::make_unique<VtkFileLoader>(),
+        mPluginSettings.mPathlines->mPath.get());
     break;
   case VolumeFileType::eNetCdf:
-    mDataManager = std::make_shared<NetCdfDataManager>(mPluginSettings.mVolumeDataPath.get(),
-        mPluginSettings.mVolumeDataPattern.get(), mPluginSettings.mPathlines.mPath.get());
+    mDataManager = std::make_shared<DataManager>(mPluginSettings.mVolumeDataPath.get(),
+        mPluginSettings.mVolumeDataPattern.get(), std::make_unique<NetCdfFileLoader>(),
+        mPluginSettings.mPathlines->mPath.get());
     break;
   default:
     logger().error("Invalid volume data type given in settings! Should be 'vtk'.");

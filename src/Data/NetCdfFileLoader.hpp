@@ -9,19 +9,14 @@
 
 #include "../logger.hpp"
 
-#include "DataManager.hpp"
+#include "FileLoader.hpp"
 
 namespace csp::volumerendering {
 
-/// DataManager with an implementation for reading NetCDF data files.
-class NetCdfDataManager : public DataManager {
+class NetCdfFileLoader : public FileLoader {
  public:
-  /// Create a DataManager that can read files in the NetCDF data format.
-  /// All files in 'path' matching 'filenamePattern' can be accessed using the DataManager.
-  NetCdfDataManager(std::string path, std::string filenamePattern, std::string pathlinesPath);
-
  protected:
-  vtkSmartPointer<vtkDataSet> loadDataImpl(Timestep timestep, Lod lod) override;
+  vtkSmartPointer<vtkDataSet> loadDataImpl(std::string const& file) override;
 };
 
 } // namespace csp::volumerendering

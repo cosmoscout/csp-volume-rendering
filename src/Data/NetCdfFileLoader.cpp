@@ -4,7 +4,7 @@
 //                        Copyright: (c) 2019 German Aerospace Center (DLR)                       //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "NetCdfDataManager.hpp"
+#include "NetCdfFileLoader.hpp"
 
 #include "../logger.hpp"
 
@@ -14,19 +14,11 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-NetCdfDataManager::NetCdfDataManager(
-    std::string path, std::string filenamePattern, std::string pathlinesPath)
-    : DataManager(path, filenamePattern, pathlinesPath) {
-  initState();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-vtkSmartPointer<vtkDataSet> NetCdfDataManager::loadDataImpl(Timestep timestep, Lod lod) {
+vtkSmartPointer<vtkDataSet> NetCdfFileLoader::loadDataImpl(std::string const& file) {
   vtkSmartPointer<vtkDataSet> data;
 
   auto reader = vtkSmartPointer<vtkNetCDFCFReader>::New();
-  reader->SetFileName(mFiles[timestep][lod].c_str());
+  reader->SetFileName(file.c_str());
   reader->SphericalCoordinatesOn();
   reader->SetDimensions("(lat, r, lon)");
   reader->Update();

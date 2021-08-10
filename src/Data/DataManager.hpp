@@ -10,6 +10,7 @@
 #include "../logger.hpp"
 
 #include "../Enums.hpp"
+#include "FileLoader.hpp"
 #include "Pathlines.hpp"
 #include "Scalar.hpp"
 
@@ -59,7 +60,9 @@ class DataManager {
     }
   };
 
-  virtual ~DataManager();
+  DataManager(std::string const& path, std::string const& filenamePattern,
+      std::unique_ptr<FileLoader> fileLoader, std::string const& pathlinesPath);
+  ~DataManager();
 
   /// List of timesteps for which files were found.
   cs::utils::Property<std::vector<int>> pTimesteps;
@@ -111,6 +114,8 @@ class DataManager {
   using Timestep = int;
   using Lod      = int;
 
+  std::unique_ptr<FileLoader> mFileLoader;
+
   std::string mCsvData;
 
   Timestep mCurrentTimestep;
@@ -134,17 +139,13 @@ class DataManager {
 
   cs::utils::Signal<Scalar const&> mOnScalarRangeUpdated;
 
-  DataManager(std::string const& path, std::string const& filenamePattern,
-      std::string const& pathlinesPath);
-
   void initState();
   void initScalars();
 
   std::shared_future<vtkSmartPointer<vtkDataSet>> getFromCache(
       Timestep timestep, std::optional<Lod> lod = {});
 
-  void                                loadData(Timestep timestep, Lod lod);
-  virtual vtkSmartPointer<vtkDataSet> loadDataImpl(Timestep timestep, Lod lod) = 0;
+  void loadData(Timestep timestep, Lod lod);
 };
 
 } // namespace csp::volumerendering
