@@ -7,7 +7,7 @@
 #ifndef CSP_VOLUME_RENDERING_PATHLINES_HPP
 #define CSP_VOLUME_RENDERING_PATHLINES_HPP
 
-#include "Data/Scalar.hpp"
+#include "Scalar.hpp"
 
 #include <rkcommon/math/vec.h>
 

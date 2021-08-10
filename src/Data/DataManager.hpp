@@ -10,7 +10,7 @@
 #include "../logger.hpp"
 
 #include "../Enums.hpp"
-#include "../Pathlines.hpp"
+#include "Pathlines.hpp"
 #include "Scalar.hpp"
 
 #include "../../../../src/cs-utils/Property.hpp"
