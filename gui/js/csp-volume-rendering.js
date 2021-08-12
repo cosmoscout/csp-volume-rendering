@@ -42,47 +42,54 @@
           document.querySelector(`[data-callback="volumeRendering.setEnablePathlinesParcoords"]`);
     }
 
+    enableSettingsSection(section, enable = true) {
+      document.getElementById(`headingVolume-${section}`).parentElement.hidden = !enable;
+    }
+
     initParcoords(volumeData, pathlinesData) {
       const me              = this;
       this._parcoordsVolume = CosmoScout.parcoords.create(
           "volumeRendering-parcoordsVolume", "Volume", volumeData, function(brushed, args) {
             CosmoScout.callbacks.volumeRendering.setVolumeScalarFilters(
                 JSON.stringify(this.pc.brushExtents()));
-            if (!me._enablePathlinesParcoordsCheckbox.checked) {
+            if (pathlinesData !== "" && !me._enablePathlinesParcoordsCheckbox.checked) {
               me.setPathlinesScalarFilters(this.pc.brushExtents(), true);
             }
           });
-      this._parcoordsPathlinesContainer =
-          document.getElementById("volumeRendering-parcoordsPathlines");
-      this._parcoordsPathlines = CosmoScout.parcoords.create("volumeRendering-parcoordsPathlines",
-          "Pathlines", pathlinesData, function(brushed, args) {
-            if (me._enablePathlinesParcoordsCheckbox.checked) {
-              me.setPathlinesScalarFilters(this.pc.brushExtents());
+
+      if (pathlinesData !== "") {
+        this._parcoordsPathlinesContainer =
+            document.getElementById("volumeRendering-parcoordsPathlines");
+        this._parcoordsPathlines = CosmoScout.parcoords.create("volumeRendering-parcoordsPathlines",
+            "Pathlines", pathlinesData, function(brushed, args) {
+              if (me._enablePathlinesParcoordsCheckbox.checked) {
+                me.setPathlinesScalarFilters(this.pc.brushExtents());
+              }
+            });
+
+        this._enablePathlinesParcoordsCheckbox.addEventListener("change", (e) => {
+          if (e.target.checked) {
+            this.setPathlinesScalarFilters(this._parcoordsPathlines.pc.brushExtents());
+          } else {
+            this.setPathlinesScalarFilters(this._parcoordsVolume.pc.brushExtents(), true);
+            if (!this._parcoordsPathlines.docked) {
+              this._parcoordsPathlines.dock();
             }
-          });
-
-      this._enablePathlinesParcoordsCheckbox.addEventListener("change", (e) => {
-        if (e.target.checked) {
-          this.setPathlinesScalarFilters(this._parcoordsPathlines.pc.brushExtents());
-        } else {
-          this.setPathlinesScalarFilters(this._parcoordsVolume.pc.brushExtents(), true);
-          if (!this._parcoordsPathlines.docked) {
-            this._parcoordsPathlines.dock();
           }
-        }
-        this._parcoordsPathlinesContainer.hidden = !e.target.checked;
-      });
+          this._parcoordsPathlinesContainer.hidden = !e.target.checked;
+        });
 
-      const copyToPathlinesWrapper = document.createElement("div");
-      copyToPathlinesWrapper.classList.add("row");
-      copyToPathlinesWrapper.innerHTML = `
+        const copyToPathlinesWrapper = document.createElement("div");
+        copyToPathlinesWrapper.classList.add("row");
+        copyToPathlinesWrapper.innerHTML = `
         <div class="col-12">
           <button class="waves-effect waves-light block btn glass text">Copy to pathlines</button>
         </div>
       `;
-      copyToPathlinesWrapper.querySelector(".btn").addEventListener(
-          "click", () => { this.copyParcoords(this._parcoordsVolume, this._parcoordsPathlines); });
-      this._parcoordsVolume.parcoordsControls.appendChild(copyToPathlinesWrapper);
+        copyToPathlinesWrapper.querySelector(".btn").addEventListener("click",
+            () => { this.copyParcoords(this._parcoordsVolume, this._parcoordsPathlines); });
+        this._parcoordsVolume.parcoordsControls.appendChild(copyToPathlinesWrapper);
+      }
     }
 
     setPathlinesScalarFilters(brushState, fromVolume = false) {
@@ -208,10 +215,12 @@
       });
       CosmoScout.gui.initSliderRange("volumeRendering.setTimestep", range, [this.timesteps[0]]);
       this.timestepSlider.noUiSlider.on("update", (values, handle, unencoded) => {
-        this._parcoordsPathlines.pc.brushExtents(
-            {"InjectionStepId_start": [unencoded - 9.5, unencoded + 0.5]});
-        if (!this._enablePathlinesParcoordsCheckbox.checked) {
-          this.setPathlinesScalarFilters(this._parcoordsVolume.pc.brushExtents(), true);
+        if (this._parcoordsPathlines !== undefined) {
+          this._parcoordsPathlines.pc.brushExtents(
+              {"InjectionStepId_start": [unencoded - 9.5, unencoded + 0.5]});
+          if (!this._enablePathlinesParcoordsCheckbox.checked) {
+            this.setPathlinesScalarFilters(this._parcoordsVolume.pc.brushExtents(), true);
+          }
         }
       });
     }

@@ -77,7 +77,8 @@ class Plugin : public cs::core::PluginBase {
       cs::utils::DefaultProperty<float>       mLineSize{1.f};
       cs::utils::DefaultProperty<float>       mLength{250.f};
       cs::utils::DefaultProperty<std::string> mActiveScalar{""};
-    } mPathlines;
+    };
+    std::optional<Pathlines> mPathlines;
   };
 
   void init() override;

@@ -297,12 +297,14 @@ void Plugin::onLoad() {
   case VolumeFileType::eVtk:
     mDataManager = std::make_shared<DataManager>(mPluginSettings.mVolumeDataPath.get(),
         mPluginSettings.mVolumeDataPattern.get(), std::make_unique<VtkFileLoader>(),
-        mPluginSettings.mPathlines->mPath.get());
+        mPluginSettings.mPathlines ? std::optional(mPluginSettings.mPathlines->mPath.get())
+                                   : std::nullopt);
     break;
   case VolumeFileType::eNetCdf:
     mDataManager = std::make_shared<DataManager>(mPluginSettings.mVolumeDataPath.get(),
         mPluginSettings.mVolumeDataPattern.get(), std::make_unique<NetCdfFileLoader>(),
-        mPluginSettings.mPathlines->mPath.get());
+        mPluginSettings.mPathlines ? std::optional(mPluginSettings.mPathlines->mPath.get())
+                                   : std::nullopt);
     break;
   default:
     logger().error("Invalid volume data type given in settings! Should be 'vtk'.");
@@ -491,48 +493,52 @@ void Plugin::registerUICallbacks() {
       }));
 
   // Pathline settings
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnablePathlines",
-      "Enable/disable rendering of pathlines.",
-      std::function([this](bool enable) { mPluginSettings.mPathlines.mEnabled = enable; }));
+  if (mPluginSettings.mPathlines.has_value()) {
+    mGuiManager->getGui()->registerCallback("volumeRendering.setEnablePathlines",
+        "Enable/disable rendering of pathlines.",
+        std::function([this](bool enable) { mPluginSettings.mPathlines->mEnabled = enable; }));
 
-  mGuiManager->getGui()->registerCallback("volumeRendering.setPathlineOpacity",
-      "Sets the opacity of the rendered pathlines.", std::function([this](double value) {
-        mPluginSettings.mPathlines.mLineOpacity = (float)value;
-      }));
+    mGuiManager->getGui()->registerCallback("volumeRendering.setPathlineOpacity",
+        "Sets the opacity of the rendered pathlines.", std::function([this](double value) {
+          mPluginSettings.mPathlines->mLineOpacity = (float)value;
+        }));
 
-  mGuiManager->getGui()->registerCallback("volumeRendering.setPathlineSize",
-      "Sets the size of the rendered pathlines.",
-      std::function([this](double value) { mPluginSettings.mPathlines.mLineSize = (float)value; }));
+    mGuiManager->getGui()->registerCallback("volumeRendering.setPathlineSize",
+        "Sets the size of the rendered pathlines.", std::function([this](double value) {
+          mPluginSettings.mPathlines->mLineSize = (float)value;
+        }));
 
-  mGuiManager->getGui()->registerCallback("volumeRendering.setPathlineLength",
-      "Sets the length of the rendered pathlines.",
-      std::function([this](double value) { mPluginSettings.mPathlines.mLength = (float)value; }));
+    mGuiManager->getGui()->registerCallback("volumeRendering.setPathlineLength",
+        "Sets the length of the rendered pathlines.", std::function([this](double value) {
+          mPluginSettings.mPathlines->mLength = (float)value;
+        }));
 
-  mGuiManager->getGui()->registerCallback("volumeRendering.setPathlineActiveScalar",
-      "Sets the active scalar for coloring the pathlines.",
-      std::function([this](std::string value) {
-        if (std::find_if(mDataManager->getPathlines().getScalars().begin(),
-                mDataManager->getPathlines().getScalars().end(), [value](Scalar s) {
-                  return s.getId() == value;
-                }) != mDataManager->getPathlines().getScalars().end()) {
-          mPluginSettings.mPathlines.mActiveScalar = value;
-        }
-      }));
+    mGuiManager->getGui()->registerCallback("volumeRendering.setPathlineActiveScalar",
+        "Sets the active scalar for coloring the pathlines.",
+        std::function([this](std::string value) {
+          if (std::find_if(mDataManager->getPathlines().getScalars().begin(),
+                  mDataManager->getPathlines().getScalars().end(), [value](Scalar s) {
+                    return s.getId() == value;
+                  }) != mDataManager->getPathlines().getScalars().end()) {
+            mPluginSettings.mPathlines->mActiveScalar = value;
+          }
+        }));
 
-  mGuiManager->getGui()->registerCallback("volumeRendering.setPathlinesScalarFilters",
-      "Sets filters for selecting which parts of the pathlines should be rendered.",
-      std::function([this](std::string jsonString) {
-        std::vector<ScalarFilter> filters =
-            parseScalarFilters(jsonString, mDataManager->getPathlines().getScalars());
-        invalidateCache();
-        mRenderer->setPathlineScalarFilters(filters);
-      }));
+    mGuiManager->getGui()->registerCallback("volumeRendering.setPathlinesScalarFilters",
+        "Sets filters for selecting which parts of the pathlines should be rendered.",
+        std::function([this](std::string jsonString) {
+          std::vector<ScalarFilter> filters =
+              parseScalarFilters(jsonString, mDataManager->getPathlines().getScalars());
+          invalidateCache();
+          mRenderer->setPathlineScalarFilters(filters);
+        }));
 
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnablePathlinesParcoords",
-      "Use a separate parallel coordinate diagram for the pathlines.",
-      std::function([](bool value) {
-        // Callback is only registered to suppress warnings
-      }));
+    mGuiManager->getGui()->registerCallback("volumeRendering.setEnablePathlinesParcoords",
+        "Use a separate parallel coordinate diagram for the pathlines.",
+        std::function([](bool value) {
+          // Callback is only registered to suppress warnings
+        }));
+  }
 
   // Parcoords
   mGuiManager->getGui()->registerCallback("parcoords.importBrushState",
@@ -710,30 +716,32 @@ void Plugin::connectSettings() {
   });
 
   // Pathline settings
-  mPluginSettings.mPathlines.mEnabled.connectAndTouch([this](bool enable) {
-    invalidateCache();
-    mRenderer->setPathlinesEnabled(enable);
-    mGuiManager->setCheckboxValue("volumeRendering.setEnablePathlines", enable);
-  });
-  mPluginSettings.mPathlines.mLineOpacity.connectAndTouch([this](float value) {
-    invalidateCache();
-    mRenderer->setPathlineOpacity(value);
-    mGuiManager->setSliderValue("volumeRendering.setPathlineOpacity", value);
-  });
-  mPluginSettings.mPathlines.mLineSize.connectAndTouch([this](float value) {
-    invalidateCache();
-    mRenderer->setPathlineSize(value);
-    mGuiManager->setSliderValue("volumeRendering.setPathlineSize", value);
-  });
-  mPluginSettings.mPathlines.mLength.connectAndTouch([this](float value) {
-    invalidateCache();
-    mRenderer->setPathlineLength(value);
-    mGuiManager->setSliderValue("volumeRendering.setPathlineLength", value);
-  });
-  mPluginSettings.mPathlines.mActiveScalar.connectAndTouch([this](std::string value) {
-    invalidateCache();
-    mRenderer->setPathlineActiveScalar(value);
-  });
+  if (mPluginSettings.mPathlines.has_value()) {
+    mPluginSettings.mPathlines->mEnabled.connectAndTouch([this](bool enable) {
+      invalidateCache();
+      mRenderer->setPathlinesEnabled(enable);
+      mGuiManager->setCheckboxValue("volumeRendering.setEnablePathlines", enable);
+    });
+    mPluginSettings.mPathlines->mLineOpacity.connectAndTouch([this](float value) {
+      invalidateCache();
+      mRenderer->setPathlineOpacity(value);
+      mGuiManager->setSliderValue("volumeRendering.setPathlineOpacity", value);
+    });
+    mPluginSettings.mPathlines->mLineSize.connectAndTouch([this](float value) {
+      invalidateCache();
+      mRenderer->setPathlineSize(value);
+      mGuiManager->setSliderValue("volumeRendering.setPathlineSize", value);
+    });
+    mPluginSettings.mPathlines->mLength.connectAndTouch([this](float value) {
+      invalidateCache();
+      mRenderer->setPathlineLength(value);
+      mGuiManager->setSliderValue("volumeRendering.setPathlineLength", value);
+    });
+    mPluginSettings.mPathlines->mActiveScalar.connectAndTouch([this](std::string value) {
+      invalidateCache();
+      mRenderer->setPathlineActiveScalar(value);
+    });
+  }
 
   // Connect to data manager properties
   mDataManager->pScalars.connectAndTouch([this](std::vector<Scalar> scalars) {
@@ -784,8 +792,15 @@ void Plugin::initUI() {
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/parcoords.js");
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
   mGuiManager->addScriptToGui("CosmoScout.volumeRendering.initParcoords(`" +
-                              mDataManager->getCsvData() + "`, `" +
-                              mDataManager->getPathlines().getCsvData() + "`);");
+                                      mDataManager->getCsvData() + "`, `" +
+                                      (mPluginSettings.mPathlines
+                                  ? mDataManager->getPathlines().getCsvData()
+                                  : "") + "`);");
+
+  if (mPluginSettings.mPathlines.has_value()) {
+    mGuiManager->getGui()->callJavascript(
+        "CosmoScout.volumeRendering.enableSettingsSection", "pathlines");
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -29,9 +29,14 @@ const char* DataManagerException::what() const noexcept {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 DataManager::DataManager(std::string const& path, std::string const& filenamePattern,
-    std::unique_ptr<FileLoader> fileLoader, std::string const& pathlinesPath)
-    : mFileLoader(std::move(fileLoader))
-    , mPathlines(pathlinesPath) {
+    std::unique_ptr<FileLoader> fileLoader, std::optional<std::string> const& pathlinesPath)
+    : mFileLoader(std::move(fileLoader)) {
+  // Initialize pathlines if path is given
+  if (pathlinesPath.has_value()) {
+    mPathlines = std::make_unique<Pathlines>(pathlinesPath.value());
+  }
+
+  // Parse regex
   std::regex patternRegex;
   try {
     patternRegex = std::regex(".*" + filenamePattern);
@@ -41,6 +46,7 @@ DataManager::DataManager(std::string const& path, std::string const& filenamePat
     throw DataManagerException();
   }
 
+  // Check if regex has capture group for lod
   bool haveLodFiles = false;
   if (patternRegex.mark_count() == 2) {
     haveLodFiles = true;
@@ -52,6 +58,7 @@ DataManager::DataManager(std::string const& path, std::string const& filenamePat
     throw DataManagerException();
   }
 
+  // Get all files matching the regex
   std::set<std::string> files;
   try {
     files = cs::utils::filesystem::listFiles(path, patternRegex);
@@ -60,6 +67,7 @@ DataManager::DataManager(std::string const& path, std::string const& filenamePat
     throw DataManagerException();
   }
 
+  // Try to get csv data
   std::string csvPattern = filenamePattern;
   cs::utils::replaceString(csvPattern, boost::filesystem::extension(csvPattern), ".csv");
   try {
@@ -75,6 +83,7 @@ DataManager::DataManager(std::string const& path, std::string const& filenamePat
     throw DataManagerException();
   }
 
+  // Sort the data files by timestep and lod
   std::vector<Timestep> timesteps;
   for (std::string file : files) {
     file = std::regex_replace(file, std::regex(R"(\\)"), "/");
@@ -109,6 +118,7 @@ DataManager::DataManager(std::string const& path, std::string const& filenamePat
   }
   pTimesteps.set(timesteps);
 
+  // Initialize state
   Timestep timestep;
   {
     std::scoped_lock lock(mStateMutex);
@@ -279,7 +289,8 @@ int DataManager::getMinLod(State state) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Pathlines const& DataManager::getPathlines() const {
-  return mPathlines;
+  assert(("getPathlines must not be called when pathlines are deactivated.", mPathlines));
+  return *mPathlines;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

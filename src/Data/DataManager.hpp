@@ -61,7 +61,7 @@ class DataManager {
   };
 
   DataManager(std::string const& path, std::string const& filenamePattern,
-      std::unique_ptr<FileLoader> fileLoader, std::string const& pathlinesPath);
+      std::unique_ptr<FileLoader> fileLoader, std::optional<std::string> const& pathlinesPath = {});
   ~DataManager();
 
   /// List of timesteps for which files were found.
@@ -115,13 +115,12 @@ class DataManager {
   using Lod      = int;
 
   std::unique_ptr<FileLoader> mFileLoader;
+  std::unique_ptr<Pathlines>  mPathlines;
 
   std::string mCsvData;
 
   Timestep mCurrentTimestep;
   Scalar   mActiveScalar;
-
-  Pathlines mPathlines;
 
   std::mutex mReadMutex;
   std::mutex mScalarsMutex;

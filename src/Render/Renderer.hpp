@@ -189,7 +189,7 @@ class Renderer {
       } mVolume;
 
       struct Pathlines {
-        bool                      mEnable;
+        bool                      mEnable = false;
         float                     mLineOpacity;
         float                     mLineSize;
         std::vector<ScalarFilter> mScalarFilters;
