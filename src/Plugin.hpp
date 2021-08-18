@@ -86,6 +86,57 @@ class Plugin : public cs::core::PluginBase {
   void update() override;
 
  private:
+  // Empty functions and properties for settings without corresponding renderer setter
+  template <typename T>
+  inline static std::function<void(Renderer*, T)> noSetter = {};
+  template <typename T>
+  inline static cs::utils::Property<T> noTarget = {};
+
+  template <typename T>
+  static constexpr int mSettingsCount = 0;
+
+  template <typename T>
+  struct Setting {
+   public:
+    inline constexpr Setting()
+        : mName("")
+        , mComment("")
+        , mTarget(Plugin::noTarget<T>)
+        , mSetter(Plugin::noSetter<T>) {
+    }
+
+    inline constexpr Setting(std::string_view name, std::string_view comment,
+        cs::utils::Property<T>&                  target,
+        std::function<void(Renderer*, T)> const& setter = Plugin::noSetter<T>)
+        : mName(name)
+        , mComment(comment)
+        , mTarget(target)
+        , mSetter(saveSetter(setter)) {
+    }
+
+    static constexpr std::array<Setting<T>, mSettingsCount<T>> getSettings(
+        Settings& pluginSettings){};
+
+    std::string_view                         mName;
+    std::string_view                         mComment;
+    cs::utils::Property<T>&                  mTarget;
+    std::function<void(Renderer*, T)> const& mSetter;
+
+   private:
+    inline std::function<void(Renderer*, T)> const& saveSetter(
+        std::function<void(Renderer*, T)> setter) {
+      int index    = mSetterIndex++;
+      mSetterIndex = mSetterIndex % mSettingsCount<T>;
+      if (index < mSettingsCount<T>) {
+        mSetters[index] = setter;
+      }
+      return mSetters[index];
+    };
+
+    static inline int                                                              mSetterIndex = 0;
+    static inline std::array<std::function<void(Renderer*, T)>, mSettingsCount<T>> mSetters;
+  };
+
   struct Frame {
     glm::mat4 mCameraTransform;
     int       mResolution;
@@ -97,6 +148,14 @@ class Plugin : public cs::core::PluginBase {
   void onLoad();
   void registerUICallbacks();
   void connectSettings();
+
+  void registerUICallback(Setting<bool> const& setting);
+  void registerUICallback(Setting<int> const& setting);
+  void registerUICallback(Setting<float> const& setting);
+
+  void connectSetting(Setting<bool> const& setting);
+  void connectSetting(Setting<int> const& setting);
+  void connectSetting(Setting<float> const& setting);
 
   bool tryRequestFrame();
 
@@ -160,6 +219,23 @@ class Plugin : public cs::core::PluginBase {
   std::unordered_set<std::unique_ptr<Renderer::RenderedImage>, ImagePtrHasher, ImagePtrEqual>
       mRenderedImages;
 };
+
+template <>
+constexpr int Plugin::mSettingsCount<bool> = 2;
+template <>
+constexpr int Plugin::mSettingsCount<int> = 0;
+template <>
+constexpr int Plugin::mSettingsCount<float> = 0;
+
+template <>
+static constexpr std::array<Plugin::Setting<bool>, Plugin::mSettingsCount<bool>>
+Plugin::Setting<bool>::getSettings(Settings& pluginSettings);
+template <>
+static constexpr std::array<Plugin::Setting<int>, Plugin::mSettingsCount<int>>
+Plugin::Setting<int>::getSettings(Settings& pluginSettings);
+template <>
+static constexpr std::array<Plugin::Setting<float>, Plugin::mSettingsCount<float>>
+Plugin::Setting<float>::getSettings(Settings& pluginSettings);
 
 } // namespace csp::volumerendering
 

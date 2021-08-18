@@ -347,33 +347,25 @@ void Plugin::onLoad() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Plugin::registerUICallbacks() {
-  // Rendering settings
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableRequestImages",
-      "If disabled no new images will be rendered.",
-      std::function([this](bool enable) { mPluginSettings.mRequestImages = enable; }));
+  auto boolSettings = Setting<bool>::getSettings(mPluginSettings);
+  for (auto const& setting : boolSettings) {
+    registerUICallback(setting);
+  }
 
+  // Rendering settings
   mGuiManager->getGui()->registerCallback("volumeRendering.cancel",
       "If an image is currently rendered, cancel it.",
       std::function([this]() { mRenderer->cancelRendering(); }));
 
-  mGuiManager->getGui()->registerCallback("volumeRendering.setResolution",
-      "Sets the resolution of the rendered volume images.", std::function([this](double value) {
-        mPluginSettings.mResolution = (int)std::lround(value);
-      }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setMaxRenderPasses",
+  /*registerUICallback(Setting<int>("setResolution",
+      "Sets the resolution of the rendered volume images.", mPluginSettings.mResolution));
+  registerUICallback(Setting<int>("setMaxRenderPasses",
       "Sets the maximum number of render passes for constant rendering parameters.",
-      std::function([this](double value) {
-        mPluginSettings.mRendering.mMaxPasses = (int)std::lround(value);
-      }));
+      mPluginSettings.mRendering.mMaxPasses));*/
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setSamplingRate",
       "Sets the sampling rate for volume rendering.",
       std::function([this](double value) { mPluginSettings.mSamplingRate = (float)value; }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableLighting",
-      "Enables/Disables shading.",
-      std::function([this](bool value) { mPluginSettings.mLighting.mEnabled = value; }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setSunStrength",
       "Sets the strength of the sun when shading is enabled.", std::function([this](double value) {
@@ -584,6 +576,10 @@ void Plugin::registerUICallbacks() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Plugin::connectSettings() {
+  auto boolSettings = Setting<bool>::getSettings(mPluginSettings);
+  for (auto const& setting : boolSettings) {
+    connectSetting(setting);
+  }
 
   // Connect to plugin settings
   // Data settings
@@ -600,9 +596,6 @@ void Plugin::connectSettings() {
   });
 
   // Rendering settings
-  mPluginSettings.mRequestImages.connectAndTouch([this](bool enable) {
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableRequestImages", enable);
-  });
   mPluginSettings.mResolution.connectAndTouch([this](int value) {
     invalidateCache();
     mNextFrame.mResolution = value;
@@ -657,11 +650,6 @@ void Plugin::connectSettings() {
   });
 
   // Lighting settings
-  mPluginSettings.mLighting.mEnabled.connectAndTouch([this](bool enable) {
-    invalidateCache();
-    mRenderer->setShading(enable);
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableLighting", enable);
-  });
   mPluginSettings.mLighting.mSunStrength.connectAndTouch([this](float value) {
     invalidateCache();
     mRenderer->setSunStrength(value);
@@ -781,6 +769,106 @@ void Plugin::connectSettings() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void Plugin::registerUICallback(Setting<bool> const& setting) {
+  std::reference_wrapper targetRef(setting.mTarget);
+  mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
+      std::string(setting.mComment),
+      std::function([targetRef](bool enable) { targetRef.get() = enable; }));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Plugin::registerUICallback(Setting<int> const& setting) {
+  std::reference_wrapper targetRef(setting.mTarget);
+  mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
+      std::string(setting.mComment),
+      std::function([targetRef](double value) { targetRef.get() = (int)std::lround(value); }));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Plugin::registerUICallback(Setting<float> const& setting) {
+  std::reference_wrapper targetRef(setting.mTarget);
+  mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
+      std::string(setting.mComment),
+      std::function([targetRef](double value) { targetRef.get() = (float)value; }));
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void csp::volumerendering::Plugin::connectSetting(Setting<bool> const& setting) {
+  std::string            name(setting.mName);
+  std::reference_wrapper setterRef(setting.mSetter);
+  setting.mTarget.connectAndTouch([this, name, setterRef](bool enable) {
+    mGuiManager->setCheckboxValue("volumeRendering." + name, enable);
+    if (setterRef.get()) {
+      invalidateCache();
+      setterRef(mRenderer.get(), enable);
+    }
+  });
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void csp::volumerendering::Plugin::connectSetting(Setting<int> const& setting) {
+  std::string            name(setting.mName);
+  std::reference_wrapper setterRef(setting.mSetter);
+  setting.mTarget.connectAndTouch([this, name, setterRef](int value) {
+    mGuiManager->setCheckboxValue("volumeRendering." + name, value);
+    if (setterRef.get()) {
+      invalidateCache();
+      setterRef(mRenderer.get(), value);
+    }
+  });
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void csp::volumerendering::Plugin::connectSetting(Setting<float> const& setting) {
+  std::string            name(setting.mName);
+  std::reference_wrapper setterRef(setting.mSetter);
+  setting.mTarget.connectAndTouch([this, name, setterRef](float value) {
+    mGuiManager->setCheckboxValue("volumeRendering." + name, value);
+    if (setterRef.get()) {
+      invalidateCache();
+      setterRef(mRenderer.get(), value);
+    }
+  });
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template <>
+constexpr std::array<Plugin::Setting<bool>, Plugin::mSettingsCount<bool>>
+Plugin::Setting<bool>::getSettings(Settings& pluginSettings) {
+  std::array<Setting<bool>, mSettingsCount<bool>> settings{
+      Setting<bool>{"setEnableRequestImages", "If disabled no new images will be rendered.",
+          pluginSettings.mRequestImages},
+      Setting<bool>{"setEnableLighting", "Enables/Disables shading.",
+          pluginSettings.mLighting.mEnabled, &Renderer::setShading}};
+  return std::move(settings);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template <>
+constexpr std::array<Plugin::Setting<int>, Plugin::mSettingsCount<int>>
+Plugin::Setting<int>::getSettings(Settings& pluginSettings) {
+  std::array<Setting<int>, mSettingsCount<int>> settings{};
+  return std::move(settings);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template <>
+constexpr std::array<Plugin::Setting<float>, Plugin::mSettingsCount<float>>
+Plugin::Setting<float>::getSettings(Settings& pluginSettings) {
+  std::array<Setting<float>, mSettingsCount<float>> settings{};
+  return std::move(settings);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void Plugin::initUI() {
   // Add the volume rendering user interface components to the CosmoScout user interface.
   mGuiManager->addCssToGui("css/csp-volume-rendering.css");
@@ -791,11 +879,9 @@ void Plugin::initUI() {
       "../share/resources/gui/third-party/js/parcoords.standalone.js");
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/parcoords.js");
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
-  mGuiManager->addScriptToGui("CosmoScout.volumeRendering.initParcoords(`" +
-                                      mDataManager->getCsvData() + "`, `" +
-                                      (mPluginSettings.mPathlines
-                                  ? mDataManager->getPathlines().getCsvData()
-                                  : "") + "`);");
+  mGuiManager->addScriptToGui(
+      "CosmoScout.volumeRendering.initParcoords(`" + mDataManager->getCsvData() + "`, `" +
+      (mPluginSettings.mPathlines ? mDataManager->getPathlines().getCsvData() : "") + "`);");
 
   if (mPluginSettings.mPathlines.has_value()) {
     mGuiManager->getGui()->callJavascript(
