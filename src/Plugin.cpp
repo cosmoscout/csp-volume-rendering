@@ -351,6 +351,14 @@ void Plugin::registerUICallbacks() {
   for (auto const& setting : boolSettings) {
     registerUICallback(setting);
   }
+  auto intSettings = Setting<int>::getSettings(mPluginSettings);
+  for (auto const& setting : intSettings) {
+    registerUICallback(setting);
+  }
+  auto floatSettings = Setting<float>::getSettings(mPluginSettings);
+  for (auto const& setting : floatSettings) {
+    registerUICallback(setting);
+  }
 
   // Rendering settings
   mGuiManager->getGui()->registerCallback("volumeRendering.cancel",
@@ -578,6 +586,14 @@ void Plugin::registerUICallbacks() {
 void Plugin::connectSettings() {
   auto boolSettings = Setting<bool>::getSettings(mPluginSettings);
   for (auto const& setting : boolSettings) {
+    connectSetting(setting);
+  }
+  auto intSettings = Setting<int>::getSettings(mPluginSettings);
+  for (auto const& setting : intSettings) {
+    connectSetting(setting);
+  }
+  auto floatSettings = Setting<float>::getSettings(mPluginSettings);
+  for (auto const& setting : floatSettings) {
     connectSetting(setting);
   }
 
@@ -814,7 +830,7 @@ void csp::volumerendering::Plugin::connectSetting(Setting<int> const& setting) {
   std::string            name(setting.mName);
   std::reference_wrapper setterRef(setting.mSetter);
   setting.mTarget.connectAndTouch([this, name, setterRef](int value) {
-    mGuiManager->setCheckboxValue("volumeRendering." + name, value);
+    mGuiManager->setSliderValue("volumeRendering." + name, value);
     if (setterRef.get()) {
       invalidateCache();
       setterRef(mRenderer.get(), value);
@@ -828,7 +844,7 @@ void csp::volumerendering::Plugin::connectSetting(Setting<float> const& setting)
   std::string            name(setting.mName);
   std::reference_wrapper setterRef(setting.mSetter);
   setting.mTarget.connectAndTouch([this, name, setterRef](float value) {
-    mGuiManager->setCheckboxValue("volumeRendering." + name, value);
+    mGuiManager->setSliderValue("volumeRendering." + name, value);
     if (setterRef.get()) {
       invalidateCache();
       setterRef(mRenderer.get(), value);
