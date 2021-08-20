@@ -101,8 +101,7 @@ class Plugin : public cs::core::PluginBase {
     inline constexpr Setting()
         : mName("")
         , mComment("")
-        , mTarget(Plugin::noTarget<T>)
-        , mSetter(Plugin::noSetter<T>) {
+        , mTarget(Plugin::noTarget<T>) {
     }
 
     inline constexpr Setting(
