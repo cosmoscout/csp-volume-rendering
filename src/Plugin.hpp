@@ -86,10 +86,6 @@ class Plugin : public cs::core::PluginBase {
   void update() override;
 
  private:
-  // Empty properties for settings without corresponding json setting
-  template <typename T>
-  inline static cs::utils::Property<T> noTarget = {};
-
   template <typename T>
   static constexpr int mSettingsCount = 0;
 
@@ -97,22 +93,26 @@ class Plugin : public cs::core::PluginBase {
   struct Setting {
    public:
     using Setter = void (Renderer::*)(T);
+    using Target = std::reference_wrapper<cs::utils::Property<T>>;
 
     inline constexpr Setting()
         : mName("")
-        , mComment("")
-        , mTarget(Plugin::noTarget<T>) {
+        , mComment("") {
     }
 
-    inline constexpr Setting(
-        std::string_view name, std::string_view comment, cs::utils::Property<T>& target)
+    inline constexpr Setting(std::string_view name, std::string_view comment)
+        : mName(name)
+        , mComment(comment) {
+    }
+
+    inline constexpr Setting(std::string_view name, std::string_view comment, Target target)
         : mName(name)
         , mComment(comment)
         , mTarget(target) {
     }
 
-    inline constexpr Setting(std::string_view name, std::string_view comment,
-        cs::utils::Property<T>& target, Setter setter)
+    inline constexpr Setting(
+        std::string_view name, std::string_view comment, Target target, Setter setter)
         : mName(name)
         , mComment(comment)
         , mTarget(target)
@@ -122,10 +122,10 @@ class Plugin : public cs::core::PluginBase {
     static constexpr std::array<Setting<T>, mSettingsCount<T>> getSettings(
         Settings& pluginSettings){};
 
-    std::string_view        mName;
-    std::string_view        mComment;
-    cs::utils::Property<T>& mTarget;
-    std::optional<Setter>   mSetter;
+    std::string_view      mName;
+    std::string_view      mComment;
+    std::optional<Target> mTarget;
+    std::optional<Setter> mSetter;
   };
 
   struct Frame {
