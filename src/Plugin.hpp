@@ -212,11 +212,11 @@ class Plugin : public cs::core::PluginBase {
 };
 
 template <>
-constexpr int Plugin::mSettingsCount<bool> = 2;
+constexpr int Plugin::mSettingsCount<bool> = 8;
 template <>
-constexpr int Plugin::mSettingsCount<int> = 0;
+constexpr int Plugin::mSettingsCount<int> = 1;
 template <>
-constexpr int Plugin::mSettingsCount<float> = 0;
+constexpr int Plugin::mSettingsCount<float> = 8;
 
 template <>
 constexpr std::array<Plugin::Setting<bool>, Plugin::mSettingsCount<bool>>

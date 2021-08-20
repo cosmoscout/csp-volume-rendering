@@ -365,37 +365,8 @@ void Plugin::registerUICallbacks() {
       "If an image is currently rendered, cancel it.",
       std::function([this]() { mRenderer->cancelRendering(); }));
 
-  /*registerUICallback(Setting<int>("setResolution",
+  registerUICallback(Setting<int>("setResolution",
       "Sets the resolution of the rendered volume images.", mPluginSettings.mResolution));
-  registerUICallback(Setting<int>("setMaxRenderPasses",
-      "Sets the maximum number of render passes for constant rendering parameters.",
-      mPluginSettings.mRendering.mMaxPasses));*/
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setSamplingRate",
-      "Sets the sampling rate for volume rendering.",
-      std::function([this](double value) { mPluginSettings.mSamplingRate = (float)value; }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setSunStrength",
-      "Sets the strength of the sun when shading is enabled.", std::function([this](double value) {
-        mPluginSettings.mLighting.mSunStrength = (float)value;
-      }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setAmbientStrength",
-      "Sets the strength of the ambient light when shading is enabled.",
-      std::function(
-          [this](double value) { mPluginSettings.mLighting.mAmbientStrength = (float)value; }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDensityScale",
-      "Sets the density scale of the volume.",
-      std::function([this](double value) { mPluginSettings.mDensityScale = (float)value; }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDenoiseColor",
-      "Enables use of OIDN for displaying color data.",
-      std::function([this](bool enable) { mPluginSettings.mDenoiseColor = enable; }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDenoiseDepth",
-      "Enables use of OIDN for displaying depth data.",
-      std::function([this](bool enable) { mPluginSettings.mDenoiseDepth = enable; }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode0",
       "Don't calculate a depth value.",
@@ -417,14 +388,6 @@ void Plugin::registerUICallbacks() {
       std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eMultiThreshold; }));
 
   // Display settings
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnablePredictiveRendering",
-      "Enables predicting the next camera position for rendering.",
-      std::function([this](bool enable) { mPluginSettings.mPredictiveRendering = enable; }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableReuseImages",
-      "Enables reuse of previously rendered images.",
-      std::function([this](bool enable) { mPluginSettings.mReuseImages = enable; }));
-
   mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDepthData",
       "Enables use of depth data for displaying data.",
       std::function([this](bool enable) { mPluginSettings.mDepthData = enable; }));
@@ -458,11 +421,6 @@ void Plugin::registerUICallbacks() {
         mRenderer->preloadData(state);
       }));
 
-  mGuiManager->getGui()->registerCallback("volumeRendering.setAnimationSpeed",
-      "Time units per second when animating.", std::function([](double value) {
-        // Callback is only registered to suppress warnings
-      }));
-
   // Transferfunction
   mGuiManager->getGui()->registerCallback("volumeRendering.setTransferFunction",
       "Sets the transfer function for rendering the volume.",
@@ -494,25 +452,6 @@ void Plugin::registerUICallbacks() {
 
   // Pathline settings
   if (mPluginSettings.mPathlines.has_value()) {
-    mGuiManager->getGui()->registerCallback("volumeRendering.setEnablePathlines",
-        "Enable/disable rendering of pathlines.",
-        std::function([this](bool enable) { mPluginSettings.mPathlines->mEnabled = enable; }));
-
-    mGuiManager->getGui()->registerCallback("volumeRendering.setPathlineOpacity",
-        "Sets the opacity of the rendered pathlines.", std::function([this](double value) {
-          mPluginSettings.mPathlines->mLineOpacity = (float)value;
-        }));
-
-    mGuiManager->getGui()->registerCallback("volumeRendering.setPathlineSize",
-        "Sets the size of the rendered pathlines.", std::function([this](double value) {
-          mPluginSettings.mPathlines->mLineSize = (float)value;
-        }));
-
-    mGuiManager->getGui()->registerCallback("volumeRendering.setPathlineLength",
-        "Sets the length of the rendered pathlines.", std::function([this](double value) {
-          mPluginSettings.mPathlines->mLength = (float)value;
-        }));
-
     mGuiManager->getGui()->registerCallback("volumeRendering.setPathlineActiveScalar",
         "Sets the active scalar for coloring the pathlines.",
         std::function([this](std::string value) {
@@ -531,12 +470,6 @@ void Plugin::registerUICallbacks() {
               parseScalarFilters(jsonString, mDataManager->getPathlines().getScalars());
           invalidateCache();
           mRenderer->setPathlineScalarFilters(filters);
-        }));
-
-    mGuiManager->getGui()->registerCallback("volumeRendering.setEnablePathlinesParcoords",
-        "Use a separate parallel coordinate diagram for the pathlines.",
-        std::function([](bool value) {
-          // Callback is only registered to suppress warnings
         }));
   }
 
@@ -618,31 +551,6 @@ void Plugin::connectSettings() {
     mRenderer->setResolution(value);
     mGuiManager->setSliderValue("volumeRendering.setResolution", value);
   });
-  mPluginSettings.mSamplingRate.connectAndTouch([this](float value) {
-    invalidateCache();
-    mRenderer->setSamplingRate(value);
-    mGuiManager->setSliderValue("volumeRendering.setSamplingRate", value);
-  });
-  mPluginSettings.mRendering.mMaxPasses.connectAndTouch([this](int value) {
-    invalidateCache();
-    mRenderer->setMaxRenderPasses(value);
-    mGuiManager->setSliderValue("volumeRendering.setMaxRenderPasses", value);
-  });
-  mPluginSettings.mDensityScale.connectAndTouch([this](float value) {
-    invalidateCache();
-    mRenderer->setDensityScale(value);
-    mGuiManager->setSliderValue("volumeRendering.setDensityScale", value);
-  });
-  mPluginSettings.mDenoiseColor.connectAndTouch([this](bool enable) {
-    invalidateCache();
-    mRenderer->setDenoiseColor(enable);
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseColor", enable);
-  });
-  mPluginSettings.mDenoiseDepth.connectAndTouch([this](bool enable) {
-    invalidateCache();
-    mRenderer->setDenoiseDepth(enable);
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseDepth", enable);
-  });
   mPluginSettings.mDepthMode.connectAndTouch([this](DepthMode drawMode) {
     invalidateCache();
     mRenderer->setDepthMode(drawMode);
@@ -665,25 +573,7 @@ void Plugin::connectSettings() {
     mGuiManager->addScriptToGui(code);
   });
 
-  // Lighting settings
-  mPluginSettings.mLighting.mSunStrength.connectAndTouch([this](float value) {
-    invalidateCache();
-    mRenderer->setSunStrength(value);
-    mGuiManager->setSliderValue("volumeRendering.setSunStrength", value);
-  });
-  mPluginSettings.mLighting.mAmbientStrength.connectAndTouch([this](float value) {
-    invalidateCache();
-    mRenderer->setAmbientLight(value);
-    mGuiManager->setSliderValue("volumeRendering.setAmbientStrength", value);
-  });
-
   // Display settings
-  mPluginSettings.mPredictiveRendering.connectAndTouch([this](bool enable) {
-    mGuiManager->setCheckboxValue("volumeRendering.setEnablePredictiveRendering", enable);
-  });
-  mPluginSettings.mReuseImages.connectAndTouch([this](bool enable) {
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableReuseImages", enable);
-  });
   mPluginSettings.mDepthData.connectAndTouch([this](bool enable) {
     for (auto const& node : mDisplayNodes) {
       node.second->setUseDepth(enable);
@@ -721,26 +611,6 @@ void Plugin::connectSettings() {
 
   // Pathline settings
   if (mPluginSettings.mPathlines.has_value()) {
-    mPluginSettings.mPathlines->mEnabled.connectAndTouch([this](bool enable) {
-      invalidateCache();
-      mRenderer->setPathlinesEnabled(enable);
-      mGuiManager->setCheckboxValue("volumeRendering.setEnablePathlines", enable);
-    });
-    mPluginSettings.mPathlines->mLineOpacity.connectAndTouch([this](float value) {
-      invalidateCache();
-      mRenderer->setPathlineOpacity(value);
-      mGuiManager->setSliderValue("volumeRendering.setPathlineOpacity", value);
-    });
-    mPluginSettings.mPathlines->mLineSize.connectAndTouch([this](float value) {
-      invalidateCache();
-      mRenderer->setPathlineSize(value);
-      mGuiManager->setSliderValue("volumeRendering.setPathlineSize", value);
-    });
-    mPluginSettings.mPathlines->mLength.connectAndTouch([this](float value) {
-      invalidateCache();
-      mRenderer->setPathlineLength(value);
-      mGuiManager->setSliderValue("volumeRendering.setPathlineLength", value);
-    });
     mPluginSettings.mPathlines->mActiveScalar.connectAndTouch([this](std::string value) {
       invalidateCache();
       mRenderer->setPathlineActiveScalar(value);
@@ -904,11 +774,31 @@ void csp::volumerendering::Plugin::connectSetting(Setting<float> const& setting)
 template <>
 constexpr std::array<Plugin::Setting<bool>, Plugin::mSettingsCount<bool>>
 Plugin::Setting<bool>::getSettings(Settings& pluginSettings) {
-  std::array<Setting<bool>, mSettingsCount<bool>> settings{
+  std::array<Setting<bool>, mSettingsCount<bool>> settings{// Rendering settings
       Setting<bool>{"setEnableRequestImages", "If disabled no new images will be rendered.",
           pluginSettings.mRequestImages},
+      Setting<bool>{"setEnableDenoiseColor", "Enables use of OIDN for displaying color data.",
+          pluginSettings.mDenoiseColor, &Renderer::setDenoiseColor},
+      Setting<bool>{"setEnableDenoiseDepth", "Enables use of OIDN for displaying depth data.",
+          pluginSettings.mDenoiseDepth, &Renderer::setDenoiseDepth},
+      // Display settings
+      Setting<bool>{"setEnablePredictiveRendering",
+          "Enables predicting the next camera position for rendering.",
+          pluginSettings.mPredictiveRendering},
+      Setting<bool>{"setEnableReuseImages", "Enables reuse of previously rendered images.",
+          pluginSettings.mReuseImages},
+      // Lighting settings
       Setting<bool>{"setEnableLighting", "Enables/Disables shading.",
-          pluginSettings.mLighting.mEnabled, &Renderer::setShading}};
+          pluginSettings.mLighting.mEnabled, &Renderer::setShading},
+      // Pathline settings
+      pluginSettings.mPathlines.has_value()
+          ? Setting<bool>{"setEnablePathlines", "Enable/disable rendering of pathlines.",
+                pluginSettings.mPathlines->mEnabled, &Renderer::setPathlinesEnabled}
+          : Setting<bool>{},
+      Setting<bool>{
+          "setEnablePathlinesParcoords",
+          "Use a separate parallel coordinate diagram for the pathlines.",
+      }};
   return std::move(settings);
 }
 
@@ -917,7 +807,10 @@ Plugin::Setting<bool>::getSettings(Settings& pluginSettings) {
 template <>
 constexpr std::array<Plugin::Setting<int>, Plugin::mSettingsCount<int>>
 Plugin::Setting<int>::getSettings(Settings& pluginSettings) {
-  std::array<Setting<int>, mSettingsCount<int>> settings{};
+  std::array<Setting<int>, mSettingsCount<int>> settings{// Rendering settings
+      Setting<int>{"setMaxRenderPasses",
+          "Sets the maximum number of render passes for constant rendering parameters.",
+          pluginSettings.mRendering.mMaxPasses, &Renderer::setMaxRenderPasses}};
   return std::move(settings);
 }
 
@@ -926,7 +819,34 @@ Plugin::Setting<int>::getSettings(Settings& pluginSettings) {
 template <>
 constexpr std::array<Plugin::Setting<float>, Plugin::mSettingsCount<float>>
 Plugin::Setting<float>::getSettings(Settings& pluginSettings) {
-  std::array<Setting<float>, mSettingsCount<float>> settings{};
+  std::array<Setting<float>, mSettingsCount<float>> settings{
+      // Animation settings
+      Setting<float>{"setAnimationSpeed", "Time units per second when animating."},
+      // Rendering settings
+      Setting<float>{"setSamplingRate", "Sets the sampling rate for volume rendering.",
+          pluginSettings.mSamplingRate, &Renderer::setSamplingRate},
+      Setting<float>{"setDensityScale", "Sets the density scale of the volume.",
+          pluginSettings.mDensityScale, &Renderer::setDensityScale},
+      // Lighting settings
+      Setting<float>{"setSunStrength", "Sets the strength of the sun when shading is enabled.",
+          pluginSettings.mLighting.mSunStrength, &Renderer::setSunStrength},
+      Setting<float>{"setAmbientStrength",
+          "Sets the strength of the ambient light when shading is enabled.",
+          pluginSettings.mLighting.mAmbientStrength, &Renderer::setAmbientLight},
+      // Pathline settings
+      pluginSettings.mPathlines.has_value()
+          ? Setting<float>{"setPathlineOpacity", "Sets the opacity of the rendered pathlines.",
+                pluginSettings.mPathlines->mLineOpacity, &Renderer::setPathlineOpacity}
+          : Setting<float>{},
+      pluginSettings.mPathlines.has_value()
+          ? Setting<float>{"setPathlineSize", "Sets the size of the rendered pathlines.",
+                pluginSettings.mPathlines->mLineSize, &Renderer::setPathlineSize}
+          : Setting<float>{},
+      pluginSettings.mPathlines.has_value()
+          ? Setting<float>{"setPathlineLength", "Sets the length of the rendered pathlines.",
+                pluginSettings.mPathlines->mLength, &Renderer::setPathlineLength}
+          : Setting<float>{},
+  };
   return std::move(settings);
 }
 
