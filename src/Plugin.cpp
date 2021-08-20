@@ -813,43 +813,57 @@ void Plugin::registerUICallback(Setting<float> const& setting) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void csp::volumerendering::Plugin::connectSetting(Setting<bool> const& setting) {
-  std::string            name(setting.mName);
-  std::reference_wrapper setterRef(setting.mSetter);
-  setting.mTarget.connectAndTouch([this, name, setterRef](bool enable) {
-    mGuiManager->setCheckboxValue("volumeRendering." + name, enable);
-    if (setterRef.get()) {
+  std::string name(setting.mName);
+  if (setting.mSetter.has_value()) {
+    Setting<bool>::Setter setter(setting.mSetter.value());
+    setting.mTarget.connectAndTouch([this, name, setter](bool value) {
+      mGuiManager->setCheckboxValue("volumeRendering." + name, value);
       invalidateCache();
-      setterRef(mRenderer.get(), enable);
-    }
-  });
+      // Call the setter on mRenderer with value
+      (mRenderer.get()->*setter)(value);
+    });
+  } else {
+    setting.mTarget.connectAndTouch([this, name](bool value) {
+      mGuiManager->setCheckboxValue("volumeRendering." + name, value);
+    });
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void csp::volumerendering::Plugin::connectSetting(Setting<int> const& setting) {
-  std::string            name(setting.mName);
-  std::reference_wrapper setterRef(setting.mSetter);
-  setting.mTarget.connectAndTouch([this, name, setterRef](int value) {
-    mGuiManager->setSliderValue("volumeRendering." + name, value);
-    if (setterRef.get()) {
+  std::string name(setting.mName);
+  if (setting.mSetter.has_value()) {
+    Setting<int>::Setter setter(setting.mSetter.value());
+    setting.mTarget.connectAndTouch([this, name, setter](int value) {
+      mGuiManager->setSliderValue("volumeRendering." + name, value);
       invalidateCache();
-      setterRef(mRenderer.get(), value);
-    }
-  });
+      // Call the setter on mRenderer with value
+      (mRenderer.get()->*setter)(value);
+    });
+  } else {
+    setting.mTarget.connectAndTouch(
+        [this, name](int value) { mGuiManager->setSliderValue("volumeRendering." + name, value); });
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void csp::volumerendering::Plugin::connectSetting(Setting<float> const& setting) {
-  std::string            name(setting.mName);
-  std::reference_wrapper setterRef(setting.mSetter);
-  setting.mTarget.connectAndTouch([this, name, setterRef](float value) {
-    mGuiManager->setSliderValue("volumeRendering." + name, value);
-    if (setterRef.get()) {
+  std::string name(setting.mName);
+  if (setting.mSetter.has_value()) {
+    Setting<float>::Setter setter(setting.mSetter.value());
+    setting.mTarget.connectAndTouch([this, name, setter](float value) {
+      mGuiManager->setSliderValue("volumeRendering." + name, value);
       invalidateCache();
-      setterRef(mRenderer.get(), value);
-    }
-  });
+      // Call the setter on mRenderer with value
+      (mRenderer.get()->*setter)(value);
+    });
+  } else {
+    setting.mTarget.connectAndTouch([this, name](float value) {
+      mGuiManager->setSliderValue("volumeRendering." + name, value);
+    });
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

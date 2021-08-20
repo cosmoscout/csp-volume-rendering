@@ -86,9 +86,7 @@ class Plugin : public cs::core::PluginBase {
   void update() override;
 
  private:
-  // Empty functions and properties for settings without corresponding renderer setter
-  template <typename T>
-  inline static std::function<void(Renderer*, T)> noSetter = {};
+  // Empty properties for settings without corresponding json setting
   template <typename T>
   inline static cs::utils::Property<T> noTarget = {};
 
@@ -98,6 +96,8 @@ class Plugin : public cs::core::PluginBase {
   template <typename T>
   struct Setting {
    public:
+    using Setter = void (Renderer::*)(T);
+
     inline constexpr Setting()
         : mName("")
         , mComment("")
@@ -105,36 +105,28 @@ class Plugin : public cs::core::PluginBase {
         , mSetter(Plugin::noSetter<T>) {
     }
 
+    inline constexpr Setting(
+        std::string_view name, std::string_view comment, cs::utils::Property<T>& target)
+        : mName(name)
+        , mComment(comment)
+        , mTarget(target) {
+    }
+
     inline constexpr Setting(std::string_view name, std::string_view comment,
-        cs::utils::Property<T>&                  target,
-        std::function<void(Renderer*, T)> const& setter = Plugin::noSetter<T>)
+        cs::utils::Property<T>& target, Setter setter)
         : mName(name)
         , mComment(comment)
         , mTarget(target)
-        , mSetter(saveSetter(setter)) {
+        , mSetter(setter) {
     }
 
     static constexpr std::array<Setting<T>, mSettingsCount<T>> getSettings(
         Settings& pluginSettings){};
 
-    std::string_view                         mName;
-    std::string_view                         mComment;
-    cs::utils::Property<T>&                  mTarget;
-    std::function<void(Renderer*, T)> const& mSetter;
-
-   private:
-    inline std::function<void(Renderer*, T)> const& saveSetter(
-        std::function<void(Renderer*, T)> setter) {
-      int index    = mSetterIndex++;
-      mSetterIndex = mSetterIndex % mSettingsCount<T>;
-      if (index < mSettingsCount<T>) {
-        mSetters[index] = setter;
-      }
-      return mSetters[index];
-    };
-
-    static inline int                                                              mSetterIndex = 0;
-    static inline std::array<std::function<void(Renderer*, T)>, mSettingsCount<T>> mSetters;
+    std::string_view        mName;
+    std::string_view        mComment;
+    cs::utils::Property<T>& mTarget;
+    std::optional<Setter>   mSetter;
   };
 
   struct Frame {
@@ -228,13 +220,13 @@ template <>
 constexpr int Plugin::mSettingsCount<float> = 0;
 
 template <>
-static constexpr std::array<Plugin::Setting<bool>, Plugin::mSettingsCount<bool>>
+constexpr std::array<Plugin::Setting<bool>, Plugin::mSettingsCount<bool>>
 Plugin::Setting<bool>::getSettings(Settings& pluginSettings);
 template <>
-static constexpr std::array<Plugin::Setting<int>, Plugin::mSettingsCount<int>>
+constexpr std::array<Plugin::Setting<int>, Plugin::mSettingsCount<int>>
 Plugin::Setting<int>::getSettings(Settings& pluginSettings);
 template <>
-static constexpr std::array<Plugin::Setting<float>, Plugin::mSettingsCount<float>>
+constexpr std::array<Plugin::Setting<float>, Plugin::mSettingsCount<float>>
 Plugin::Setting<float>::getSettings(Settings& pluginSettings);
 
 } // namespace csp::volumerendering
