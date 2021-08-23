@@ -655,126 +655,49 @@ void Plugin::connectSettings() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Plugin::registerUICallback(Setting<bool> const& setting) {
-  if (std::string(setting.mName) == "") {
-    return;
-  }
-  if (setting.mTarget.has_value()) {
-    std::reference_wrapper targetRef(setting.mTarget.value());
-    mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
-        std::string(setting.mComment),
-        std::function([targetRef](bool value) { targetRef.get() = value; }));
-  } else {
-    mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
-        std::string(setting.mComment), std::function([](bool value) {}));
-  }
+std::function<void(bool)> csp::volumerendering::Plugin::getCallbackHandler(
+    Setting<bool>::Target const& target) {
+  return std::function([target](bool value) { target.get() = value; });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Plugin::registerUICallback(Setting<int> const& setting) {
-  if (std::string(setting.mName) == "") {
-    return;
-  }
-  if (setting.mTarget.has_value()) {
-    std::reference_wrapper targetRef(setting.mTarget.value());
-    mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
-        std::string(setting.mComment),
-        std::function([targetRef](double value) { targetRef.get() = (int)std::lround(value); }));
-  } else {
-    mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
-        std::string(setting.mComment), std::function([](double value) {}));
-  }
+std::function<void(double)> csp::volumerendering::Plugin::getCallbackHandler(
+    Setting<int>::Target const& target) {
+  return std::function([target](double value) { target.get() = (int)std::lround(value); });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Plugin::registerUICallback(Setting<float> const& setting) {
-  if (std::string(setting.mName) == "") {
-    return;
-  }
-  if (setting.mTarget.has_value()) {
-    std::reference_wrapper targetRef(setting.mTarget.value());
-    mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
-        std::string(setting.mComment),
-        std::function([targetRef](double value) { targetRef.get() = (float)value; }));
-  } else {
-    mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
-        std::string(setting.mComment), std::function([](double value) {}));
-  }
+std::function<void(double)> csp::volumerendering::Plugin::getCallbackHandler(
+    Setting<float>::Target const& target) {
+  return std::function([target](double value) { target.get() = (float)value; });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void csp::volumerendering::Plugin::connectSetting(Setting<bool> const& setting) {
-  if (std::string(setting.mName) == "" || !setting.mTarget.has_value()) {
-    return;
-  }
-  std::string name(setting.mName);
-  if (setting.mSetter.has_value()) {
-    Setting<bool>::Setter setter(setting.mSetter.value());
-    setting.mTarget.value().get().connectAndTouch([this, name, setter](bool value) {
-      mGuiManager->setCheckboxValue("volumeRendering." + name, value);
-      invalidateCache();
-      // Call the setter on mRenderer with value
-      (mRenderer.get()->*setter)(value);
-    });
-  } else {
-    setting.mTarget.value().get().connectAndTouch([this, name](bool value) {
-      mGuiManager->setCheckboxValue("volumeRendering." + name, value);
-    });
-  }
+void Plugin::setValueInUI(std::string name, bool value) {
+  mGuiManager->setCheckboxValue(name, value);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void csp::volumerendering::Plugin::connectSetting(Setting<int> const& setting) {
-  if (std::string(setting.mName) == "" || !setting.mTarget.has_value()) {
-    return;
-  }
-  std::string name(setting.mName);
-  if (setting.mSetter.has_value()) {
-    Setting<int>::Setter setter(setting.mSetter.value());
-    setting.mTarget.value().get().connectAndTouch([this, name, setter](int value) {
-      mGuiManager->setSliderValue("volumeRendering." + name, value);
-      invalidateCache();
-      // Call the setter on mRenderer with value
-      (mRenderer.get()->*setter)(value);
-    });
-  } else {
-    setting.mTarget.value().get().connectAndTouch(
-        [this, name](int value) { mGuiManager->setSliderValue("volumeRendering." + name, value); });
-  }
+void Plugin::setValueInUI(std::string name, int value) {
+  mGuiManager->setSliderValue(name, value);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void csp::volumerendering::Plugin::connectSetting(Setting<float> const& setting) {
-  if (std::string(setting.mName) == "" || !setting.mTarget.has_value()) {
-    return;
-  }
-  std::string name(setting.mName);
-  if (setting.mSetter.has_value()) {
-    Setting<float>::Setter setter(setting.mSetter.value());
-    setting.mTarget.value().get().connectAndTouch([this, name, setter](float value) {
-      mGuiManager->setSliderValue("volumeRendering." + name, value);
-      invalidateCache();
-      // Call the setter on mRenderer with value
-      (mRenderer.get()->*setter)(value);
-    });
-  } else {
-    setting.mTarget.value().get().connectAndTouch([this, name](float value) {
-      mGuiManager->setSliderValue("volumeRendering." + name, value);
-    });
-  }
+void Plugin::setValueInUI(std::string name, float value) {
+  mGuiManager->setSliderValue(name, value);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template <>
-constexpr std::array<Plugin::Setting<bool>, Plugin::mSettingsCount<bool>>
+constexpr std::array<Plugin::Setting<bool>, SETTINGS_COUNT<bool>>
 Plugin::Setting<bool>::getSettings(Settings& pluginSettings) {
-  std::array<Setting<bool>, mSettingsCount<bool>> settings{// Rendering settings
+  std::array<Setting<bool>, SETTINGS_COUNT<bool>> settings{// Rendering settings
       Setting<bool>{"setEnableRequestImages", "If disabled no new images will be rendered.",
           pluginSettings.mRequestImages},
       Setting<bool>{"setEnableDenoiseColor", "Enables use of OIDN for displaying color data.",
@@ -805,9 +728,9 @@ Plugin::Setting<bool>::getSettings(Settings& pluginSettings) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template <>
-constexpr std::array<Plugin::Setting<int>, Plugin::mSettingsCount<int>>
+constexpr std::array<Plugin::Setting<int>, SETTINGS_COUNT<int>>
 Plugin::Setting<int>::getSettings(Settings& pluginSettings) {
-  std::array<Setting<int>, mSettingsCount<int>> settings{// Rendering settings
+  std::array<Setting<int>, SETTINGS_COUNT<int>> settings{// Rendering settings
       Setting<int>{"setMaxRenderPasses",
           "Sets the maximum number of render passes for constant rendering parameters.",
           pluginSettings.mRendering.mMaxPasses, &Renderer::setMaxRenderPasses}};
@@ -817,9 +740,9 @@ Plugin::Setting<int>::getSettings(Settings& pluginSettings) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template <>
-constexpr std::array<Plugin::Setting<float>, Plugin::mSettingsCount<float>>
+constexpr std::array<Plugin::Setting<float>, SETTINGS_COUNT<float>>
 Plugin::Setting<float>::getSettings(Settings& pluginSettings) {
-  std::array<Setting<float>, mSettingsCount<float>> settings{
+  std::array<Setting<float>, SETTINGS_COUNT<float>> settings{
       // Animation settings
       Setting<float>{"setAnimationSpeed", "Time units per second when animating."},
       // Rendering settings
@@ -845,7 +768,7 @@ Plugin::Setting<float>::getSettings(Settings& pluginSettings) {
       pluginSettings.mPathlines.has_value()
           ? Setting<float>{"setPathlineLength", "Sets the length of the rendered pathlines.",
                 pluginSettings.mPathlines->mLength, &Renderer::setPathlineLength}
-          : Setting<float>{},
+          : Setting<float>{}
   };
   return std::move(settings);
 }

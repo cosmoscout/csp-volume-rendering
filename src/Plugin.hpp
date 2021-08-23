@@ -27,6 +27,15 @@
 
 namespace csp::volumerendering {
 
+template <typename T>
+constexpr int SETTINGS_COUNT = 0;
+template <>
+inline constexpr int SETTINGS_COUNT<bool> = 8;
+template <>
+inline constexpr int SETTINGS_COUNT<int> = 1;
+template <>
+inline constexpr int SETTINGS_COUNT<float> = 8;
+
 class Plugin : public cs::core::PluginBase {
  public:
   struct Settings {
@@ -87,9 +96,6 @@ class Plugin : public cs::core::PluginBase {
 
  private:
   template <typename T>
-  static constexpr int mSettingsCount = 0;
-
-  template <typename T>
   struct Setting {
    public:
     using Setter = void (Renderer::*)(T);
@@ -119,7 +125,7 @@ class Plugin : public cs::core::PluginBase {
         , mSetter(setter) {
     }
 
-    static constexpr std::array<Setting<T>, mSettingsCount<T>> getSettings(
+    static constexpr std::array<Setting<T>, SETTINGS_COUNT<T>> getSettings(
         Settings& pluginSettings){};
 
     std::string_view      mName;
@@ -140,13 +146,53 @@ class Plugin : public cs::core::PluginBase {
   void registerUICallbacks();
   void connectSettings();
 
-  void registerUICallback(Setting<bool> const& setting);
-  void registerUICallback(Setting<int> const& setting);
-  void registerUICallback(Setting<float> const& setting);
+  std::function<void(bool)>   getCallbackHandler(Setting<bool>::Target const& target);
+  std::function<void(double)> getCallbackHandler(Setting<int>::Target const& target);
+  std::function<void(double)> getCallbackHandler(Setting<float>::Target const& target);
 
-  void connectSetting(Setting<bool> const& setting);
-  void connectSetting(Setting<int> const& setting);
-  void connectSetting(Setting<float> const& setting);
+  template <typename T>
+  void registerUICallback(Setting<T> const& setting) {
+    if (std::string(setting.mName) == "") {
+      return;
+    }
+    if (setting.mTarget.has_value()) {
+      Setting<T>::Target target(setting.mTarget.value());
+      mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
+          std::string(setting.mComment), getCallbackHandler(target));
+    } else {
+      if constexpr (std::is_same_v<T, bool>) {
+        mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
+            std::string(setting.mComment), std::function([](bool value) {}));
+      } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, float>) {
+        mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
+            std::string(setting.mComment), std::function([](double value) {}));
+      }
+    }
+  };
+
+  void setValueInUI(std::string name, bool value);
+  void setValueInUI(std::string name, int value);
+  void setValueInUI(std::string name, float value);
+
+  template <typename T>
+  void connectSetting(Setting<T> const& setting) {
+    if (std::string(setting.mName) == "" || !setting.mTarget.has_value()) {
+      return;
+    }
+    std::string name(setting.mName);
+    if (setting.mSetter.has_value()) {
+      Setting<T>::Setter setter(setting.mSetter.value());
+      setting.mTarget.value().get().connectAndTouch([this, name, setter](T value) {
+        setValueInUI("volumeRendering." + name, value);
+        invalidateCache();
+        // Call the setter on mRenderer with value
+        (mRenderer.get()->*setter)(value);
+      });
+    } else {
+      setting.mTarget.value().get().connectAndTouch(
+          [this, name](T value) { setValueInUI("volumeRendering." + name, value); });
+    }
+  };
 
   bool tryRequestFrame();
 
@@ -212,20 +258,13 @@ class Plugin : public cs::core::PluginBase {
 };
 
 template <>
-constexpr int Plugin::mSettingsCount<bool> = 8;
-template <>
-constexpr int Plugin::mSettingsCount<int> = 1;
-template <>
-constexpr int Plugin::mSettingsCount<float> = 8;
-
-template <>
-constexpr std::array<Plugin::Setting<bool>, Plugin::mSettingsCount<bool>>
+constexpr std::array<Plugin::Setting<bool>, SETTINGS_COUNT<bool>>
 Plugin::Setting<bool>::getSettings(Settings& pluginSettings);
 template <>
-constexpr std::array<Plugin::Setting<int>, Plugin::mSettingsCount<int>>
+constexpr std::array<Plugin::Setting<int>, SETTINGS_COUNT<int>>
 Plugin::Setting<int>::getSettings(Settings& pluginSettings);
 template <>
-constexpr std::array<Plugin::Setting<float>, Plugin::mSettingsCount<float>>
+constexpr std::array<Plugin::Setting<float>, SETTINGS_COUNT<float>>
 Plugin::Setting<float>::getSettings(Settings& pluginSettings);
 
 } // namespace csp::volumerendering
