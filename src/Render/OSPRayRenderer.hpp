@@ -88,21 +88,22 @@ class OSPRayRenderer : public Renderer {
   struct Cache {
     std::map<DataManager::State, std::map<int, std::shared_future<Volume>>> mVolumes;
 
-    Camera                       mCamera;
-    ospray::cpp::FrameBuffer     mFrameBuffer;
-    ospray::cpp::World           mWorld;
-    ospray::cpp::Geometry        mPathlines;
-    ospray::cpp::GeometricModel  mPathlinesModel;
-    ospray::cpp::Volume          mVolume;
-    ospray::cpp::VolumetricModel mVolumeModel;
-    ospray::cpp::Geometry        mCore;
-    ospray::cpp::GeometricModel  mCoreModel;
-    ospray::cpp::Texture         mCoreTexture;
-    ospray::cpp::Material        mCoreMaterial;
-    ospray::cpp::Group           mGroup;
-    ospray::cpp::Instance        mInstance;
-    ospray::cpp::Light           mAmbientLight;
-    ospray::cpp::Light           mSunLight;
+    Camera                        mCamera;
+    ospray::cpp::FrameBuffer      mFrameBuffer;
+    ospray::cpp::World            mWorld;
+    ospray::cpp::Geometry         mPathlines;
+    ospray::cpp::GeometricModel   mPathlinesModel;
+    ospray::cpp::Volume           mVolume;
+    ospray::cpp::VolumetricModel  mVolumeModel;
+    ospray::cpp::Geometry         mCore;
+    ospray::cpp::GeometricModel   mCoreModel;
+    ospray::cpp::Texture          mCoreTexture;
+    ospray::cpp::Material         mCoreMaterial;
+    ospray::cpp::TransferFunction mCoreTransferFunction;
+    ospray::cpp::Group            mGroup;
+    ospray::cpp::Instance         mInstance;
+    ospray::cpp::Light            mAmbientLight;
+    ospray::cpp::Light            mSunLight;
 
     struct State {
       glm::mat4          mCameraTransform;

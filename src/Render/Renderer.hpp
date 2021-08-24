@@ -138,6 +138,10 @@ class Renderer {
   /// Sets the strength of the light of the sun.
   void setSunStrength(float strength);
 
+  void setCoreEnabled(bool value);
+  void setCoreScalar(std::string value);
+  void setCoreRadius(float value);
+
   void setPathlinesEnabled(bool enable);
   void setPathlineOpacity(float value);
   void setPathlineSize(float value);
@@ -188,6 +192,16 @@ class Renderer {
         }
       } mVolume;
 
+      struct Core {
+        bool        mEnable = false;
+        std::string mScalar;
+        float       mRadius;
+
+        bool operator==(const Core& other) const {
+          return mEnable == other.mEnable && mScalar == other.mScalar && mRadius == other.mRadius;
+        }
+      } mCore;
+
       struct Pathlines {
         bool                      mEnable = false;
         float                     mLineOpacity;
@@ -212,7 +226,7 @@ class Renderer {
 
       bool operator==(const World& other) const {
         return mDepthMode == other.mDepthMode && mLights == other.mLights &&
-               mVolume == other.mVolume && mPathlines == other.mPathlines &&
+               mVolume == other.mVolume && mCore == other.mCore && mPathlines == other.mPathlines &&
                mPathlinesTexture == other.mPathlinesTexture;
       }
     } mWorld;

@@ -139,6 +139,27 @@ void Renderer::setSunStrength(float strength) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void Renderer::setCoreEnabled(bool value) {
+  std::scoped_lock lock(mParameterMutex);
+  mParameters.mWorld.mCore.mEnable = value;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Renderer::setCoreScalar(std::string value) {
+  std::scoped_lock lock(mParameterMutex);
+  mParameters.mWorld.mCore.mScalar = std::move(value);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Renderer::setCoreRadius(float value) {
+  std::scoped_lock lock(mParameterMutex);
+  mParameters.mWorld.mCore.mRadius = value;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void Renderer::setPathlinesEnabled(bool enable) {
   std::scoped_lock lock(mParameterMutex);
   mParameters.mWorld.mPathlines.mEnable = enable;

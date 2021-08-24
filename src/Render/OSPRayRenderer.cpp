@@ -225,22 +225,48 @@ void OSPRayRenderer::updateWorld(
   ospray::cpp::TransferFunction transferFunction = getTransferFunction(volume, parameters);
 
   if (!(dataState == mCache.mState.mDataState && volume.mLod == mCache.mState.mVolumeLod)) {
-    DataManager::State anomalyState = dataState;
-    anomalyState.mScalar =
-        *std::find_if(mDataManager->pScalars.get().begin(), mDataManager->pScalars.get().end(),
-            [](Scalar s) { return s.getId() == "cell_temperature anomaly"; });
-    Volume anomalyVolume = getVolume(anomalyState, volume.mLod);
-
-    mCache.mCoreTexture.setParam("volume", anomalyVolume.mOsprayData);
-    mCache.mCoreTexture.commit();
-    mCache.mCoreMaterial.commit();
-
     mCache.mVolumeModel.setParam("volume", volume.mOsprayData);
+    mCache.mVolumeModel.setParam("transferFunction", transferFunction);
+    mCache.mVolumeModel.commit();
     updateGroup = true;
   }
 
   if (!(dataState == mCache.mState.mDataState && volume.mLod == mCache.mState.mVolumeLod &&
-          parameters.mWorld.mVolume == mCache.mState.mParameters.mWorld.mVolume &&
+          parameters.mWorld.mCore == mCache.mState.mParameters.mWorld.mCore)) {
+    if (parameters.mWorld.mCore.mEnable) {
+      DataManager::State scalarState = dataState;
+      auto               scalar =
+          std::find_if(mDataManager->pScalars.get().begin(), mDataManager->pScalars.get().end(),
+              [&parameters](Scalar s) { return s.getId() == parameters.mWorld.mCore.mScalar; });
+
+      if (scalar != mDataManager->pScalars.get().end()) {
+        scalarState.mScalar = *scalar;
+        Volume coreVolume   = getVolume(scalarState, volume.mLod);
+
+        rkcommon::math::vec2f valueRange = {
+            (float)coreVolume.mScalarBounds[0], (float)coreVolume.mScalarBounds[1]};
+        mCache.mCoreTransferFunction.setParam("valueRange", valueRange);
+        mCache.mCoreTransferFunction.commit();
+
+        mCache.mCoreTexture.setParam("volume", coreVolume.mOsprayData);
+        mCache.mCoreTexture.commit();
+
+        mCache.mCoreMaterial.removeParam("kd");
+        mCache.mCoreMaterial.setParam("map_kd", mCache.mCoreTexture);
+        mCache.mCoreMaterial.commit();
+      } else {
+        rkcommon::math::vec3f color = {0.8f, 0.8f, 0.8f};
+        mCache.mCoreMaterial.removeParam("map_kd");
+        mCache.mCoreMaterial.setParam("kd", color);
+        mCache.mCoreMaterial.commit();
+      }
+
+      mCache.mCore.setParam("radius", parameters.mWorld.mCore.mRadius);
+      mCache.mCore.commit();
+    }
+  }
+
+  if (!(parameters.mWorld.mVolume == mCache.mState.mParameters.mWorld.mVolume &&
           parameters.mWorld.mLights.mShading ==
               mCache.mState.mParameters.mWorld.mLights.mShading)) {
     mCache.mVolumeModel.setParam("transferFunction", transferFunction);
@@ -312,9 +338,10 @@ void OSPRayRenderer::updateWorld(
   }
 
   if (!(parameters.mWorld.mDepthMode == mCache.mState.mParameters.mWorld.mDepthMode &&
-          parameters.mWorld.mPathlines == mCache.mState.mParameters.mWorld.mPathlines)) {
+          parameters.mWorld.mPathlines.mEnable ==
+              mCache.mState.mParameters.mWorld.mPathlines.mEnable &&
+          parameters.mWorld.mCore.mEnable == mCache.mState.mParameters.mWorld.mCore.mEnable)) {
     std::vector<ospray::cpp::GeometricModel> geometries;
-    geometries.push_back(mCache.mCoreModel);
     if (parameters.mWorld.mDepthMode == DepthMode::eIsosurface) {
       ospray::cpp::Geometry isosurface("isosurface");
       isosurface.setParam("isovalue", 0.8f);
@@ -328,11 +355,17 @@ void OSPRayRenderer::updateWorld(
 
       geometries.push_back(isoModel);
     }
+    if (parameters.mWorld.mCore.mEnable) {
+      geometries.push_back(mCache.mCoreModel);
+    }
     if (parameters.mWorld.mPathlines.mEnable && pathlinesPresent) {
       geometries.push_back(mCache.mPathlinesModel);
     }
-    mCache.mGroup.setParam("geometry", ospray::cpp::Data(geometries));
-
+    if (geometries.size() > 0) {
+      mCache.mGroup.setParam("geometry", ospray::cpp::Data(geometries));
+    } else {
+      mCache.mGroup.setParam("geometry", NULL);
+    }
     updateGroup = true;
   }
 
@@ -515,29 +548,23 @@ OSPRayRenderer::Cache::Cache()
     , mCoreModel(mCore)
     , mCoreTexture("volume")
     , mCoreMaterial("scivis", "obj")
+    , mCoreTransferFunction("piecewiseLinear")
     , mInstance(mGroup)
     , mAmbientLight("ambient")
     , mSunLight("distant") {
   mCore.setParam("sphere.position", ospray::cpp::Data(rkcommon::math::vec3f(0, 0, 0)));
-  mCore.setParam("radius", 3500.f);
   mCore.commit();
 
   std::vector<rkcommon::math::vec3f> color = {
       rkcommon::math::vec3f(0.f, 0.f, 0.f), rkcommon::math::vec3f(1.f, 1.f, 1.f)};
   std::vector<float> opacity = {1.f, 1.f};
 
-  rkcommon::math::vec2f valueRange = {-1200.f, 1200.f};
-
-  ospray::cpp::TransferFunction transferFunction("piecewiseLinear");
-  transferFunction.setParam("color", ospray::cpp::Data(color));
-  transferFunction.setParam("opacity", ospray::cpp::Data(opacity));
-  transferFunction.setParam("valueRange", valueRange);
-  transferFunction.commit();
+  mCoreTransferFunction.setParam("color", ospray::cpp::Data(color));
+  mCoreTransferFunction.setParam("opacity", ospray::cpp::Data(opacity));
+  mCoreTransferFunction.commit();
 
   // Commits have to be done after volume is set
-  mCoreTexture.setParam("transferFunction", transferFunction);
-
-  mCoreMaterial.setParam("map_kd", mCoreTexture);
+  mCoreTexture.setParam("transferFunction", mCoreTransferFunction);
 
   mCoreModel.setParam("material", mCoreMaterial);
   mCoreModel.commit();

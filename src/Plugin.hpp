@@ -30,11 +30,13 @@ namespace csp::volumerendering {
 template <typename T>
 constexpr int SETTINGS_COUNT = 0;
 template <>
-inline constexpr int SETTINGS_COUNT<bool> = 8;
+inline constexpr int SETTINGS_COUNT<bool> = 9;
 template <>
 inline constexpr int SETTINGS_COUNT<int> = 1;
 template <>
-inline constexpr int SETTINGS_COUNT<float> = 8;
+inline constexpr int SETTINGS_COUNT<float> = 9;
+template <>
+inline constexpr int SETTINGS_COUNT<std::string> = 1;
 
 class Plugin : public cs::core::PluginBase {
  public:
@@ -78,6 +80,13 @@ class Plugin : public cs::core::PluginBase {
     cs::utils::DefaultProperty<glm::dvec3> mPosition{glm::dvec3(0, 0, 0)};
     cs::utils::DefaultProperty<double>     mScale{1.};
     cs::utils::DefaultProperty<glm::dquat> mRotation{glm::dquat(1, 0, 0, 0)};
+
+    struct Core {
+      cs::utils::DefaultProperty<bool>        mEnabled{true};
+      cs::utils::DefaultProperty<std::string> mScalar{""};
+      cs::utils::Property<float>              mRadius;
+    };
+    std::optional<Core> mCore;
 
     struct Pathlines {
       cs::utils::Property<std::string>        mPath;
@@ -146,9 +155,10 @@ class Plugin : public cs::core::PluginBase {
   void registerUICallbacks();
   void connectSettings();
 
-  std::function<void(bool)>   getCallbackHandler(Setting<bool>::Target const& target);
-  std::function<void(double)> getCallbackHandler(Setting<int>::Target const& target);
-  std::function<void(double)> getCallbackHandler(Setting<float>::Target const& target);
+  std::function<void(bool)>        getCallbackHandler(Setting<bool>::Target const& target);
+  std::function<void(double)>      getCallbackHandler(Setting<int>::Target const& target);
+  std::function<void(double)>      getCallbackHandler(Setting<float>::Target const& target);
+  std::function<void(std::string)> getCallbackHandler(Setting<std::string>::Target const& target);
 
   template <typename T>
   void registerUICallback(Setting<T> const& setting) {
@@ -166,6 +176,9 @@ class Plugin : public cs::core::PluginBase {
       } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, float>) {
         mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
             std::string(setting.mComment), std::function([](double value) {}));
+      } else if constexpr (std::is_same_v<T, std::string>) {
+        mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
+            std::string(setting.mComment), std::function([](std::string value) {}));
       }
     }
   };
@@ -173,6 +186,7 @@ class Plugin : public cs::core::PluginBase {
   void setValueInUI(std::string name, bool value);
   void setValueInUI(std::string name, int value);
   void setValueInUI(std::string name, float value);
+  void setValueInUI(std::string name, std::string const& value);
 
   template <typename T>
   void connectSetting(Setting<T> const& setting) {
@@ -261,11 +275,14 @@ template <>
 constexpr std::array<Plugin::Setting<bool>, SETTINGS_COUNT<bool>>
 Plugin::Setting<bool>::getSettings(Settings& pluginSettings);
 template <>
-constexpr std::array<Plugin::Setting<int>, SETTINGS_COUNT<int>>
-Plugin::Setting<int>::getSettings(Settings& pluginSettings);
+constexpr std::array<Plugin::Setting<int>, SETTINGS_COUNT<int>> Plugin::Setting<int>::getSettings(
+    Settings& pluginSettings);
 template <>
 constexpr std::array<Plugin::Setting<float>, SETTINGS_COUNT<float>>
 Plugin::Setting<float>::getSettings(Settings& pluginSettings);
+template <>
+constexpr std::array<Plugin::Setting<std::string>, SETTINGS_COUNT<std::string>>
+Plugin::Setting<std::string>::getSettings(Settings& pluginSettings);
 
 } // namespace csp::volumerendering
 

@@ -99,6 +99,18 @@ void to_json(nlohmann::json& j, Plugin::Settings::Lighting const& o) {
   cs::core::Settings::serialize(j, "ambientStrength", o.mSunStrength);
 }
 
+void from_json(nlohmann::json const& j, Plugin::Settings::Core& o) {
+  cs::core::Settings::deserialize(j, "enabled", o.mEnabled);
+  cs::core::Settings::deserialize(j, "scalar", o.mScalar);
+  cs::core::Settings::deserialize(j, "radius", o.mRadius);
+}
+
+void to_json(nlohmann::json& j, Plugin::Settings::Core const& o) {
+  cs::core::Settings::serialize(j, "enabled", o.mEnabled);
+  cs::core::Settings::serialize(j, "scalar", o.mScalar);
+  cs::core::Settings::serialize(j, "radius", o.mRadius);
+}
+
 void from_json(nlohmann::json const& j, Plugin::Settings::Pathlines& o) {
   cs::core::Settings::deserialize(j, "path", o.mPath);
   cs::core::Settings::deserialize(j, "enabled", o.mEnabled);
@@ -152,6 +164,7 @@ void from_json(nlohmann::json const& j, Plugin::Settings& o) {
   if (j.contains("lighting")) {
     cs::core::Settings::deserialize(j, "lighting", o.mLighting);
   }
+  cs::core::Settings::deserialize(j, "core", o.mCore);
   cs::core::Settings::deserialize(j, "pathlines", o.mPathlines);
 }
 
@@ -188,6 +201,7 @@ void to_json(nlohmann::json& j, Plugin::Settings const& o) {
   cs::core::Settings::serialize(j, "rotation", o.mRotation);
 
   cs::core::Settings::serialize(j, "lighting", o.mLighting);
+  cs::core::Settings::serialize(j, "core", o.mCore);
   cs::core::Settings::serialize(j, "pathlines", o.mPathlines);
 }
 
@@ -357,6 +371,10 @@ void Plugin::registerUICallbacks() {
   }
   auto floatSettings = Setting<float>::getSettings(mPluginSettings);
   for (auto const& setting : floatSettings) {
+    registerUICallback(setting);
+  }
+  auto stringSettings = Setting<std::string>::getSettings(mPluginSettings);
+  for (auto const& setting : stringSettings) {
     registerUICallback(setting);
   }
 
@@ -529,6 +547,10 @@ void Plugin::connectSettings() {
   for (auto const& setting : floatSettings) {
     connectSetting(setting);
   }
+  auto stringSetting = Setting<std::string>::getSettings(mPluginSettings);
+  for (auto const& setting : stringSetting) {
+    connectSetting(setting);
+  }
 
   // Connect to plugin settings
   // Data settings
@@ -676,6 +698,13 @@ std::function<void(double)> csp::volumerendering::Plugin::getCallbackHandler(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+std::function<void(std::string)> csp::volumerendering::Plugin::getCallbackHandler(
+    Setting<std::string>::Target const& target) {
+  return std::function([target](std::string value) { target.get() = (std::string)value; });
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void Plugin::setValueInUI(std::string name, bool value) {
   mGuiManager->setCheckboxValue(name, value);
 }
@@ -694,10 +723,17 @@ void Plugin::setValueInUI(std::string name, float value) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void csp::volumerendering::Plugin::setValueInUI(std::string name, std::string const& value) {
+  // TODO
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 template <>
 constexpr std::array<Plugin::Setting<bool>, SETTINGS_COUNT<bool>>
 Plugin::Setting<bool>::getSettings(Settings& pluginSettings) {
-  std::array<Setting<bool>, SETTINGS_COUNT<bool>> settings{// Rendering settings
+  std::array<Setting<bool>, SETTINGS_COUNT<bool>> settings{
+      // Rendering settings
       Setting<bool>{"setEnableRequestImages", "If disabled no new images will be rendered.",
           pluginSettings.mRequestImages},
       Setting<bool>{"setEnableDenoiseColor", "Enables use of OIDN for displaying color data.",
@@ -713,6 +749,11 @@ Plugin::Setting<bool>::getSettings(Settings& pluginSettings) {
       // Lighting settings
       Setting<bool>{"setEnableLighting", "Enables/Disables shading.",
           pluginSettings.mLighting.mEnabled, &Renderer::setShading},
+      // Core settings
+      pluginSettings.mCore.has_value()
+          ? Setting<bool>{"setEnableCore", "Enable/disable rendering of core",
+                pluginSettings.mCore->mEnabled, &Renderer::setCoreEnabled}
+          : Setting<bool>{},
       // Pathline settings
       pluginSettings.mPathlines.has_value()
           ? Setting<bool>{"setEnablePathlines", "Enable/disable rendering of pathlines.",
@@ -721,19 +762,22 @@ Plugin::Setting<bool>::getSettings(Settings& pluginSettings) {
       Setting<bool>{
           "setEnablePathlinesParcoords",
           "Use a separate parallel coordinate diagram for the pathlines.",
-      }};
+      },
+  };
   return std::move(settings);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 template <>
-constexpr std::array<Plugin::Setting<int>, SETTINGS_COUNT<int>>
-Plugin::Setting<int>::getSettings(Settings& pluginSettings) {
-  std::array<Setting<int>, SETTINGS_COUNT<int>> settings{// Rendering settings
+constexpr std::array<Plugin::Setting<int>, SETTINGS_COUNT<int>> Plugin::Setting<int>::getSettings(
+    Settings& pluginSettings) {
+  std::array<Setting<int>, SETTINGS_COUNT<int>> settings{
+      // Rendering settings
       Setting<int>{"setMaxRenderPasses",
           "Sets the maximum number of render passes for constant rendering parameters.",
-          pluginSettings.mRendering.mMaxPasses, &Renderer::setMaxRenderPasses}};
+          pluginSettings.mRendering.mMaxPasses, &Renderer::setMaxRenderPasses},
+  };
   return std::move(settings);
 }
 
@@ -756,6 +800,11 @@ Plugin::Setting<float>::getSettings(Settings& pluginSettings) {
       Setting<float>{"setAmbientStrength",
           "Sets the strength of the ambient light when shading is enabled.",
           pluginSettings.mLighting.mAmbientStrength, &Renderer::setAmbientLight},
+      // Core settings
+      pluginSettings.mCore.has_value()
+          ? Setting<float>{"setCoreRadius", "Sets the radius of the rendered core.",
+                pluginSettings.mCore->mRadius, &Renderer::setCoreRadius}
+          : Setting<float>{},
       // Pathline settings
       pluginSettings.mPathlines.has_value()
           ? Setting<float>{"setPathlineOpacity", "Sets the opacity of the rendered pathlines.",
@@ -768,7 +817,22 @@ Plugin::Setting<float>::getSettings(Settings& pluginSettings) {
       pluginSettings.mPathlines.has_value()
           ? Setting<float>{"setPathlineLength", "Sets the length of the rendered pathlines.",
                 pluginSettings.mPathlines->mLength, &Renderer::setPathlineLength}
-          : Setting<float>{}
+          : Setting<float>{},
+  };
+  return std::move(settings);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template <>
+constexpr std::array<Plugin::Setting<std::string>, SETTINGS_COUNT<std::string>>
+Plugin::Setting<std::string>::getSettings(Settings& pluginSettings) {
+  std::array<Setting<std::string>, SETTINGS_COUNT<std::string>> settings{
+      // Core settings
+      pluginSettings.mCore.has_value()
+          ? Setting<std::string>{"setCoreScalar", "Sets the scalar used for coloring the core.",
+                pluginSettings.mCore->mScalar, &Renderer::setCoreScalar}
+          : Setting<std::string>{},
   };
   return std::move(settings);
 }
