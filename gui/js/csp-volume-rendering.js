@@ -225,17 +225,6 @@
       });
     }
 
-    /**
-     * Sets the range of the currently active scalar.
-     *
-     * @param xMin {number} Minimum scalar value
-     * @param xMax {number} Maximum scalar value
-     * @param newScalar {bool} Should be true, if the active scalar changed
-     */
-    setXRange(xMin, xMax, newScalar) {
-      this.transferFunctionEditor.setData([xMin, xMax], newScalar);
-    }
-
     loadTransferFunction(path) {
       CosmoScout.callbacks.transferFunctionEditor.importTransferFunction(
           path, this.transferFunctionEditor.id);

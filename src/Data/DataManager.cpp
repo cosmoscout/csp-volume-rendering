@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <future>
+#include <random>
 #include <regex>
 
 namespace csp::volumerendering {
@@ -211,6 +212,36 @@ void DataManager::setActiveScalar(std::string scalarId) {
 
 std::string const& DataManager::getCsvData() {
   return mCsvData;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+std::future<std::vector<float>> DataManager::getSample(
+    State state, std::chrono::high_resolution_clock::duration duration) {
+  return std::async(
+      std::launch::async, [this, state = std::move(state), duration = std::move(duration)]() {
+        vtkSmartPointer<vtkDataArray> data;
+        switch (state.mScalar.mType) {
+        case ScalarType::eCellData:
+          data = getData(state)->GetCellData()->GetScalars(state.mScalar.mName.c_str());
+          break;
+        case ScalarType::ePointData:
+          data = getData(state)->GetPointData()->GetScalars(state.mScalar.mName.c_str());
+          break;
+        }
+
+        std::random_device                       rd;
+        std::default_random_engine               gen(rd());
+        std::uniform_int_distribution<vtkIdType> indices(0, data->GetNumberOfTuples() - 1);
+
+        std::chrono::high_resolution_clock::time_point start =
+            std::chrono::high_resolution_clock::now();
+        std::vector<float> sample;
+        while (std::chrono::high_resolution_clock::now() < start + duration) {
+          sample.push_back(data->GetVariantValue(indices(gen)).ToFloat());
+        }
+        return sample;
+      });
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

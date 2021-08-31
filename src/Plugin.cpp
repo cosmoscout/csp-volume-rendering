@@ -257,6 +257,30 @@ void Plugin::deInit() {
 void Plugin::update() {
   mNextFrame.mCameraTransform = getCurrentCameraTransform();
 
+  if (mDataManager->isReady() && mSampleCount < 20) {
+    if (mDataSample.valid() &&
+        mDataSample.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
+      std::vector<float> sample = mDataSample.get();
+      if (sample.size() > 0) {
+        nlohmann::json sampleJson = sample;
+        if (mSampleCount == 0) {
+          nlohmann::json extents =
+              mDataManager->getScalarRange(mDataManager->getState().mScalar.getId());
+          mGuiManager->getGui()->callJavascript(
+              "CosmoScout.volumeRendering.transferFunctionEditor.setData", sampleJson,
+              mResetTfHandles, extents);
+        } else {
+          mGuiManager->getGui()->callJavascript(
+              "CosmoScout.volumeRendering.transferFunctionEditor.addData", sampleJson, false);
+        }
+        mSampleCount++;
+      }
+    } else {
+      mDataSample =
+          mDataManager->getSample(mDataManager->getState(), std::chrono::milliseconds(10));
+    }
+  }
+
   switch (mRenderState) {
   case RenderState::eWaitForData:
     if (mDataManager->isReady()) {
@@ -430,6 +454,8 @@ void Plugin::registerUICallbacks() {
       "Sets the timestep of the rendered volume images.", std::function([this](double value) {
         invalidateCache();
         mDataManager->setTimestep((int)std::lround(value));
+        mSampleCount    = 0;
+        mResetTfHandles = false;
       }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.preloadTimestep",
@@ -558,9 +584,8 @@ void Plugin::connectSettings() {
     invalidateCache();
     if (mDataManager->isReady()) {
       mDataManager->setActiveScalar(value);
-      mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setXRange",
-          mDataManager->getScalarRange(mDataManager->getState().mScalar.getId())[0],
-          mDataManager->getScalarRange(mDataManager->getState().mScalar.getId())[1], true);
+      mSampleCount    = 0;
+      mResetTfHandles = true;
       mGuiManager->getGui()->callJavascript(
           "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", value);
     }
@@ -654,9 +679,8 @@ void Plugin::connectSettings() {
         activeScalar = scalars.begin();
       }
       mPluginSettings.mActiveScalar.set(activeScalar->getId());
-      mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setXRange",
-          mDataManager->getScalarRange(activeScalar->getId())[0],
-          mDataManager->getScalarRange(activeScalar->getId())[1], true);
+      mSampleCount    = 0;
+      mResetTfHandles = true;
       mGuiManager->getGui()->callJavascript(
           "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", activeScalar->getId());
     }
@@ -668,9 +692,8 @@ void Plugin::connectSettings() {
   });
   mDataManager->onScalarRangeUpdated().connect([this](Scalar const& scalar) {
     if (mDataManager->isReady() && scalar.getId() == mPluginSettings.mActiveScalar.get()) {
-      mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setXRange",
-          mDataManager->getScalarRange(scalar.getId())[0],
-          mDataManager->getScalarRange(scalar.getId())[1], false);
+      mSampleCount    = 0;
+      mResetTfHandles = false;
     }
   });
 }

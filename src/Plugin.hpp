@@ -250,6 +250,10 @@ class Plugin : public cs::core::PluginBase {
   bool mFrameInvalid;
   bool mParametersDirty;
 
+  std::future<std::vector<float>> mDataSample;
+  int                             mSampleCount = 0;
+  bool                            mResetTfHandles;
+
   struct ImagePtrHasher {
     size_t operator()(std::unique_ptr<Renderer::RenderedImage> const& imagePtr) const {
       return std::hash<Renderer::RenderedImage>{}(*imagePtr);

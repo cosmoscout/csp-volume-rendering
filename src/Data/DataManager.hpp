@@ -92,6 +92,9 @@ class DataManager {
   /// Returns the volume data as a csv string.
   std::string const& getCsvData();
 
+  std::future<std::vector<float>> getSample(
+      State state, std::chrono::high_resolution_clock::duration duration);
+
   /// Returns the data for the current state.
   /// May block, if the requested data is not yet loaded.
   /// If isReady() returns false, the data may have no active scalar.
