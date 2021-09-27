@@ -28,15 +28,43 @@
 namespace csp::volumerendering {
 
 template <typename T>
+struct get_ui_type {
+  using type = void;
+};
+template <typename T>
+using get_ui_type_t = typename get_ui_type<T>::type;
+
+template <>
+struct get_ui_type<bool> {
+  using type = bool;
+};
+template <>
+struct get_ui_type<std::string> {
+  using type = std::string;
+};
+template <>
+struct get_ui_type<int> {
+  using type = double;
+};
+template <>
+struct get_ui_type<float> {
+  using type = double;
+};
+
+template <typename T>
 constexpr int SETTINGS_COUNT = 0;
 template <>
-inline constexpr int SETTINGS_COUNT<bool> = 9;
+inline constexpr int SETTINGS_COUNT<bool> = 11;
 template <>
-inline constexpr int SETTINGS_COUNT<int> = 1;
+inline constexpr int SETTINGS_COUNT<int> = 2;
 template <>
 inline constexpr int SETTINGS_COUNT<float> = 9;
 template <>
-inline constexpr int SETTINGS_COUNT<std::string> = 1;
+inline constexpr int SETTINGS_COUNT<std::string> = 2;
+template <>
+inline constexpr int SETTINGS_COUNT<DisplayMode> = 1;
+template <>
+inline constexpr int SETTINGS_COUNT<DepthMode> = 1;
 
 class Plugin : public cs::core::PluginBase {
  public:
@@ -109,29 +137,22 @@ class Plugin : public cs::core::PluginBase {
    public:
     using Setter = void (Renderer::*)(T);
     using Target = std::reference_wrapper<cs::utils::Property<T>>;
+    using Action = std::conditional_t<std::is_arithmetic_v<T> || std::is_enum_v<T>,
+        void (Plugin::*)(T), void (Plugin::*)(T const&)>;
 
     inline constexpr Setting()
         : mName("")
         , mComment("") {
     }
 
-    inline constexpr Setting(std::string_view name, std::string_view comment)
-        : mName(name)
-        , mComment(comment) {
-    }
-
-    inline constexpr Setting(std::string_view name, std::string_view comment, Target target)
-        : mName(name)
-        , mComment(comment)
-        , mTarget(target) {
-    }
-
-    inline constexpr Setting(
-        std::string_view name, std::string_view comment, Target target, Setter setter)
+    inline constexpr Setting(std::string_view name, std::string_view comment,
+        std::optional<Target> target = {}, std::optional<Setter> setter = {},
+        std::optional<Action> action = {})
         : mName(name)
         , mComment(comment)
         , mTarget(target)
-        , mSetter(setter) {
+        , mSetter(setter)
+        , mAction(action) {
     }
 
     static constexpr std::array<Setting<T>, SETTINGS_COUNT<T>> getSettings(
@@ -141,6 +162,7 @@ class Plugin : public cs::core::PluginBase {
     std::string_view      mComment;
     std::optional<Target> mTarget;
     std::optional<Setter> mSetter;
+    std::optional<Action> mAction;
   };
 
   struct Frame {
@@ -152,13 +174,39 @@ class Plugin : public cs::core::PluginBase {
 
   void initUI();
   void onLoad();
-  void registerUICallbacks();
-  void connectSettings();
+  void registerAllUICallbacks();
+  void connectAllSettings();
 
-  std::function<void(bool)>        getCallbackHandler(Setting<bool>::Target const& target);
-  std::function<void(double)>      getCallbackHandler(Setting<int>::Target const& target);
-  std::function<void(double)>      getCallbackHandler(Setting<float>::Target const& target);
-  std::function<void(std::string)> getCallbackHandler(Setting<std::string>::Target const& target);
+  template <typename T>
+  void connectSettings() {
+    auto settings = Setting<T>::getSettings(mPluginSettings);
+    for (auto const& setting : settings) {
+      connectSetting(setting);
+    }
+  };
+
+  template <typename T>
+  void registerUICallbacks() {
+    auto settings = Setting<T>::getSettings(mPluginSettings);
+    for (auto const& setting : settings) {
+      registerUICallback(setting);
+    }
+  };
+
+  template <typename T>
+  std::function<void(get_ui_type_t<T>)> getCallbackHandler(
+      typename Setting<T>::Target const& target) {
+    if constexpr (std::is_same_v<get_ui_type_t<T>, T>) {
+      return std::function([target](get_ui_type_t<T> value) { target.get() = value; });
+    } else if constexpr (std::is_same_v<T, int>) {
+      return std::function(
+          [target](get_ui_type_t<T> value) { target.get() = (int)std::lround(value); });
+    } else if constexpr (std::is_same_v<T, float>) {
+      return std::function([target](get_ui_type_t<T> value) { target.get() = (float)value; });
+    } else {
+      static_assert(false, "Unhandled type for getCallbackHandler");
+    }
+  };
 
   template <typename T>
   void registerUICallback(Setting<T> const& setting) {
@@ -167,46 +215,70 @@ class Plugin : public cs::core::PluginBase {
     }
     if (setting.mTarget.has_value()) {
       Setting<T>::Target target(setting.mTarget.value());
-      mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
-          std::string(setting.mComment), getCallbackHandler(target));
+      if constexpr (std::is_enum_v<T>) {
+        for (int i = static_cast<int>(T::First); i <= static_cast<int>(T::Last); i++) {
+          mGuiManager->getGui()->registerCallback(
+              "volumeRendering." + std::string(setting.mName) + std::to_string(i),
+              std::string(setting.mComment),
+              std::function([target, i]() { target.get() = static_cast<T>(i); }));
+        }
+      } else {
+        mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
+            std::string(setting.mComment), getCallbackHandler<T>(target));
+      }
     } else {
-      if constexpr (std::is_same_v<T, bool>) {
+      if constexpr (std::is_void_v<get_ui_type_t<T>>) {
         mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
-            std::string(setting.mComment), std::function([](bool value) {}));
-      } else if constexpr (std::is_same_v<T, int> || std::is_same_v<T, float>) {
+            std::string(setting.mComment), std::function([]() {}));
+      } else {
         mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
-            std::string(setting.mComment), std::function([](double value) {}));
-      } else if constexpr (std::is_same_v<T, std::string>) {
-        mGuiManager->getGui()->registerCallback("volumeRendering." + std::string(setting.mName),
-            std::string(setting.mComment), std::function([](std::string value) {}));
+            std::string(setting.mComment), std::function([](get_ui_type_t<T> value) {}));
       }
     }
   };
 
-  void setValueInUI(std::string name, bool value);
-  void setValueInUI(std::string name, int value);
-  void setValueInUI(std::string name, float value);
-  void setValueInUI(std::string name, std::string const& value);
+  template <typename T>
+  void setValueInUI(std::string                                                     name,
+      std::conditional_t<std::is_arithmetic_v<T> || std::is_enum_v<T>, T, T const&> value) {
+    if constexpr (std::is_same_v<T, bool>) {
+      mGuiManager->setCheckboxValue(name, value);
+    } else if constexpr (std::is_arithmetic_v<T>) {
+      mGuiManager->setSliderValue(name, value);
+    } else if constexpr (std::is_same_v<T, std::string>) {
+      mGuiManager->getGui()->callJavascript("CosmoScout.gui.setDropdownValue", name, value);
+    } else if constexpr (std::is_enum_v<T>) {
+      mGuiManager->setRadioChecked("volumeRendering." + name + std::to_string(static_cast<int>(value)));
+    } else {
+      static_assert(false, "Unhandled type for setValueInUI");
+    }
+  };
 
   template <typename T>
   void connectSetting(Setting<T> const& setting) {
     if (std::string(setting.mName) == "" || !setting.mTarget.has_value()) {
       return;
     }
-    std::string name(setting.mName);
-    if (setting.mSetter.has_value()) {
-      Setting<T>::Setter setter(setting.mSetter.value());
-      setting.mTarget.value().get().connectAndTouch([this, name, setter](T value) {
-        setValueInUI("volumeRendering." + name, value);
+    std::string                       name(setting.mName);
+    std::optional<Setting<T>::Setter> setter(setting.mSetter);
+    std::optional<Setting<T>::Action> action(setting.mAction);
+    setting.mTarget.value().get().connectAndTouch([this, name, setter, action](T value) {
+      setValueInUI<T>("volumeRendering." + name, value);
+      if (setter.has_value()) {
         invalidateCache();
         // Call the setter on mRenderer with value
-        (mRenderer.get()->*setter)(value);
-      });
-    } else {
-      setting.mTarget.value().get().connectAndTouch(
-          [this, name](T value) { setValueInUI("volumeRendering." + name, value); });
-    }
+        (mRenderer.get()->*setter.value())(value);
+      }
+      if (action.has_value()) {
+        (this->*action.value())(value);
+      }
+    });
   };
+
+  void setResolution(int value);
+  void setDepthData(bool value);
+  void setDrawDepth(bool value);
+  void setScalar(std::string const& value);
+  void setDisplayMode(DisplayMode value);
 
   bool tryRequestFrame();
 
@@ -287,6 +359,12 @@ Plugin::Setting<float>::getSettings(Settings& pluginSettings);
 template <>
 constexpr std::array<Plugin::Setting<std::string>, SETTINGS_COUNT<std::string>>
 Plugin::Setting<std::string>::getSettings(Settings& pluginSettings);
+template <>
+constexpr std::array<Plugin::Setting<DisplayMode>, SETTINGS_COUNT<DisplayMode>>
+Plugin::Setting<DisplayMode>::getSettings(Settings& pluginSettings);
+template <>
+constexpr std::array<Plugin::Setting<DepthMode>, SETTINGS_COUNT<DepthMode>>
+Plugin::Setting<DepthMode>::getSettings(Settings& pluginSettings);
 
 } // namespace csp::volumerendering
 

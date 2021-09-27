@@ -196,7 +196,7 @@ void DataManager::cacheTimestep(int timestep) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void DataManager::setActiveScalar(std::string scalarId) {
+void DataManager::setActiveScalar(std::string const& scalarId) {
   std::scoped_lock lock(mStateMutex, mScalarsMutex);
   auto             scalar = std::find_if(pScalars.get().begin(), pScalars.get().end(),
       [&scalarId](Scalar const& s) { return s.getId() == scalarId; });

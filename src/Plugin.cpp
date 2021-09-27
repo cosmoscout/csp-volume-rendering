@@ -226,9 +226,9 @@ void Plugin::init() {
       [this]() { mAllSettings->mPlugins["csp-volume-rendering"] = mPluginSettings; });
 
   onLoad();
-  registerUICallbacks();
+  registerAllUICallbacks();
   initUI();
-  connectSettings();
+  connectAllSettings();
 
   // Init buffers for predictive rendering
   mFrameIntervals.resize(mFrameIntervalsLength);
@@ -384,72 +384,20 @@ void Plugin::onLoad() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Plugin::registerUICallbacks() {
-  auto boolSettings = Setting<bool>::getSettings(mPluginSettings);
-  for (auto const& setting : boolSettings) {
-    registerUICallback(setting);
-  }
-  auto intSettings = Setting<int>::getSettings(mPluginSettings);
-  for (auto const& setting : intSettings) {
-    registerUICallback(setting);
-  }
-  auto floatSettings = Setting<float>::getSettings(mPluginSettings);
-  for (auto const& setting : floatSettings) {
-    registerUICallback(setting);
-  }
-  auto stringSettings = Setting<std::string>::getSettings(mPluginSettings);
-  for (auto const& setting : stringSettings) {
-    registerUICallback(setting);
-  }
+void Plugin::registerAllUICallbacks() {
+  registerUICallbacks<bool>();
+  registerUICallbacks<int>();
+  registerUICallbacks<float>();
+  registerUICallbacks<std::string>();
+  registerUICallbacks<DisplayMode>();
+  registerUICallbacks<DepthMode>();
 
   // Rendering settings
   mGuiManager->getGui()->registerCallback("volumeRendering.cancel",
       "If an image is currently rendered, cancel it.",
       std::function([this]() { mRenderer->cancelRendering(); }));
 
-  registerUICallback(Setting<int>("setResolution",
-      "Sets the resolution of the rendered volume images.", mPluginSettings.mResolution));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode0",
-      "Don't calculate a depth value.",
-      std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eNone; }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode1",
-      "Calculate depth of isosurface.",
-      std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eIsosurface; }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode2",
-      "Uses first hit as depth value.",
-      std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eFirstHit; }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode3",
-      "Uses last hit as depth value.",
-      std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eLastHit; }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode4",
-      "Uses depth, at which an opacity threshold was reached.",
-      std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eThreshold; }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode5",
-      "Uses depth, at which the last of multiple opacity thresholds was reached.",
-      std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eMultiThreshold; }));
-
-  // Display settings
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDepthData",
-      "Enables use of depth data for displaying data.",
-      std::function([this](bool enable) { mPluginSettings.mDepthData = enable; }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDrawDepth",
-      "Enables displaying the depth buffer instead of the color buffer.",
-      std::function([this](bool enable) { mPluginSettings.mDrawDepth = enable; }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDisplayMode0",
-      "Displays the rendered images on a continuous mesh.",
-      std::function([this]() { mPluginSettings.mDisplayMode = DisplayMode::eMesh; }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDisplayMode1",
-      "Displays the rendered images on a continuous mesh.",
-      std::function([this]() { mPluginSettings.mDisplayMode = DisplayMode::ePoints; }));
-
   // Data settings
-  mGuiManager->getGui()->registerCallback("volumeRendering.setScalar",
-      "Set the scalar to be rendered.",
-      std::function([this](std::string scalar) { mPluginSettings.mActiveScalar = scalar; }));
-
   mGuiManager->getGui()->registerCallback("volumeRendering.setTimestep",
       "Sets the timestep of the rendered volume images.", std::function([this](double value) {
         invalidateCache();
@@ -560,100 +508,19 @@ void Plugin::registerUICallbacks() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Plugin::connectSettings() {
-  auto boolSettings = Setting<bool>::getSettings(mPluginSettings);
-  for (auto const& setting : boolSettings) {
-    connectSetting(setting);
-  }
-  auto intSettings = Setting<int>::getSettings(mPluginSettings);
-  for (auto const& setting : intSettings) {
-    connectSetting(setting);
-  }
-  auto floatSettings = Setting<float>::getSettings(mPluginSettings);
-  for (auto const& setting : floatSettings) {
-    connectSetting(setting);
-  }
-  auto stringSetting = Setting<std::string>::getSettings(mPluginSettings);
-  for (auto const& setting : stringSetting) {
-    connectSetting(setting);
-  }
+void Plugin::connectAllSettings() {
+  connectSettings<bool>();
+  connectSettings<int>();
+  connectSettings<float>();
+  connectSettings<std::string>();
+  connectSettings<DisplayMode>();
+  connectSettings<DepthMode>();
 
   // Connect to plugin settings
-  // Data settings
-  mPluginSettings.mActiveScalar.connectAndTouch([this](std::string value) {
-    invalidateCache();
-    if (mDataManager->isReady()) {
-      mDataManager->setActiveScalar(value);
-      mSampleCount    = 0;
-      mResetTfHandles = true;
-      mGuiManager->getGui()->callJavascript(
-          "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", value);
-    }
-  });
-
   // Rendering settings
-  mPluginSettings.mResolution.connectAndTouch([this](int value) {
-    invalidateCache();
-    mNextFrame.mResolution = value;
-    mRenderer->setResolution(value);
-    mGuiManager->setSliderValue("volumeRendering.setResolution", value);
-  });
-  mPluginSettings.mDepthMode.connectAndTouch([this](DepthMode drawMode) {
-    invalidateCache();
-    mRenderer->setDepthMode(drawMode);
-    if (drawMode == DepthMode::eNone) {
-      mGuiManager->setRadioChecked("volumeRendering.setDepthMode0");
-    } else if (drawMode == DepthMode::eIsosurface) {
-      mGuiManager->setRadioChecked("volumeRendering.setDepthMode1");
-    } else if (drawMode == DepthMode::eFirstHit) {
-      mGuiManager->setRadioChecked("volumeRendering.setDepthMode2");
-    } else if (drawMode == DepthMode::eLastHit) {
-      mGuiManager->setRadioChecked("volumeRendering.setDepthMode3");
-    } else if (drawMode == DepthMode::eThreshold) {
-      mGuiManager->setRadioChecked("volumeRendering.setDepthMode4");
-    } else if (drawMode == DepthMode::eMultiThreshold) {
-      mGuiManager->setRadioChecked("volumeRendering.setDepthMode5");
-    }
-  });
   mPluginSettings.mTransferFunction.connectAndTouch([this](std::string name) {
     std::string code = "CosmoScout.volumeRendering.loadTransferFunction('" + name + "');";
     mGuiManager->addScriptToGui(code);
-  });
-
-  // Display settings
-  mPluginSettings.mDepthData.connectAndTouch([this](bool enable) {
-    for (auto const& node : mDisplayNodes) {
-      node.second->setUseDepth(enable);
-    }
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableDepthData", enable);
-  });
-  mPluginSettings.mDrawDepth.connectAndTouch([this](bool enable) {
-    for (auto const& node : mDisplayNodes) {
-      node.second->setDrawDepth(enable);
-    }
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableDrawDepth", enable);
-  });
-  mPluginSettings.mDisplayMode.connectAndTouch([this](DisplayMode displayMode) {
-    for (auto const& node : mDisplayNodes) {
-      if (node.first == displayMode) {
-        node.second->setEnabled(true);
-      } else {
-        node.second->setEnabled(false);
-      }
-    }
-    mActiveDisplay = mDisplayNodes.find(displayMode)->second;
-
-    if (displayMode == DisplayMode::eMesh) {
-      mGuiManager->setRadioChecked("volumeRendering.setDisplayMode0");
-    } else if (displayMode == DisplayMode::ePoints) {
-      mGuiManager->setRadioChecked("volumeRendering.setDisplayMode1");
-    }
-    if (mDisplayedImage) {
-      displayFrame(std::move(mDisplayedImage), displayMode);
-    } else {
-      // TODO What to do here?
-      mParametersDirty = true;
-    }
   });
 
   // Pathline settings
@@ -700,58 +567,6 @@ void Plugin::connectSettings() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::function<void(bool)> csp::volumerendering::Plugin::getCallbackHandler(
-    Setting<bool>::Target const& target) {
-  return std::function([target](bool value) { target.get() = value; });
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-std::function<void(double)> csp::volumerendering::Plugin::getCallbackHandler(
-    Setting<int>::Target const& target) {
-  return std::function([target](double value) { target.get() = (int)std::lround(value); });
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-std::function<void(double)> csp::volumerendering::Plugin::getCallbackHandler(
-    Setting<float>::Target const& target) {
-  return std::function([target](double value) { target.get() = (float)value; });
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-std::function<void(std::string)> csp::volumerendering::Plugin::getCallbackHandler(
-    Setting<std::string>::Target const& target) {
-  return std::function([target](std::string value) { target.get() = (std::string)value; });
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Plugin::setValueInUI(std::string name, bool value) {
-  mGuiManager->setCheckboxValue(name, value);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Plugin::setValueInUI(std::string name, int value) {
-  mGuiManager->setSliderValue(name, value);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Plugin::setValueInUI(std::string name, float value) {
-  mGuiManager->setSliderValue(name, value);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void csp::volumerendering::Plugin::setValueInUI(std::string name, std::string const& value) {
-  // TODO
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 template <>
 constexpr std::array<Plugin::Setting<bool>, SETTINGS_COUNT<bool>>
 Plugin::Setting<bool>::getSettings(Settings& pluginSettings) {
@@ -764,6 +579,11 @@ Plugin::Setting<bool>::getSettings(Settings& pluginSettings) {
       Setting<bool>{"setEnableDenoiseDepth", "Enables use of OIDN for displaying depth data.",
           pluginSettings.mDenoiseDepth, &Renderer::setDenoiseDepth},
       // Display settings
+      Setting<bool>{"setEnableDepthData", "Enables use of depth data for displaying data.",
+          pluginSettings.mDepthData, {}, &Plugin::setDepthData},
+      Setting<bool>{"setEnableDrawDepth",
+          "Enables displaying the depth buffer instead of the color buffer.",
+          pluginSettings.mDrawDepth, {}, &Plugin::setDrawDepth},
       Setting<bool>{"setEnablePredictiveRendering",
           "Enables predicting the next camera position for rendering.",
           pluginSettings.mPredictiveRendering},
@@ -800,6 +620,8 @@ constexpr std::array<Plugin::Setting<int>, SETTINGS_COUNT<int>> Plugin::Setting<
       Setting<int>{"setMaxRenderPasses",
           "Sets the maximum number of render passes for constant rendering parameters.",
           pluginSettings.mRendering.mMaxPasses, &Renderer::setMaxRenderPasses},
+      Setting<int>{"setResolution", "Sets the resolution of the rendered volume images.",
+          pluginSettings.mResolution, &Renderer::setResolution, &Plugin::setResolution},
   };
   return std::move(settings);
 }
@@ -851,11 +673,39 @@ template <>
 constexpr std::array<Plugin::Setting<std::string>, SETTINGS_COUNT<std::string>>
 Plugin::Setting<std::string>::getSettings(Settings& pluginSettings) {
   std::array<Setting<std::string>, SETTINGS_COUNT<std::string>> settings{
+      // Data settings
+      Setting<std::string>{"setScalar", "Set the scalar to be rendered.",
+          pluginSettings.mActiveScalar, {}, &Plugin::setScalar},
       // Core settings
       pluginSettings.mCore.has_value()
           ? Setting<std::string>{"setCoreScalar", "Sets the scalar used for coloring the core.",
                 pluginSettings.mCore->mScalar, &Renderer::setCoreScalar}
           : Setting<std::string>{},
+  };
+  return std::move(settings);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template <>
+constexpr std::array<Plugin::Setting<DisplayMode>, SETTINGS_COUNT<DisplayMode>>
+Plugin::Setting<DisplayMode>::getSettings(Settings& pluginSettings) {
+  std::array<Setting<DisplayMode>, SETTINGS_COUNT<DisplayMode>> settings{
+      Setting<DisplayMode>{"setDisplayMode", "Sets the mode for displaying the rendered images.",
+          pluginSettings.mDisplayMode, {}, &Plugin::setDisplayMode},
+  };
+  return std::move(settings);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template <>
+constexpr std::array<Plugin::Setting<DepthMode>, SETTINGS_COUNT<DepthMode>>
+Plugin::Setting<DepthMode>::getSettings(Settings& pluginSettings) {
+  std::array<Setting<DepthMode>, SETTINGS_COUNT<DepthMode>> settings{
+      Setting<DepthMode>{"setDepthMode",
+          "Sets the mode for determining the per pixel depth values of the volume.",
+          pluginSettings.mDepthMode, &Renderer::setDepthMode},
   };
   return std::move(settings);
 }
@@ -879,6 +729,59 @@ void Plugin::initUI() {
   if (mPluginSettings.mPathlines.has_value()) {
     mGuiManager->getGui()->callJavascript(
         "CosmoScout.volumeRendering.enableSettingsSection", "pathlines");
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void csp::volumerendering::Plugin::setResolution(int value) {
+  mNextFrame.mResolution = value;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void csp::volumerendering::Plugin::setDepthData(bool value) {
+  for (auto const& node : mDisplayNodes) {
+    node.second->setUseDepth(value);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void csp::volumerendering::Plugin::setDrawDepth(bool value) {
+  for (auto const& node : mDisplayNodes) {
+    node.second->setDrawDepth(value);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void csp::volumerendering::Plugin::setScalar(std::string const& value) {
+  invalidateCache();
+  if (mDataManager->isReady()) {
+    mDataManager->setActiveScalar(value);
+    mSampleCount    = 0;
+    mResetTfHandles = true;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void csp::volumerendering::Plugin::setDisplayMode(DisplayMode value) {
+  for (auto const& node : mDisplayNodes) {
+    if (node.first == value) {
+      node.second->setEnabled(true);
+    } else {
+      node.second->setEnabled(false);
+    }
+  }
+  mActiveDisplay = mDisplayNodes.find(value)->second;
+
+  if (mDisplayedImage) {
+    displayFrame(std::move(mDisplayedImage), value);
+  } else {
+    // TODO What to do here?
+    mParametersDirty = true;
   }
 }
 

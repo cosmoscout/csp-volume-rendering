@@ -87,7 +87,7 @@ class DataManager {
   /// Sets the current scalar to the given value.
   /// Has to be one of the values in pScalars.
   /// Future calls to getData() will return data with this as the active scalar.
-  void setActiveScalar(std::string scalarId);
+  void setActiveScalar(std::string const& scalarId);
 
   /// Returns the volume data as a csv string.
   std::string const& getCsvData();
