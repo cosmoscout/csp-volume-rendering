@@ -31,6 +31,10 @@
       // Trigger "setTimestep" callback on "update" event
       this.timestepSlider = document.querySelector(`[data-callback="volumeRendering.setTimestep"]`);
       this.timestepSlider.dataset.event = "update";
+      this.timestepContainer = document.getElementById("volumeRendering.timestepContainer");
+      this.animationSpeedContainer =
+          document.getElementById("volumeRendering.animationSpeedContainer");
+      this.playButton = document.getElementById("volumeRendering.play");
 
       this.progressBar = document.getElementById("volumeRendering.progressBar");
 
@@ -191,11 +195,21 @@
 
     /**
      * Sets the available timesteps. The timestep slider will snap to these values.
+     * If there is only one timestep, the timestep slider and the animation feature
+     * will be disabled.
      *
      * @param timestepsJson {string} json string of a list of all available timesteps
      */
     setTimesteps(timestepsJson) {
       this.timesteps = JSON.parse(timestepsJson);
+
+      if (this.timesteps.length < 2) {
+        this.timestepContainer.hidden       = true;
+        this.animationSpeedContainer.hidden = true;
+        this.playButton.hidden              = true;
+        return;
+      }
+
       this.timesteps.sort((a, b) => a - b);
       var min   = this.timesteps[0];
       var max   = this.timesteps[this.timesteps.length - 1];
