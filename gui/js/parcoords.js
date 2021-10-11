@@ -103,6 +103,8 @@
       this.resizeObserver.observe(target, config);
 
       this.setHeight(200);
+
+      this._generateHistograms();
     }
 
     exportBrushState() {
@@ -181,6 +183,46 @@
         this.brushMin.value = "";
         this.brushMax.value = "";
       }
+    }
+
+    _generateHistograms() {
+      const self = this;
+      const bincount = 20;
+      const columns = {};
+      this.data.columns.forEach((c) => {
+        columns[c] = this.data.map(d => d[c]);
+      });
+      const bins = {};
+      Object.keys(columns).forEach((c) => {
+        const bincounter = d3.histogram();
+        bincounter.domain(this.pc.dimensions()[c].yscale.domain()).thresholds(bincount);
+        bins[c] = bincounter(columns[c]);
+      });
+      const xScale = d3.scaleLog()
+        .domain([1, this.data.length])
+        .range([0, 50]);
+
+      const histogram = this.pc.g()
+        .append("svg:g")
+        .attr("class", "histogram")
+        .selectAll("rect")
+        .data(d => bins[d]);
+      histogram.enter()
+        .append("rect")
+        .attr("x", 1)
+        .attr("y", function (d) {
+          const dimension = d3.select(this.parentNode).data()[0];
+          const scale = self.pc.dimensions()[dimension].yscale;
+          return scale(d.x1);
+        })
+        .attr("height", function (d) {
+          const dimension = d3.select(this.parentNode).data()[0];
+          const scale = self.pc.dimensions()[dimension].yscale;
+          return Math.abs(scale(d.x1) - scale(d.x0));
+        })
+        .attr("width", d => {
+          return d.length == 0 ? 0 : xScale(d.length);
+        });
     }
   }
 
