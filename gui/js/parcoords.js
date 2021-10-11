@@ -102,9 +102,9 @@
       });
       this.resizeObserver.observe(target, config);
 
-      this.setHeight(200);
-
       this._generateHistograms();
+
+      this.setHeight(200);
     }
 
     exportBrushState() {
@@ -166,6 +166,7 @@
       this.parcoords.style.height = `${height}px`;
       this.parcoords.querySelectorAll("g.tick line, path.domain")
           .forEach(e => {e.style.stroke = "var(--cs-color-text)"});
+      this._insertHistograms();
     }
 
     _updateMinMax(dimension) {
@@ -186,27 +187,29 @@
     }
 
     _generateHistograms() {
-      const self = this;
       const bincount = 20;
       const columns = {};
       this.data.columns.forEach((c) => {
         columns[c] = this.data.map(d => d[c]);
       });
-      const bins = {};
+      this.bins = {};
       Object.keys(columns).forEach((c) => {
         const bincounter = d3.histogram();
         bincounter.domain(this.pc.dimensions()[c].yscale.domain()).thresholds(bincount);
-        bins[c] = bincounter(columns[c]);
+        this.bins[c] = bincounter(columns[c]);
       });
+    }
+
+    _insertHistograms() {
+      const self = this;
       const xScale = d3.scaleLog()
         .domain([1, this.data.length])
         .range([0, 50]);
-
       const histogram = this.pc.g()
         .append("svg:g")
         .attr("class", "histogram")
         .selectAll("rect")
-        .data(d => bins[d]);
+        .data(d => this.bins[d]);
       histogram.enter()
         .append("rect")
         .attr("x", 1)
