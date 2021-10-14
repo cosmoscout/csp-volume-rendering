@@ -58,3 +58,8 @@
 .parcoordsControls {
     max-width: 400px;
 }
+
+.parcoords .histogram {
+    fill: #ddf5;
+    stroke: black;
+}
