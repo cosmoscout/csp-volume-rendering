@@ -184,7 +184,7 @@ class Renderer {
 
       struct Volume {
         std::vector<glm::vec4> mTransferFunction;
-        float                  mDensityScale;
+        float                  mDensityScale = 0.f;
 
         bool operator==(const Volume& other) const {
           return mDensityScale == other.mDensityScale &&
@@ -195,7 +195,7 @@ class Renderer {
       struct Core {
         bool        mEnable = false;
         std::string mScalar;
-        float       mRadius;
+        float       mRadius = 0.0f;
 
         bool operator==(const Core& other) const {
           return mEnable == other.mEnable && mScalar == other.mScalar && mRadius == other.mRadius;
@@ -204,8 +204,8 @@ class Renderer {
 
       struct Pathlines {
         bool                      mEnable = false;
-        float                     mLineOpacity;
-        float                     mLineSize;
+        float                     mLineOpacity = 0.f;
+        float                     mLineSize = 0.f;
         std::vector<ScalarFilter> mScalarFilters;
         std::string               mActiveScalar;
 
@@ -217,7 +217,7 @@ class Renderer {
       } mPathlines;
 
       struct PathlinesTexture {
-        float mLength;
+        float mLength = 0.f;
 
         bool operator==(const PathlinesTexture& other) const {
           return mLength == other.mLength;
