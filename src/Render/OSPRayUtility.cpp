@@ -108,15 +108,13 @@ ospray::cpp::Volume createOSPRayVolume(
   }
   }
 
-  std::vector<uint64_t> vertexIndices(vtkVolume->GetCells()->GetNumberOfConnectivityEntries());
-  vtkVolume->GetCells()->GetConnectivityArray64()->ExportToVoidPointer(vertexIndices.data());
+  std::vector<uint64_t> vertexIndices(vtkVolume->GetCells()->GetConnectivityArray64()->Begin(),
+      vtkVolume->GetCells()->GetConnectivityArray64()->End());
 
-  std::vector<uint64_t> cellIndices(vtkVolume->GetNumberOfCells());
-  int                   index = -4;
-  std::generate(cellIndices.begin(), cellIndices.end(), [&index] {
-    index += 5;
-    return index;
-  });
+  // This VTK array includes an additional offset for where the next cell would be placed
+  // It has to be removed for using the array with OSPRay
+  std::vector<uint64_t> cellIndices(vtkVolume->GetCells()->GetOffsetsArray64()->Begin(),
+      vtkVolume->GetCells()->GetOffsetsArray64()->End() - 1);
 
   std::vector<uint8_t> cellTypes(
       vtkVolume->GetCellTypesArray()->Begin(), vtkVolume->GetCellTypesArray()->End());
@@ -132,7 +130,6 @@ ospray::cpp::Volume createOSPRayVolume(
   }
   volume.setParam("vertex.position", ospray::cpp::Data(vertexPositions));
   volume.setParam("index", ospray::cpp::Data(vertexIndices));
-  volume.setParam("indexPrefixed", false);
   volume.setParam("cell.index", ospray::cpp::Data(cellIndices));
   volume.setParam("cell.type", ospray::cpp::Data(cellTypes));
   volume.commit();
