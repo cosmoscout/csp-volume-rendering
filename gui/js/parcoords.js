@@ -161,18 +161,34 @@
       });
       // Apparently brushMode has to be switched back and forth once, or else the brushing will
       // not work after a resize
-      this.pc.height(height).render().brushMode("angular").brushMode("1D-axes").brushExtents(
-          brushExtents);
+      this.pc.height(height).render();
+      this._insertHistograms();
+      this._showHistogram(this.activeBrush, true);
+      this.pc.brushMode("angular").brushMode("1D-axes").brushExtents(brushExtents);
       this.parcoords.style.height = `${height}px`;
       this.parcoords.querySelectorAll("g.tick line, path.domain")
           .forEach(e => {e.style.stroke = "var(--cs-color-text)"});
-      this._insertHistograms();
     }
 
-    _updateMinMax(dimension) {
+    _showHistogram(dimension, enable) {
+      if (dimension != "") {
+        const newBars = this.pc.g()._groups[0].find(g => g.__data__ == dimension).querySelector(".histogram").children;
+        for (let bar of newBars) {
+          d3.select(bar).attr("hidden", enable ? null : false);
+        }
+      }
+    }
+
+    _updateActiveScalar(dimension) {
       if (typeof this.activeScalarCallback === "function") {
         this.activeScalarCallback(dimension);
       }
+      this._showHistogram(this.activeBrush, false);
+      this._showHistogram(dimension, true);
+    }
+
+    _updateMinMax(dimension) {
+      this._updateActiveScalar(dimension);
       this.activeBrushLabel.innerText = dimension;
       this.activeBrush                = dimension;
       this.brushMin.disabled          = false;
@@ -221,11 +237,13 @@
         .attr("height", function (d) {
           const dimension = d3.select(this.parentNode).data()[0];
           const scale = self.pc.dimensions()[dimension].yscale;
-          return Math.abs(scale(d.x1) - scale(d.x0));
+          const height = Math.abs(scale(d.x1) - scale(d.x0))
+          return height > 0 ? height : 0.1;
         })
         .attr("width", d => {
           return d.length == 0 ? 0 : xScale(d.length);
-        });
+        })
+        .attr("hidden", true);
     }
   }
 
