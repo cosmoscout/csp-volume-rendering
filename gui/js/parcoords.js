@@ -222,7 +222,7 @@
         .domain([1, this.data.length])
         .range([0, 50]);
       const histogram = this.pc.g()
-        .append("svg:g")
+        .insert("svg:g", ".brush")
         .attr("class", "histogram")
         .selectAll("rect")
         .data(d => this.bins[d]);
