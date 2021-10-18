@@ -19,6 +19,7 @@
 #include "../../../src/cs-core/SolarSystem.hpp"
 #include "../../../src/cs-core/TimeControl.hpp"
 #include "../../../src/cs-graphics/ColorMap.hpp"
+#include "../../../src/cs-utils/convert.hpp"
 #include "../../../src/cs-utils/filesystem.hpp"
 
 #include <VistaKernel/GraphicsManager/VistaGroupNode.h>
@@ -376,7 +377,7 @@ void Plugin::onLoad() {
   for (auto const& node : mDisplayNodes) {
     node.second->setAnchorPosition(mPluginSettings.mPosition.get());
     node.second->setAnchorScale(mPluginSettings.mScale.get());
-    node.second->setAnchorRotation(mPluginSettings.mRotation.get());
+    node.second->setAnchorRotation(cs::utils::convert::toRadians(mPluginSettings.mRotation.get()));
 
     mSolarSystem->registerAnchor(node.second);
   }

@@ -107,7 +107,7 @@ class Plugin : public cs::core::PluginBase {
     cs::utils::Property<std::string>       mAnchor;
     cs::utils::DefaultProperty<glm::dvec3> mPosition{glm::dvec3(0, 0, 0)};
     cs::utils::DefaultProperty<double>     mScale{1.};
-    cs::utils::DefaultProperty<glm::dquat> mRotation{glm::dquat(1, 0, 0, 0)};
+    cs::utils::DefaultProperty<glm::dvec3> mRotation{glm::dvec3(0, 0, 0)};
 
     struct Core {
       cs::utils::DefaultProperty<bool>        mEnabled{true};
