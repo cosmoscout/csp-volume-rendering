@@ -71,6 +71,7 @@
           .mode("queue")
           .rate(50)
           .render()
+          .reorderable()
           .brushMode("1D-axes")
           .interactive();
       const boundCallback = callback.bind(this);
