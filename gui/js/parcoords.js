@@ -57,6 +57,7 @@
       });
 
       this.heightOffset = 47;
+      this._handleBrushEvents = true;
 
       this.data                                    = d3.csvParse(csv);
       this.data                                    = d3.shuffle(this.data);
@@ -76,9 +77,11 @@
           .interactive();
       const boundCallback = callback.bind(this);
       this.pc.on("brush", (brushed, args) => {
-        boundCallback(brushed, args);
-        if (args) {
-          this._updateMinMax(args.axis);
+        if (this._handleBrushEvents) {
+          boundCallback(brushed, args);
+          if (args) {
+            this._updateMinMax(args.axis);
+          }
         }
       });
       this.pc.on("brushend", (brushed, args) => {
@@ -148,6 +151,8 @@
     }
 
     setHeight(height) {
+      this._handleBrushEvents = false;
+
       const scrollbarHeight =
           this.parcoords.parentNode.offsetHeight - this.parcoords.parentNode.clientHeight;
       height -= scrollbarHeight;
@@ -169,6 +174,7 @@
       this.parcoords.style.height = `${height}px`;
       this.parcoords.querySelectorAll("g.tick line, path.domain")
           .forEach(e => {e.style.stroke = "var(--cs-color-text)"});
+      this._handleBrushEvents = true;
     }
 
     _showHistogram(dimension, enable) {
