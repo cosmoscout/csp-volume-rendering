@@ -130,7 +130,7 @@ OSPRayRenderer::Volume const& OSPRayRenderer::getVolume(
     }
     for (auto const& cacheEntry : stateCache->second) {
       if (cacheEntry.second.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-        if (cacheEntry.first <= maxLod) {
+        if (!maxLod.has_value() || cacheEntry.first <= maxLod) {
           lod = cacheEntry.first;
         }
       }
