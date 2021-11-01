@@ -321,6 +321,8 @@ class Plugin : public cs::core::PluginBase {
   bool mFrameInvalid;
   bool mParametersDirty;
 
+  bool mAnimating = false;
+
   std::future<std::vector<float>> mDataSample;
   int                             mSampleCount = 0;
   bool                            mResetTfHandles;

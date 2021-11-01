@@ -274,7 +274,7 @@ void Plugin::deInit() {
 void Plugin::update() {
   mNextFrame.mCameraTransform = getCurrentCameraTransform();
 
-  if (mDataManager->isReady() && mSampleCount < 20) {
+  if (mDataManager->isReady() && mSampleCount < 20 && !mAnimating) {
     if (mDataSample.valid() &&
         mDataSample.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
       std::vector<float> sample = mDataSample.get();
@@ -452,6 +452,7 @@ void Plugin::registerAllUICallbacks() {
       "Specifies, whether timesteps are currently animated (increasing automatically).",
       std::function([this](bool value) {
         invalidateCache();
+        mAnimating = value;
         if (value) {
           mRenderer->setMaxLod(mDataManager->getMinLod(mDataManager->getState()));
         } else {
