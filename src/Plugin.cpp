@@ -88,6 +88,48 @@ NLOHMANN_JSON_SERIALIZE_ENUM(DepthMode, {
                                             {DepthMode::eMultiThreshold, "multiThreshold"},
                                         })
 
+void from_json(nlohmann::json const& j, Plugin::Settings::Data& o) {
+  cs::core::Settings::deserialize(j, "path", o.mPath);
+  cs::core::Settings::deserialize(j, "namePattern", o.mNamePattern);
+  cs::core::Settings::deserialize(j, "type", o.mType);
+  cs::core::Settings::deserialize(j, "structure", o.mStructure);
+  cs::core::Settings::deserialize(j, "shape", o.mShape);
+  cs::core::Settings::deserialize(j, "activeScalar", o.mActiveScalar);
+};
+
+void to_json(nlohmann::json& j, Plugin::Settings::Data const& o) {
+  cs::core::Settings::serialize(j, "path", o.mPath);
+  cs::core::Settings::serialize(j, "namePattern", o.mNamePattern);
+  cs::core::Settings::serialize(j, "type", o.mType);
+  cs::core::Settings::serialize(j, "structure", o.mStructure);
+  cs::core::Settings::serialize(j, "shape", o.mShape);
+  cs::core::Settings::serialize(j, "activeScalar", o.mActiveScalar);
+};
+
+void from_json(nlohmann::json const& j, Plugin::Settings::Rendering& o) {
+  cs::core::Settings::deserialize(j, "requestImages", o.mRequestImages);
+  cs::core::Settings::deserialize(j, "resolution", o.mResolution);
+  cs::core::Settings::deserialize(j, "samplingRate", o.mSamplingRate);
+  cs::core::Settings::deserialize(j, "maxPasses", o.mMaxPasses);
+  cs::core::Settings::deserialize(j, "densityScale", o.mDensityScale);
+  cs::core::Settings::deserialize(j, "denoiseColor", o.mDenoiseColor);
+  cs::core::Settings::deserialize(j, "denoiseDepth", o.mDenoiseDepth);
+  cs::core::Settings::deserialize(j, "depthMode", o.mDepthMode);
+  cs::core::Settings::deserialize(j, "transferFunction", o.mTransferFunction);
+};
+
+void to_json(nlohmann::json& j, Plugin::Settings::Rendering const& o) {
+  cs::core::Settings::serialize(j, "requestImages", o.mRequestImages);
+  cs::core::Settings::serialize(j, "resolution", o.mResolution);
+  cs::core::Settings::serialize(j, "samplingRate", o.mSamplingRate);
+  cs::core::Settings::serialize(j, "maxPasses", o.mMaxPasses);
+  cs::core::Settings::serialize(j, "densityScale", o.mDensityScale);
+  cs::core::Settings::serialize(j, "denoiseColor", o.mDenoiseColor);
+  cs::core::Settings::serialize(j, "denoiseDepth", o.mDenoiseDepth);
+  cs::core::Settings::serialize(j, "depthMode", o.mDepthMode);
+  cs::core::Settings::serialize(j, "transferFunction", o.mTransferFunction);
+};
+
 void from_json(nlohmann::json const& j, Plugin::Settings::Lighting& o) {
   cs::core::Settings::deserialize(j, "enabled", o.mEnabled);
   cs::core::Settings::deserialize(j, "sunStrength", o.mSunStrength);
@@ -99,6 +141,36 @@ void to_json(nlohmann::json& j, Plugin::Settings::Lighting const& o) {
   cs::core::Settings::serialize(j, "sunStrength", o.mSunStrength);
   cs::core::Settings::serialize(j, "ambientStrength", o.mSunStrength);
 }
+
+void from_json(nlohmann::json const& j, Plugin::Settings::Display& o) {
+  cs::core::Settings::deserialize(j, "predictiveRendering", o.mPredictiveRendering);
+  cs::core::Settings::deserialize(j, "reuseImages", o.mReuseImages);
+  cs::core::Settings::deserialize(j, "useDepth", o.mDepthData);
+  cs::core::Settings::deserialize(j, "drawDepth", o.mDrawDepth);
+  cs::core::Settings::deserialize(j, "displayMode", o.mDisplayMode);
+};
+
+void to_json(nlohmann::json& j, Plugin::Settings::Display const& o) {
+  cs::core::Settings::serialize(j, "predictiveRendering", o.mPredictiveRendering);
+  cs::core::Settings::serialize(j, "reuseImages", o.mReuseImages);
+  cs::core::Settings::serialize(j, "useDepth", o.mDepthData);
+  cs::core::Settings::serialize(j, "drawDepth", o.mDrawDepth);
+  cs::core::Settings::serialize(j, "displayMode", o.mDisplayMode);
+};
+
+void from_json(nlohmann::json const& j, Plugin::Settings::Transform& o) {
+  cs::core::Settings::deserialize(j, "anchor", o.mAnchor);
+  cs::core::Settings::deserialize(j, "position", o.mPosition);
+  cs::core::Settings::deserialize(j, "scale", o.mScale);
+  cs::core::Settings::deserialize(j, "rotation", o.mRotation);
+};
+
+void to_json(nlohmann::json& j, Plugin::Settings::Transform const& o) {
+  cs::core::Settings::serialize(j, "anchor", o.mAnchor);
+  cs::core::Settings::serialize(j, "position", o.mPosition);
+  cs::core::Settings::serialize(j, "scale", o.mScale);
+  cs::core::Settings::serialize(j, "rotation", o.mRotation);
+};
 
 void from_json(nlohmann::json const& j, Plugin::Settings::Core& o) {
   cs::core::Settings::deserialize(j, "enabled", o.mEnabled);
@@ -125,77 +197,27 @@ void to_json(nlohmann::json& j, Plugin::Settings::Pathlines const& o) {
 }
 
 void from_json(nlohmann::json const& j, Plugin::Settings& o) {
-  // Data settings
-  cs::core::Settings::deserialize(j, "volumeDataPath", o.mVolumeDataPath);
-  cs::core::Settings::deserialize(j, "volumeDataPattern", o.mVolumeDataPattern);
-  cs::core::Settings::deserialize(j, "volumeDataType", o.mVolumeDataType);
-  cs::core::Settings::deserialize(j, "volumeStructure", o.mVolumeStructure);
-  cs::core::Settings::deserialize(j, "volumeShape", o.mVolumeShape);
-  cs::core::Settings::deserialize(j, "activeScalar", o.mActiveScalar);
-
-  // Rendering settings
-  cs::core::Settings::deserialize(j, "requestImages", o.mRequestImages);
-  cs::core::Settings::deserialize(j, "resolution", o.mResolution);
-  cs::core::Settings::deserialize(j, "samplingRate", o.mSamplingRate);
-  cs::core::Settings::deserialize(j, "densityScale", o.mDensityScale);
-  cs::core::Settings::deserialize(j, "denoiseColor", o.mDenoiseColor);
-  cs::core::Settings::deserialize(j, "denoiseDepth", o.mDenoiseDepth);
-  cs::core::Settings::deserialize(j, "depthMode", o.mDepthMode);
-  cs::core::Settings::deserialize(j, "transferFunction", o.mTransferFunction);
-
-  // Display settings
-  cs::core::Settings::deserialize(j, "predictiveRendering", o.mPredictiveRendering);
-  cs::core::Settings::deserialize(j, "reuseImages", o.mReuseImages);
-  cs::core::Settings::deserialize(j, "useDepth", o.mDepthData);
-  cs::core::Settings::deserialize(j, "drawDepth", o.mDrawDepth);
-  cs::core::Settings::deserialize(j, "displayMode", o.mDisplayMode);
-
-  // Transform settings
-  cs::core::Settings::deserialize(j, "anchor", o.mAnchor);
-  cs::core::Settings::deserialize(j, "position", o.mPosition);
-  cs::core::Settings::deserialize(j, "scale", o.mScale);
-  cs::core::Settings::deserialize(j, "rotation", o.mRotation);
-
+  cs::core::Settings::deserialize(j, "data", o.mData);
+  if (j.contains("rendering")) {
+    cs::core::Settings::deserialize(j, "rendering", o.mRendering);
+  }
   if (j.contains("lighting")) {
     cs::core::Settings::deserialize(j, "lighting", o.mLighting);
   }
+  if (j.contains("display")) {
+    cs::core::Settings::deserialize(j, "display", o.mDisplay);
+  }
+  cs::core::Settings::deserialize(j, "transform", o.mTransform);
   cs::core::Settings::deserialize(j, "core", o.mCore);
   cs::core::Settings::deserialize(j, "pathlines", o.mPathlines);
 }
 
 void to_json(nlohmann::json& j, Plugin::Settings const& o) {
-  // Data settings
-  cs::core::Settings::serialize(j, "volumeDataPath", o.mVolumeDataPath);
-  cs::core::Settings::serialize(j, "volumeDataPattern", o.mVolumeDataPattern);
-  cs::core::Settings::serialize(j, "volumeDataType", o.mVolumeDataType);
-  cs::core::Settings::serialize(j, "volumeStructure", o.mVolumeStructure);
-  cs::core::Settings::serialize(j, "volumeShape", o.mVolumeShape);
-  cs::core::Settings::serialize(j, "activeScalar", o.mActiveScalar);
-
-  // Rendering settings
-  cs::core::Settings::serialize(j, "requestImages", o.mRequestImages);
-  cs::core::Settings::serialize(j, "resolution", o.mResolution);
-  cs::core::Settings::serialize(j, "samplingRate", o.mSamplingRate);
-  cs::core::Settings::serialize(j, "densityScale", o.mDensityScale);
-  cs::core::Settings::serialize(j, "denoiseColor", o.mDenoiseColor);
-  cs::core::Settings::serialize(j, "denoiseDepth", o.mDenoiseDepth);
-  cs::core::Settings::serialize(j, "depthMode", o.mDepthMode);
-  cs::core::Settings::serialize(j, "transferFunction", o.mTransferFunction);
-
-  // Display settings
-  cs::core::Settings::serialize(j, "predictiveRendering", o.mPredictiveRendering);
-  cs::core::Settings::serialize(j, "reuseImages", o.mReuseImages);
-  cs::core::Settings::serialize(j, "useDepth", o.mDepthData);
-  cs::core::Settings::serialize(j, "drawDepth", o.mDrawDepth);
-  cs::core::Settings::serialize(j, "displayMode", o.mDisplayMode);
-
-  // Transform settings
-  cs::core::Settings::serialize(j, "anchor", o.mAnchor);
-  cs::core::Settings::serialize(j, "position", o.mPosition);
-  cs::core::Settings::serialize(j, "scale", o.mScale);
-  cs::core::Settings::serialize(j, "rotation", o.mRotation);
-
+  cs::core::Settings::serialize(j, "data", o.mData);
+  cs::core::Settings::serialize(j, "rendering", o.mRendering);
   cs::core::Settings::serialize(j, "lighting", o.mLighting);
+  cs::core::Settings::serialize(j, "display", o.mDisplay);
+  cs::core::Settings::serialize(j, "transform", o.mTransform);
   cs::core::Settings::serialize(j, "core", o.mCore);
   cs::core::Settings::serialize(j, "pathlines", o.mPathlines);
 }
@@ -281,16 +303,16 @@ void Plugin::update() {
     if (mDataManager->isReady()) {
       mRenderState = RenderState::eIdle;
       // Make sure that the correct scalar is selected in the DataManager
-      mPluginSettings.mActiveScalar.touch();
+      mPluginSettings.mData.mActiveScalar.touch();
     }
     break;
   case RenderState::ePaused:
-    if (mPluginSettings.mRequestImages.get()) {
+    if (mPluginSettings.mRendering.mRequestImages.get()) {
       mRenderState = RenderState::eIdle;
     }
     break;
   case RenderState::eIdle:
-    if (!mPluginSettings.mRequestImages.get()) {
+    if (!mPluginSettings.mRendering.mRequestImages.get()) {
       mRenderState = RenderState::ePaused;
     } else if (tryRequestFrame()) {
       mRenderState = RenderState::eRenderingImage;
@@ -298,7 +320,7 @@ void Plugin::update() {
     break;
   case RenderState::eRenderingImage:
     showRenderProgress();
-    if (!mPluginSettings.mRequestImages.get()) {
+    if (!mPluginSettings.mRendering.mRequestImages.get()) {
       mRenderer->cancelRendering();
       mRenderState = RenderState::ePaused;
     } else if (mFutureFrameData.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
@@ -310,7 +332,7 @@ void Plugin::update() {
     break;
   }
 
-  if (mPluginSettings.mReuseImages.get() && mRenderedImages.size() > 0) {
+  if (mPluginSettings.mDisplay.mReuseImages.get() && mRenderedImages.size() > 0) {
     tryReuseFrame(mNextFrame.mCameraTransform);
   }
 
@@ -326,16 +348,16 @@ void Plugin::onLoad() {
   // Init data manager and volume renderer
   mRenderState = RenderState::eWaitForData;
 
-  switch (mPluginSettings.mVolumeDataType.get()) {
+  switch (mPluginSettings.mData.mType.get()) {
   case VolumeFileType::eVtk:
-    mDataManager = std::make_shared<DataManager>(mPluginSettings.mVolumeDataPath.get(),
-        mPluginSettings.mVolumeDataPattern.get(), std::make_unique<VtkFileLoader>(),
+    mDataManager = std::make_shared<DataManager>(mPluginSettings.mData.mPath.get(),
+        mPluginSettings.mData.mNamePattern.get(), std::make_unique<VtkFileLoader>(),
         mPluginSettings.mPathlines ? std::optional(mPluginSettings.mPathlines->mPath.get())
                                    : std::nullopt);
     break;
   case VolumeFileType::eNetCdf:
-    mDataManager = std::make_shared<DataManager>(mPluginSettings.mVolumeDataPath.get(),
-        mPluginSettings.mVolumeDataPattern.get(), std::make_unique<NetCdfFileLoader>(),
+    mDataManager = std::make_shared<DataManager>(mPluginSettings.mData.mPath.get(),
+        mPluginSettings.mData.mNamePattern.get(), std::make_unique<NetCdfFileLoader>(),
         mPluginSettings.mPathlines ? std::optional(mPluginSettings.mPathlines->mPath.get())
                                    : std::nullopt);
     break;
@@ -346,7 +368,7 @@ void Plugin::onLoad() {
   }
 
   mRenderer = std::make_unique<OSPRayRenderer>(
-      mDataManager, mPluginSettings.mVolumeStructure.get(), mPluginSettings.mVolumeShape.get());
+      mDataManager, mPluginSettings.mData.mStructure.get(), mPluginSettings.mData.mShape.get());
 
   // If the volume representations already exist, remove them from the solar system
   for (auto const& node : mDisplayNodes) {
@@ -356,22 +378,22 @@ void Plugin::onLoad() {
   mActiveDisplay.reset();
 
   // Init volume representation
-  auto anchor = mAllSettings->mAnchors.find(mPluginSettings.mAnchor.get());
+  auto anchor = mAllSettings->mAnchors.find(mPluginSettings.mTransform.mAnchor.get());
   if (anchor == mAllSettings->mAnchors.end()) {
-    logger().error("No anchor with name '{}' found!", mPluginSettings.mAnchor.get());
+    logger().error("No anchor with name '{}' found!", mPluginSettings.mTransform.mAnchor.get());
     throw std::runtime_error("Failed to initialize CelestialObjects.");
   }
 
   auto existence                    = anchor->second.mExistence;
   mDisplayNodes[DisplayMode::eMesh] = std::make_shared<Billboard>(
-      mPluginSettings.mVolumeShape.get(), mAllSettings, mPluginSettings.mAnchor.get());
+      mPluginSettings.mData.mShape.get(), mAllSettings, mPluginSettings.mTransform.mAnchor.get());
   mDisplayNodes[DisplayMode::ePoints] = std::make_shared<PointsForwardWarped>(
-      mPluginSettings.mVolumeShape.get(), mAllSettings, mPluginSettings.mAnchor.get());
+      mPluginSettings.mData.mShape.get(), mAllSettings, mPluginSettings.mTransform.mAnchor.get());
 
   for (auto const& node : mDisplayNodes) {
-    node.second->setAnchorPosition(mPluginSettings.mPosition.get());
-    node.second->setAnchorScale(mPluginSettings.mScale.get());
-    node.second->setAnchorRotation(cs::utils::convert::toRadians(mPluginSettings.mRotation.get()));
+    node.second->setAnchorPosition(mPluginSettings.mTransform.mPosition.get());
+    node.second->setAnchorScale(mPluginSettings.mTransform.mScale.get());
+    node.second->setAnchorRotation(cs::utils::convert::toRadians(mPluginSettings.mTransform.mRotation.get()));
 
     mSolarSystem->registerAnchor(node.second);
   }
@@ -502,7 +524,7 @@ void Plugin::connectAllSettings() {
 
   // Connect to plugin settings
   // Rendering settings
-  mPluginSettings.mTransferFunction.connectAndTouch([this](std::string name) {
+  mPluginSettings.mRendering.mTransferFunction.connectAndTouch([this](std::string name) {
     std::string code = "CosmoScout.volumeRendering.loadTransferFunction('" + name + "');";
     mGuiManager->addScriptToGui(code);
   });
@@ -517,11 +539,11 @@ void Plugin::connectAllSettings() {
     }
     if (scalars.size() > 0) {
       auto activeScalar = std::find_if(scalars.begin(), scalars.end(),
-          [this](Scalar s) { return s.getId() == mPluginSettings.mActiveScalar.get(); });
+          [this](Scalar s) { return s.getId() == mPluginSettings.mData.mActiveScalar.get(); });
       if (activeScalar == scalars.end()) {
         activeScalar = scalars.begin();
       }
-      mPluginSettings.mActiveScalar.set(activeScalar->getId());
+      mPluginSettings.mData.mActiveScalar.set(activeScalar->getId());
       mSampleCount    = 0;
       mResetTfHandles = true;
       mGuiManager->getGui()->callJavascript(
@@ -534,7 +556,7 @@ void Plugin::connectAllSettings() {
         "CosmoScout.volumeRendering.setTimesteps", timestepsJson.dump());
   });
   mDataManager->onScalarRangeUpdated().connect([this](Scalar const& scalar) {
-    if (mDataManager->isReady() && scalar.getId() == mPluginSettings.mActiveScalar.get()) {
+    if (mDataManager->isReady() && scalar.getId() == mPluginSettings.mData.mActiveScalar.get()) {
       mSampleCount    = 0;
       mResetTfHandles = false;
     }
@@ -549,22 +571,22 @@ Plugin::Setting<bool>::getSettings(Settings& pluginSettings) {
   std::array<Setting<bool>, SETTINGS_COUNT<bool>> settings{
       // Rendering settings
       Setting<bool>{"setEnableRequestImages", "If disabled no new images will be rendered.",
-          pluginSettings.mRequestImages},
+          pluginSettings.mRendering.mRequestImages},
       Setting<bool>{"setEnableDenoiseColor", "Enables use of OIDN for displaying color data.",
-          pluginSettings.mDenoiseColor, &Renderer::setDenoiseColor},
+          pluginSettings.mRendering.mDenoiseColor, &Renderer::setDenoiseColor},
       Setting<bool>{"setEnableDenoiseDepth", "Enables use of OIDN for displaying depth data.",
-          pluginSettings.mDenoiseDepth, &Renderer::setDenoiseDepth},
+          pluginSettings.mRendering.mDenoiseDepth, &Renderer::setDenoiseDepth},
       // Display settings
       Setting<bool>{"setEnableDepthData", "Enables use of depth data for displaying data.",
-          pluginSettings.mDepthData, {}, &Plugin::setDepthData},
+          pluginSettings.mDisplay.mDepthData, {}, &Plugin::setDepthData},
       Setting<bool>{"setEnableDrawDepth",
           "Enables displaying the depth buffer instead of the color buffer.",
-          pluginSettings.mDrawDepth, {}, &Plugin::setDrawDepth},
+          pluginSettings.mDisplay.mDrawDepth, {}, &Plugin::setDrawDepth},
       Setting<bool>{"setEnablePredictiveRendering",
           "Enables predicting the next camera position for rendering.",
-          pluginSettings.mPredictiveRendering},
+          pluginSettings.mDisplay.mPredictiveRendering},
       Setting<bool>{"setEnableReuseImages", "Enables reuse of previously rendered images.",
-          pluginSettings.mReuseImages},
+          pluginSettings.mDisplay.mReuseImages},
       // Lighting settings
       Setting<bool>{"setEnableLighting", "Enables/Disables shading.",
           pluginSettings.mLighting.mEnabled, &Renderer::setShading},
@@ -597,7 +619,7 @@ constexpr std::array<Plugin::Setting<int>, SETTINGS_COUNT<int>> Plugin::Setting<
           "Sets the maximum number of render passes for constant rendering parameters.",
           pluginSettings.mRendering.mMaxPasses, &Renderer::setMaxRenderPasses},
       Setting<int>{"setResolution", "Sets the resolution of the rendered volume images.",
-          pluginSettings.mResolution, &Renderer::setResolution, &Plugin::setResolution},
+          pluginSettings.mRendering.mResolution, &Renderer::setResolution, &Plugin::setResolution},
   };
   return std::move(settings);
 }
@@ -612,9 +634,9 @@ Plugin::Setting<float>::getSettings(Settings& pluginSettings) {
       Setting<float>{"setAnimationSpeed", "Time units per second when animating."},
       // Rendering settings
       Setting<float>{"setSamplingRate", "Sets the sampling rate for volume rendering.",
-          pluginSettings.mSamplingRate, &Renderer::setSamplingRate},
+          pluginSettings.mRendering.mSamplingRate, &Renderer::setSamplingRate},
       Setting<float>{"setDensityScale", "Sets the density scale of the volume.",
-          pluginSettings.mDensityScale, &Renderer::setDensityScale},
+          pluginSettings.mRendering.mDensityScale, &Renderer::setDensityScale},
       // Lighting settings
       Setting<float>{"setSunStrength", "Sets the strength of the sun when shading is enabled.",
           pluginSettings.mLighting.mSunStrength, &Renderer::setSunStrength},
@@ -643,7 +665,7 @@ Plugin::Setting<std::string>::getSettings(Settings& pluginSettings) {
   std::array<Setting<std::string>, SETTINGS_COUNT<std::string>> settings{
       // Data settings
       Setting<std::string>{"setScalar", "Set the scalar to be rendered.",
-          pluginSettings.mActiveScalar, {}, &Plugin::setScalar},
+          pluginSettings.mData.mActiveScalar, {}, &Plugin::setScalar},
       // Core settings
       pluginSettings.mCore.has_value()
           ? Setting<std::string>{"setCoreScalar", "Sets the scalar used for coloring the core.",
@@ -660,7 +682,7 @@ constexpr std::array<Plugin::Setting<DisplayMode>, SETTINGS_COUNT<DisplayMode>>
 Plugin::Setting<DisplayMode>::getSettings(Settings& pluginSettings) {
   std::array<Setting<DisplayMode>, SETTINGS_COUNT<DisplayMode>> settings{
       Setting<DisplayMode>{"setDisplayMode", "Sets the mode for displaying the rendered images.",
-          pluginSettings.mDisplayMode, {}, &Plugin::setDisplayMode},
+          pluginSettings.mDisplay.mDisplayMode, {}, &Plugin::setDisplayMode},
   };
   return std::move(settings);
 }
@@ -673,7 +695,7 @@ Plugin::Setting<DepthMode>::getSettings(Settings& pluginSettings) {
   std::array<Setting<DepthMode>, SETTINGS_COUNT<DepthMode>> settings{
       Setting<DepthMode>{"setDepthMode",
           "Sets the mode for determining the per pixel depth values of the volume.",
-          pluginSettings.mDepthMode, &Renderer::setDepthMode},
+          pluginSettings.mRendering.mDepthMode, &Renderer::setDepthMode},
   };
   return std::move(settings);
 }
@@ -790,7 +812,7 @@ glm::mat4 Plugin::getCurrentCameraTransform() {
     mCameraTransformsIndex = 0;
   }
 
-  if (mPluginSettings.mPredictiveRendering.get()) {
+  if (mPluginSettings.mDisplay.mPredictiveRendering.get()) {
     currentCameraTransform = predictCameraTransform(currentCameraTransform);
   }
   return currentCameraTransform;
@@ -910,7 +932,7 @@ std::vector<ScalarFilter> csp::volumerendering::Plugin::parseScalarFilters(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Plugin::displayFrame(std::unique_ptr<Renderer::RenderedImage> frame) {
-  displayFrame(std::move(frame), mPluginSettings.mDisplayMode.get());
+  displayFrame(std::move(frame), mPluginSettings.mDisplay.mDisplayMode.get());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -928,7 +950,7 @@ void Plugin::displayFrame(std::unique_ptr<Renderer::RenderedImage> frame, Displa
   if (mDisplayedImage) {
     mRenderedImages.insert(std::move(mDisplayedImage));
   }
-  if (mPluginSettings.mReuseImages.get()) {
+  if (mPluginSettings.mDisplay.mReuseImages.get()) {
     mDisplayedImage = std::make_unique<Renderer::CopiedImage>(*frame);
   } else {
     mDisplayedImage.reset();

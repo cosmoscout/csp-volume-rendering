@@ -69,26 +69,26 @@ inline constexpr int SETTINGS_COUNT<DepthMode> = 1;
 class Plugin : public cs::core::PluginBase {
  public:
   struct Settings {
-    // Data settings
-    cs::utils::Property<std::string>        mVolumeDataPath;
-    cs::utils::Property<std::string>        mVolumeDataPattern;
-    cs::utils::Property<VolumeFileType>     mVolumeDataType;
-    cs::utils::Property<VolumeStructure>    mVolumeStructure;
-    cs::utils::Property<VolumeShape>        mVolumeShape;
-    cs::utils::DefaultProperty<std::string> mActiveScalar{""};
+    struct Data {
+      cs::utils::Property<std::string>        mPath;
+      cs::utils::Property<std::string>        mNamePattern;
+      cs::utils::Property<VolumeFileType>     mType;
+      cs::utils::Property<VolumeStructure>    mStructure;
+      cs::utils::Property<VolumeShape>        mShape;
+      cs::utils::DefaultProperty<std::string> mActiveScalar{""};
+    } mData;
 
-    // Rendering settings
     struct Rendering {
-      cs::utils::DefaultProperty<int> mMaxPasses{10};
+      cs::utils::DefaultProperty<bool>        mRequestImages{true};
+      cs::utils::DefaultProperty<int>         mResolution{256};
+      cs::utils::DefaultProperty<float>       mSamplingRate{0.05f};
+      cs::utils::DefaultProperty<int>         mMaxPasses{10};
+      cs::utils::DefaultProperty<float>       mDensityScale{1.f};
+      cs::utils::DefaultProperty<bool>        mDenoiseColor{true};
+      cs::utils::DefaultProperty<bool>        mDenoiseDepth{true};
+      cs::utils::DefaultProperty<DepthMode>   mDepthMode{DepthMode::eNone};
+      cs::utils::DefaultProperty<std::string> mTransferFunction{"BlackBody.json"};
     } mRendering;
-    cs::utils::DefaultProperty<bool>        mRequestImages{true};
-    cs::utils::DefaultProperty<int>         mResolution{256};
-    cs::utils::DefaultProperty<float>       mSamplingRate{0.05f};
-    cs::utils::DefaultProperty<float>       mDensityScale{1.f};
-    cs::utils::DefaultProperty<bool>        mDenoiseColor{true};
-    cs::utils::DefaultProperty<bool>        mDenoiseDepth{true};
-    cs::utils::DefaultProperty<DepthMode>   mDepthMode{DepthMode::eNone};
-    cs::utils::DefaultProperty<std::string> mTransferFunction{"BlackBody.json"};
 
     struct Lighting {
       cs::utils::DefaultProperty<bool>  mEnabled{false};
@@ -96,18 +96,20 @@ class Plugin : public cs::core::PluginBase {
       cs::utils::DefaultProperty<float> mAmbientStrength{.5f};
     } mLighting;
 
-    // Display settings
-    cs::utils::DefaultProperty<bool>        mPredictiveRendering{false};
-    cs::utils::DefaultProperty<bool>        mReuseImages{false};
-    cs::utils::DefaultProperty<bool>        mDepthData{true};
-    cs::utils::DefaultProperty<bool>        mDrawDepth{false};
-    cs::utils::DefaultProperty<DisplayMode> mDisplayMode{DisplayMode::eMesh};
+    struct Display {
+      cs::utils::DefaultProperty<bool>        mPredictiveRendering{false};
+      cs::utils::DefaultProperty<bool>        mReuseImages{false};
+      cs::utils::DefaultProperty<bool>        mDepthData{true};
+      cs::utils::DefaultProperty<bool>        mDrawDepth{false};
+      cs::utils::DefaultProperty<DisplayMode> mDisplayMode{DisplayMode::eMesh};
+    } mDisplay;
 
-    // Transform settings
-    cs::utils::Property<std::string>       mAnchor;
-    cs::utils::DefaultProperty<glm::dvec3> mPosition{glm::dvec3(0, 0, 0)};
-    cs::utils::DefaultProperty<double>     mScale{1.};
-    cs::utils::DefaultProperty<glm::dvec3> mRotation{glm::dvec3(0, 0, 0)};
+    struct Transform {
+      cs::utils::Property<std::string>       mAnchor;
+      cs::utils::DefaultProperty<glm::dvec3> mPosition{glm::dvec3(0, 0, 0)};
+      cs::utils::DefaultProperty<double>     mScale{1.};
+      cs::utils::DefaultProperty<glm::dvec3> mRotation{glm::dvec3(0, 0, 0)};
+    } mTransform;
 
     struct Core {
       cs::utils::DefaultProperty<bool>        mEnabled{true};
