@@ -58,7 +58,7 @@ inline constexpr int SETTINGS_COUNT<bool> = 11;
 template <>
 inline constexpr int SETTINGS_COUNT<int> = 2;
 template <>
-inline constexpr int SETTINGS_COUNT<float> = 9;
+inline constexpr int SETTINGS_COUNT<float> = 7;
 template <>
 inline constexpr int SETTINGS_COUNT<std::string> = 2;
 template <>
@@ -117,12 +117,9 @@ class Plugin : public cs::core::PluginBase {
     std::optional<Core> mCore;
 
     struct Pathlines {
-      cs::utils::Property<std::string>        mPath;
-      cs::utils::DefaultProperty<bool>        mEnabled{true};
-      cs::utils::DefaultProperty<float>       mLineOpacity{1.f};
-      cs::utils::DefaultProperty<float>       mLineSize{1.f};
-      cs::utils::DefaultProperty<float>       mLength{250.f};
-      cs::utils::DefaultProperty<std::string> mActiveScalar{""};
+      cs::utils::Property<std::string>  mPath;
+      cs::utils::DefaultProperty<bool>  mEnabled{true};
+      cs::utils::DefaultProperty<float> mLineSize{1.f};
     };
     std::optional<Pathlines> mPathlines;
   };

@@ -306,19 +306,10 @@ void OSPRayRenderer::updateWorld(
     std::vector<uint8_t> pixels(256 * 256 * 4);
     for (int x = 0; x < 256; x++) {
       for (int y = 0; y < 256; y++) {
-        // TODO Get max age from somewhere else
-        float age = ((float)y / 256.f) * 109.f;
-        if (age < parameters.mWorld.mPathlinesTexture.mLength) {
-          pixels[4 * (y * 256 + x) + 0] = x < 128 ? x * 2 : 255;
-          pixels[4 * (y * 256 + x) + 1] = 255 - std::abs((x - 128) * 2);
-          pixels[4 * (y * 256 + x) + 2] = x > 128 ? 255 - (x - 128) * 2 : 255;
-          pixels[4 * (y * 256 + x) + 3] = 255;
-        } else {
-          pixels[4 * (y * 256 + x) + 0] = 0;
-          pixels[4 * (y * 256 + x) + 1] = 0;
-          pixels[4 * (y * 256 + x) + 2] = 0;
-          pixels[4 * (y * 256 + x) + 3] = 0;
-        }
+        pixels[4 * (y * 256 + x) + 0] = x < 128 ? x * 2 : 255;
+        pixels[4 * (y * 256 + x) + 1] = 255 - std::abs((x - 128) * 2);
+        pixels[4 * (y * 256 + x) + 2] = x > 128 ? 255 - (x - 128) * 2 : 255;
+        pixels[4 * (y * 256 + x) + 3] = 255;
       }
     }
     ospray::cpp::Data texData(pixels.data(), OSP_VEC4UC, rkcommon::math::vec2i{256, 256});

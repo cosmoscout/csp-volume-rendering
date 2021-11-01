@@ -21,9 +21,7 @@
           {"min": 0.001, "25%": 0.01, "50%": 0.1, "75%": 1, "max": 10}, [0.005]);
       CosmoScout.gui.initSlider("volumeRendering.setMaxRenderPasses", 1, 100, 1, [10]);
       CosmoScout.gui.initSlider("volumeRendering.setDensityScale", 0, 10, 0.1, [1]);
-      CosmoScout.gui.initSlider("volumeRendering.setPathlineOpacity", 0, 1, 0.05, [1]);
       CosmoScout.gui.initSlider("volumeRendering.setPathlineSize", 1, 20, 1, [1]);
-      CosmoScout.gui.initSlider("volumeRendering.setPathlineLength", 0, 250, 1, [250]);
 
       CosmoScout.gui.initSlider("volumeRendering.setSunStrength", 0, 10, 0.1, [1]);
       CosmoScout.gui.initSlider("volumeRendering.setAmbientStrength", 0, 1, 0.01, [0.5]);

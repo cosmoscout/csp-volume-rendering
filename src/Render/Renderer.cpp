@@ -167,13 +167,6 @@ void Renderer::setPathlinesEnabled(bool enable) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Renderer::setPathlineOpacity(float value) {
-  std::scoped_lock lock(mParameterMutex);
-  mParameters.mWorld.mPathlines.mLineOpacity = value;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 void Renderer::setPathlineSize(float value) {
   std::scoped_lock lock(mParameterMutex);
   mParameters.mWorld.mPathlines.mLineSize = value;
@@ -184,20 +177,6 @@ void Renderer::setPathlineSize(float value) {
 void Renderer::setPathlineScalarFilters(std::vector<ScalarFilter> const& value) {
   std::scoped_lock lock(mParameterMutex);
   mParameters.mWorld.mPathlines.mScalarFilters = value;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Renderer::setPathlineLength(float value) {
-  std::scoped_lock lock(mParameterMutex);
-  mParameters.mWorld.mPathlinesTexture.mLength = value;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void Renderer::setPathlineActiveScalar(std::string const& value) {
-  std::scoped_lock lock(mParameterMutex);
-  mParameters.mWorld.mPathlines.mActiveScalar = value;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

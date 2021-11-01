@@ -115,19 +115,13 @@ void to_json(nlohmann::json& j, Plugin::Settings::Core const& o) {
 void from_json(nlohmann::json const& j, Plugin::Settings::Pathlines& o) {
   cs::core::Settings::deserialize(j, "path", o.mPath);
   cs::core::Settings::deserialize(j, "enabled", o.mEnabled);
-  cs::core::Settings::deserialize(j, "opacity", o.mLineOpacity);
   cs::core::Settings::deserialize(j, "size", o.mLineSize);
-  cs::core::Settings::deserialize(j, "length", o.mLength);
-  cs::core::Settings::deserialize(j, "activeScalar", o.mActiveScalar);
 }
 
 void to_json(nlohmann::json& j, Plugin::Settings::Pathlines const& o) {
   cs::core::Settings::serialize(j, "path", o.mPath);
   cs::core::Settings::serialize(j, "enabled", o.mEnabled);
-  cs::core::Settings::serialize(j, "opacity", o.mLineOpacity);
   cs::core::Settings::serialize(j, "size", o.mLineSize);
-  cs::core::Settings::serialize(j, "length", o.mLength);
-  cs::core::Settings::serialize(j, "activeScalar", o.mActiveScalar);
 }
 
 void from_json(nlohmann::json const& j, Plugin::Settings& o) {
@@ -445,17 +439,6 @@ void Plugin::registerAllUICallbacks() {
 
   // Pathline settings
   if (mPluginSettings.mPathlines.has_value()) {
-    mGuiManager->getGui()->registerCallback("volumeRendering.setPathlineActiveScalar",
-        "Sets the active scalar for coloring the pathlines.",
-        std::function([this](std::string value) {
-          if (std::find_if(mDataManager->getPathlines().getScalars().begin(),
-                  mDataManager->getPathlines().getScalars().end(), [value](Scalar s) {
-                    return s.getId() == value;
-                  }) != mDataManager->getPathlines().getScalars().end()) {
-            mPluginSettings.mPathlines->mActiveScalar = value;
-          }
-        }));
-
     mGuiManager->getGui()->registerCallback("volumeRendering.setPathlinesScalarFilters",
         "Sets filters for selecting which parts of the pathlines should be rendered.",
         std::function([this](std::string jsonString) {
@@ -523,14 +506,6 @@ void Plugin::connectAllSettings() {
     std::string code = "CosmoScout.volumeRendering.loadTransferFunction('" + name + "');";
     mGuiManager->addScriptToGui(code);
   });
-
-  // Pathline settings
-  if (mPluginSettings.mPathlines.has_value()) {
-    mPluginSettings.mPathlines->mActiveScalar.connectAndTouch([this](std::string value) {
-      invalidateCache();
-      mRenderer->setPathlineActiveScalar(value);
-    });
-  }
 
   // Connect to data manager properties
   mDataManager->pScalars.connectAndTouch([this](std::vector<Scalar> scalars) {
@@ -653,16 +628,8 @@ Plugin::Setting<float>::getSettings(Settings& pluginSettings) {
           : Setting<float>{},
       // Pathline settings
       pluginSettings.mPathlines.has_value()
-          ? Setting<float>{"setPathlineOpacity", "Sets the opacity of the rendered pathlines.",
-                pluginSettings.mPathlines->mLineOpacity, &Renderer::setPathlineOpacity}
-          : Setting<float>{},
-      pluginSettings.mPathlines.has_value()
           ? Setting<float>{"setPathlineSize", "Sets the size of the rendered pathlines.",
                 pluginSettings.mPathlines->mLineSize, &Renderer::setPathlineSize}
-          : Setting<float>{},
-      pluginSettings.mPathlines.has_value()
-          ? Setting<float>{"setPathlineLength", "Sets the length of the rendered pathlines.",
-                pluginSettings.mPathlines->mLength, &Renderer::setPathlineLength}
           : Setting<float>{},
   };
   return std::move(settings);
