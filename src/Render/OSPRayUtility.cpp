@@ -150,10 +150,13 @@ ospray::cpp::Volume createOSPRayVolume(
     origin[i] = -(vtkVolume->GetBounds()[i * 2 + 1] - vtkVolume->GetBounds()[i * 2]) / 2;
   }
 
-  std::vector<ospray::cpp::CopiedData> ospData(scalars.size());
+  std::vector<ospray::cpp::CopiedData> ospData;
   vtkSmartPointer<vtkDataArray>        vtkData;
 
   for (size_t i = 0; i < scalars.size(); i++) {
+    if (scalars[i].mType != scalars[0].mType) {
+      continue;
+    }
     switch (scalars[i].mType) {
     case ScalarType::ePointData:
       vtkData = vtkVolume->GetPointData()->GetScalars(scalars[i].mName.c_str());
@@ -163,12 +166,31 @@ ospray::cpp::Volume createOSPRayVolume(
       break;
     }
 
-    if (vtkData->GetDataTypeSize() == 4) {
-      ospData[i] = ospray::cpp::CopiedData((float*)vtkData->GetVoidPointer(0),
+    switch (vtkData->GetDataType()) {
+    case VTK_FLOAT:
+      ospData.emplace_back((float*)vtkData->GetVoidPointer(0), OSP_FLOAT,
           rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
-    } else if (vtkData->GetDataTypeSize() == 8) {
-      ospData[i] = ospray::cpp::CopiedData((double*)vtkData->GetVoidPointer(0),
+      break;
+    case VTK_DOUBLE:
+      ospData.emplace_back((double*)vtkData->GetVoidPointer(0), OSP_DOUBLE,
           rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_UNSIGNED_CHAR:
+      ospData.emplace_back((uint8_t*)vtkData->GetVoidPointer(0), OSP_UCHAR,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_CHAR:
+      ospData.emplace_back((int8_t*)vtkData->GetVoidPointer(0), OSP_UCHAR,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_SHORT:
+      ospData.emplace_back((int16_t*)vtkData->GetVoidPointer(0), OSP_SHORT,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_UNSIGNED_SHORT:
+      ospData.emplace_back((uint16_t*)vtkData->GetVoidPointer(0), OSP_USHORT,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
     }
   }
 
@@ -197,11 +219,14 @@ ospray::cpp::Volume createOSPRayVolume(
   std::array<double, 3> origin;
   vtkVolume->GetPoint(0, 0, 0, origin.data());
 
-  std::vector<ospray::cpp::CopiedData> ospData(scalars.size());
+  std::vector<ospray::cpp::CopiedData> ospData;
   vtkSmartPointer<vtkDataArray>        vtkData;
   rkcommon::math::vec3i                dim;
 
   for (size_t i = 0; i < scalars.size(); i++) {
+    if (scalars[i].mType != scalars[0].mType) {
+      continue;
+    }
     switch (scalars[i].mType) {
     case ScalarType::ePointData:
       dim     = {dimensions[1], dimensions[2], dimensions[0]};
@@ -213,12 +238,29 @@ ospray::cpp::Volume createOSPRayVolume(
       break;
     }
 
-    if (vtkData->GetDataTypeSize() == 4) {
-      ospData[i] = ospray::cpp::CopiedData((float*)vtkData->GetVoidPointer(0), dim,
-          rkcommon::math::vec3i{4 * dim[2], 4 * dim[2] * dim[0], 4});
-    } else if (vtkData->GetDataTypeSize() == 8) {
-      ospData[i] = ospray::cpp::CopiedData((double*)vtkData->GetVoidPointer(0), dim,
-          rkcommon::math::vec3i{8 * dim[2], 8 * dim[2] * dim[0], 8});
+    int                   dataSize = vtkData->GetDataTypeSize();
+    rkcommon::math::vec3i stride{dataSize * dim[2], dataSize * dim[2] * dim[0], dataSize};
+    switch (vtkData->GetDataType()) {
+    case VTK_FLOAT:
+      ospData.emplace_back((float*)vtkData->GetVoidPointer(0), OSP_FLOAT, dim, stride);
+      break;
+    case VTK_DOUBLE:
+      ospData.emplace_back((double*)vtkData->GetVoidPointer(0), OSP_DOUBLE, dim, stride);
+      break;
+    case VTK_UNSIGNED_CHAR:
+      ospData.emplace_back((uint8_t*)vtkData->GetVoidPointer(0), OSP_UCHAR, dim, stride);
+      break;
+    case VTK_CHAR:
+      ospData.emplace_back((int8_t*)vtkData->GetVoidPointer(0), OSP_UCHAR, dim, stride);
+      break;
+    case VTK_SHORT:
+      ospData.emplace_back((int16_t*)vtkData->GetVoidPointer(0), OSP_SHORT,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_UNSIGNED_SHORT:
+      ospData.emplace_back((uint16_t*)vtkData->GetVoidPointer(0), OSP_USHORT,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
     }
   }
 
