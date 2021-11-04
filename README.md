@@ -49,11 +49,11 @@ Note that this means that the volume will not be visible, unless
         ...
         "csp-volume-rendering": {
             "data": {
-                "volumeDataPath": "/path/to/data/",
-                "volumeDataPattern": "simulation_([0-9]+).vtk",
-                "volumeDataType": "vtk",
-                "volumeStructure": "structured",
-                "volumeShape": "spherical"
+                "path": "/path/to/data/",
+                "namePattern": "simulation_([0-9]+).vtk",
+                "type": "vtk",
+                "structure": "structured",
+                "shape": "spherical"
             },
             "transform": {
                 "anchor": "Earth"
@@ -83,7 +83,7 @@ There are the following categories:
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | **volumeDataPath** | string | - | Path to the directory that contains the volumetric data files. |
-| **volumeDataPattern** | string | - | Regex pattern that matches the filename of all relevant data files. The index of the simulation step that produced the file has to be marked using a capturing group. If files are named "Sim_01.vtk", "Sim_02.vtk" etc., `"Sim_([0-9]+).vtk"` would be a suitable regex. Optionally, if multiple levels of detail are available for some timesteps, the pattern may include a second capturing group for marking the lod in the filename. The captured value should go up with increasing levels of detail. If two capturing groups are present in the pattern, the first one is used for marking the lod and the second is used for marking the timestep.  |
+| **volumeDataPattern** | string | - | Regex pattern that matches the filename of all relevant data files. Has to contain a capture group for marking the timestep and may contain another capture group for marking the level of detail. For more information on the correct format see [Data preparation](#naming-files) |
 | **volumeDataType** | `"vtk"` / `"netcdf"` | - | Data format of the specified files. Currently supports VTK data and NetCDF files. |
 | **volumeStructure** | `"structured"` / `"structuredSpherical"` / `"unstructured"` | - | Structure of the volumetric data. Currently supports structured regular grids, structured spherical grids and unstructured grids. |
 | **volumeShape** | `"cubic"` / `"spherical"` | - | Shape of the volume. By default, spherical volumes are rendered with the same size as the planet they are bound to. Cubic volumes are rendered, so that their corners touch the planets surface. |
@@ -137,6 +137,36 @@ These settings can only be changed in the settings file.
 | *position* | double[3] | `[0,0,0]` | Offset from the center of the frame in meters. |
 | *scale* | double | `1` | Factor by which the volume should be scaled. A value of `1` results in the volume being scaled to be the same size as the specified anchor. |
 | *rotation* | double[3] | `[0,0,0]` | Rotation of the volume as pitch, yaw, roll euler angles in degrees. |
+
+
+# Data preparation
+
+There are a few aspects to be regarded when preparing your data for use with this plugin.
+
+## Naming files
+
+First of all, your data files have to be named in a specific manner.
+Currently, each file may only contain one timestep of the dataset.
+A numerical representation of the timestep has to be present at some point in the filename, e.g. "Sim_01.vtk", "Sim_02.vtk" etc.
+In the `data.namePattern` configuration property, this numerical representation has to be marked with a regular expression capture group, e.g. `"Sim_([0-9]+).vtk"`.
+
+Optionally you can save timesteps in multiple levels of detail as separate files.
+The level of detail has to be represented as a numerical value in the filename with lower values meaning lower levels of detail.
+The lod component of the filename has to occur before the timestep component.
+In the `data.namePattern` configuration property, this numerical representation has to also be marked with a second regular expression capture group.
+
+## Generating CSV
+
+In addition to the files containing the volume data, a csv file containing scalar values has to be generated and saved in the same directory as the volume data.
+Only one file is needed and it will be used for all timesteps.
+The file has to be named according to the `data.namePattern` configuration property, with the extension replaced by `.csv`.
+It can be created in ParaView by using File->Save Data and selecting "Comma or Tab Delimited Files" for "Files of Type".
+
+This file will be used for filling the parallel coordinates plot with data.
+The parallel coordinates plot runs fine with around 100.000 lines, but if your dataset contains more points/cells, you should consider writing only a subset of the data to the csv file.
+
+For NetCDF data files, the python script under [`scripts/metadata.py`](scripts/metadata.py) can be used.
+Run it using `python scripts/metadata.py /path/to/datafile.nc` to generate the csv file next to the original file.
 
 
 # Usage
