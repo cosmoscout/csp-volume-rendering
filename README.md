@@ -2,7 +2,8 @@
 
 A CosmoScout VR plugin which allows rendering of volumetric datasets.
 
-## Configuration
+
+# Configuration
 
 This plugin can be enabled with a configuration using the following pattern in your `settings.json`:
 
@@ -12,12 +13,16 @@ This plugin can be enabled with a configuration using the following pattern in y
     "plugins": {
         ...
         "csp-volume-rendering": {
-            "volumeDataPath": <path to directory containing simulation data>,
-            "volumeDataPattern": <regex pattern that matches simulation filenames>,
-            "volumeDataType": "vtk",
-            "volumeStructure": <"structured"/"unstructured">,
-            "volumeShape": <"cubic"/"spherical">,
-            "anchor": <Anchor name, e.g. "Earth">
+            "data": {
+                "path": <path to directory containing simulation data>,
+                "namePattern": <regex pattern that matches simulation filenames>,
+                "type": <"vtk"/"netcdf">,
+                "structure": <"structured"/"unstructured">,
+                "shape": <"cubic"/"spherical">
+            },
+            "transform": {
+                "anchor": <Anchor name, e.g. "Earth">
+            }
         }
     }
 }
@@ -43,12 +48,16 @@ Note that this means that the volume will not be visible, unless
     "plugins": {
         ...
         "csp-volume-rendering": {
-            "volumeDataPath": "/path/to/data/",
-            "volumeDataPattern": "simulation_([0-9]+).vtk",
-            "volumeDataType": "vtk",
-            "volumeStructure": "structured",
-            "volumeShape": "spherical",
-            "anchor": "Earth"
+            "data": {
+                "volumeDataPath": "/path/to/data/",
+                "volumeDataPattern": "simulation_([0-9]+).vtk",
+                "volumeDataType": "vtk",
+                "volumeStructure": "structured",
+                "volumeShape": "spherical"
+            },
+            "transform": {
+                "anchor": "Earth"
+            }
         }
     }
 }
@@ -57,19 +66,30 @@ Note that this means that the volume will not be visible, unless
 This configuration only contains the mandatory settings.
 All available settings are described in the following sections.
 Mandatory settings are shown **bold**, while optional settings are shown in *italics*.
+Optional settings will have their default value, if they are not present in the configuration.
 
-### Data settings
+As you can see in the example configuration, the settings are grouped in different categories.
+The categories have to be inserted as child properties of the `"csp-volume-rendering"` entry, and the individual settings have to be inserted as children of the corresponding category.
+There are the following categories:
+
+* [`"data"`](#data-settings)
+* [`"rendering"`](#rendering-settings)
+* [`"lighting"`](#lighting-settings)
+* [`"display"`](#display-settings)
+* [`"transform"`](#transform-settings)
+
+## Data settings
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
 | **volumeDataPath** | string | - | Path to the directory that contains the volumetric data files. |
-| **volumeDataPattern** | string | - | Regex pattern that matches the filename of all relevant data files. The index of the simulation step that produced the file has to be marked using a capturing group. If files are named "Sim_01.vtk", "Sim_02.vtk" etc., `"Sim_([0-9]+).vtk"` would be a suitable regex. |
-| **volumeDataType** | `"vtk"` | - | Data format of the specified files. Currently only supports VTK data. |
-| **volumeStructure** | `"structured"` / `"unstructured"` | - | Structure of the volumetric data. Currently supports structured regular grids and unstructured grids. |
+| **volumeDataPattern** | string | - | Regex pattern that matches the filename of all relevant data files. The index of the simulation step that produced the file has to be marked using a capturing group. If files are named "Sim_01.vtk", "Sim_02.vtk" etc., `"Sim_([0-9]+).vtk"` would be a suitable regex. Optionally, if multiple levels of detail are available for some timesteps, the pattern may include a second capturing group for marking the lod in the filename. The captured value should go up with increasing levels of detail. If two capturing groups are present in the pattern, the first one is used for marking the lod and the second is used for marking the timestep.  |
+| **volumeDataType** | `"vtk"` / `"netcdf"` | - | Data format of the specified files. Currently supports VTK data and NetCDF files. |
+| **volumeStructure** | `"structured"` / `"structuredSpherical"` / `"unstructured"` | - | Structure of the volumetric data. Currently supports structured regular grids, structured spherical grids and unstructured grids. |
 | **volumeShape** | `"cubic"` / `"spherical"` | - | Shape of the volume. By default, spherical volumes are rendered with the same size as the planet they are bound to. Cubic volumes are rendered, so that their corners touch the planets surface. |
-| **activeScalar** | string | "" | The scalar, that should initially be active. Should be the name of the scalar, prefixed by `"cell_"` or `"point_"` to signify whether it is Point or Cell Data. |
+| *activeScalar* | string | `""` | Name of the scalar, that should be used for coloring the volume. Has to be prefixed with `"cell_"` or `"point_"`, depending on whether it is a per cell or point scalar. |
 
-### Rendering settings
+## Rendering settings
 
 These settings can also be dynamically changed in the CosmoScout UI.
 
@@ -78,13 +98,24 @@ These settings can also be dynamically changed in the CosmoScout UI.
 | *requestImages* | bool | `true` | When false, no new images of the volumetric data will be rendered. |
 | *resolution* | int | `256` | Horizontal and vertical resolution of the rendered images in pixels. |
 | *samplingRate* | float | `0.05` | Sampling rate to be used while rendering. Higher values result in higher quality images with less noise. |
-| *sunStrength* | float | `1` | Factor for the strength of the sunlight. Only used, when shading is enabled in CosmoScout. |
+| *maxPasses* | int | `10` | Maximum number of additional render passes for progressive rendering. |
 | *densityScale* | float | `1` | Sets the density of the volume. |
 | *denoiseColor* | bool | `true` | Use the OIDN library to denoise the color image of the volume before displaying it in CosmoScout. |
 | *denoiseDepth* | bool | `true` | Use the OIDN library to denoise the image containing depth information of the volume before using it for image based rendering. |
 | *depthMode* | `"none"` / `"isosurface"` / `"firstHit"` / `"lastHit"` / `"threshold"` / `"multiThreshold"` | `"none"` | Heuristic for determining per pixel depth values for the rendered images. |
+| *transferFunction* | string | `"BlackBody.json` | Name of a exported transfer function file in `<cosmoscout-installation-directory>/share/resources/transferfunctions/` that should be used by default. |
 
-### Display settings
+## Lighting settings
+
+These settings can also be dynamically changed in the CosmoScout UI.
+
+| Key | Type | Default | Description |
+| --- | --- | --- | --- |
+| *enabled* | bool | false | Enables lighting for the rendering. |
+| *ambientStrength* | float | `0.5` | Factor for the strength of the ambient light. Only used, when lighting is enabled. |
+| *sunStrength* | float | `1` | Factor for the strength of the sunlight. Only used, when lighting is enabled. |
+
+## Display settings
 
 These settings can also be dynamically changed in the CosmoScout UI.
 
@@ -96,7 +127,7 @@ These settings can also be dynamically changed in the CosmoScout UI.
 | *drawDepth* | bool | `false` | When true, a grayscale image of the depth information will be displayed instead of the color image of the volume. |
 | *displayMode* | `"mesh"` / `"points"` | `"mesh"` | Geometry used for displaying rendered images. `"mesh"` uses a continuous triangle mesh for displaying the image, while `"points"` displays the pixels of the image as points of varying size. |
 
-### Transform settings
+## Transform settings
 
 These settings can only be changed in the settings file.
 
@@ -104,10 +135,11 @@ These settings can only be changed in the settings file.
 | --- | --- | --- | --- |
 | **anchor** | string | - | Name of the SPICE frame, in which the volume should be placed. |
 | *position* | double[3] | `[0,0,0]` | Offset from the center of the frame in meters. |
-| *scale* | double | `1` | Factor by which the volume should be scaled. |
-| *rotation* | double[4] | `[0,0,0,1]` | Rotation of the volume as a quaternion. |
+| *scale* | double | `1` | Factor by which the volume should be scaled. A value of `1` results in the volume being scaled to be the same size as the specified anchor. |
+| *rotation* | double[3] | `[0,0,0]` | Rotation of the volume as pitch, yaw, roll euler angles in degrees. |
 
-## Usage
+
+# Usage
 
 When CosmoScout VR is started, this plugin will start loading an initial timestep of data specified in the `settings.json` in the background.
 Loading the data may take a while depending on its size and data format.
@@ -123,17 +155,19 @@ Rendered images will be displayed at the position specified in the transform set
 If the observer is moved, the image of the volume is updated, so that the volume can be examined from different angles.
 The rate at which the updates happen depend on the complexity of the data, the used hardware and the rendering parameters.
 
-### Configuration at runtime
+## Configuration at runtime
 
 For configuring the plugin at runtime a new tab is added to the CosmoScout sidebar:
 
 ![sidebar tab](docs/img/sidebar.png)
 
-#### Data
+### Data
 
 The data section allows selecting the exact data that should be rendered.
 The scalar can be selected from a dropdown menu that is filled with values when the data for the initial timestep was loaded.
-The timestep that should be visualized can be changed using the `Timestep` slider.
+
+If multiple timesteps are available, the timestep that should be visualized can be changed using the `Timestep` slider.
+The slider is hidden, if only one data file matching the volumeDataPattern was found.
 
 In addition to manual timestep selection it is also possible to automatically and uniformly increase the timestep at a speed selectable using the `Animation speed` slider.
 The speed is given as indices per second, so starting at timestep `0` and at a speed of `100` after one second data for timestep `100` will be displayed.
@@ -141,7 +175,7 @@ The animation can be started and paused using the button at the bottom of the se
 
 ![sidebar data section](docs/img/sidebar_data.png)
 
-#### Rendering
+### Rendering
 
 The rendering section contains sliders for setting several the rendering parameters resolution, sampling rate, density scale and sun strength that can also be set using properties in the settings.json file.
 Information on these settings can be found under [Configuration - Rendering settings](#rendering-settings).
@@ -154,7 +188,7 @@ The current progress of the rendering progress is shown using the bar next to th
 
 ![sidebar rendering section](docs/img/sidebar_rendering.png)
 
-#### Transfer Function
+### Transfer Function
 
 The transfer function section contains an editor for setting the transfer function that is used for rendering.
 The leftmost value of the function will be used for the lowest scalar value present in the dataset, the rightmost will be used for the highest value present.
@@ -178,7 +212,7 @@ Transfer functions are exported to and imported from `<cosmoscout-installation-d
 
 ![sidebar transfer function section](docs/img/sidebar_transfer_function.png)
 
-#### Display
+### Display
 
 The display section allows changing the way rendered images are displayed in CosmoScout VR.
 
@@ -194,7 +228,7 @@ Mesh mode | Points mode
 
 ![sidebar display section](docs/img/sidebar_display.png)
 
-#### Depth
+### Depth
 
 The depth section allows configurating the image based rendering.
 
@@ -208,14 +242,14 @@ The radio buttons at the bottom of the section allow selecting the heuristic, th
 
 ![sidebar depth section](docs/img/sidebar_depth.png)
 
-#### Denoising
+### Denoising
 
 The plugin optionally uses Intel Open Image Denoise (OIDN) for denoising both the rendered color images, as well as the depth information.
 This can be enabled/disabled in this section for both images seperately.
 
 ![sidebar denoising section](docs/img/sidebar_denoising.png)
 
-#### Latency compensation
+### Latency compensation
 
 The latency compensation section contains toggles for features to reduce the effects of the rendering latency.
 
@@ -226,3 +260,58 @@ Reuse images enables displaying previously rendered images, if those are a bette
 Only images rendered with the same parameters will be considered for reuse.
 
 ![sidebar latency compensation section](docs/img/sidebar_latency_compensation.png)
+
+
+# Optional features
+
+Some optional features can be activated by inserting an additional settings category into the configuration file.
+These features will only be active and use their default settings, if their category is present in the configuration file.
+Currently there are the following optional features:
+
+* [`"core"`](#core-rendering): Render a spherical core inside the volume
+* [`"pathlines"`](#pathline-rendering): Render pathlines inside the volume
+
+## Core rendering
+
+Used to render a spherical core inside the volume.
+
+One of the volume's scalars may be used to color the core.
+For this, the volume will be sampled at the surface of the core, so make sure, that the core's radius is slightly larger than the inner radius of the volume.
+
+### Settings
+
+These settings can only be changed in the settings file.
+
+| Key | Type | Default | Description |
+| --- | --- | --- | --- |
+| *enabled* | bool | `true` | Enables the rendering of the core. |
+| *scalar* | string | `""` | If this scalar is part of the volume data, the core will be colored in grayscale according to the scalar. Otherwise the core will be light gray. Has to be prefixed with `"cell_"` or `"point_"`, depending on whether it is a per cell or point scalar. |
+| **radius** | float | - | Sets the radius of the core in the same units as used by the volume. |
+
+## Pathline rendering
+
+Used to render precomputed pathlines inside the volume.
+
+### Settings
+
+All settings apart from the path can be dynamically changed in the CosmoScout UI.
+
+| Key | Type | Default | Description |
+| --- | --- | --- | --- |
+| *enabled* | bool | `true` | Enables the rendering of the pathlines. |
+| **path** | string | - | Path to a vtk data file containing the pathlines. |
+| *lineSize* | float | `1` | Width of the pathlines in the same units as used by the volume. |
+
+### Supported data
+
+Currently, only files in the legacy VTK format (.vtk) are supported.
+The dataset should be of the type `vtkPolyData` with cells of the type `vtkPolyLine`.
+
+The dataset **has to** include a point scalar named `"ParticleAge"`, which will be used to color the pathlines from blue at their starting point over white to red at their end point.
+
+Apart from the .vtk file, you also **have to** supply a .csv file containing the cell scalar values of the pathlines.
+This will be used to allow restricting the rendered pathlines using a parallel coordinates plot.
+
+Scalars with the names `<name>_start` and `<name>_end` will be linked to a corresponding scalar `<name>` in the volume data, if such a scalar exists.
+This is used to copy scalar restrictions on the volume data to the pathline data.
+If a cell scalar named `"InjectionStepId_start"` is present, it will be used to only show lines spawned during the last 10 timesteps.
