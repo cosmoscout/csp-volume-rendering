@@ -27,6 +27,7 @@
 
 namespace csp::volumerendering {
 
+/// Type transformation to get the corresponding type passed in UI callbacks.
 template <typename T>
 struct get_ui_type {
   using type = void;
@@ -51,6 +52,7 @@ struct get_ui_type<float> {
   using type = double;
 };
 
+/// Amount of different setting parameters per type.
 template <typename T>
 constexpr int SETTINGS_COUNT = 0;
 template <>
@@ -131,6 +133,7 @@ class Plugin : public cs::core::PluginBase {
   void update() override;
 
  private:
+  /// Template struct for managing a single setting parameter.
   template <typename T>
   struct Setting {
    public:
@@ -154,14 +157,15 @@ class Plugin : public cs::core::PluginBase {
         , mAction(action) {
     }
 
+    /// Returns an array of all Setting objects of type T.
     static constexpr std::array<Setting<T>, SETTINGS_COUNT<T>> getSettings(
         Settings& pluginSettings){};
 
-    std::string_view      mName;
-    std::string_view      mComment;
-    std::optional<Target> mTarget;
-    std::optional<Setter> mSetter;
-    std::optional<Action> mAction;
+    std::string_view      mName;    /// Name of the parameter's UI callback
+    std::string_view      mComment; /// Description of the parameter
+    std::optional<Target> mTarget;  /// Property in the Plugin::Settings struct
+    std::optional<Setter> mSetter;  /// Setter method on the Renderer class
+    std::optional<Action> mAction;  /// Setter method on the Plugin class
   };
 
   struct Frame {
@@ -192,6 +196,8 @@ class Plugin : public cs::core::PluginBase {
     }
   };
 
+  /// Returns a callback handler function that assigns the callback's parameter
+  /// to a target property.
   template <typename T>
   std::function<void(get_ui_type_t<T>)> getCallbackHandler(
       typename Setting<T>::Target const& target) {
@@ -207,6 +213,9 @@ class Plugin : public cs::core::PluginBase {
     }
   };
 
+  /// If the setting specifies a callback name, the callback is registered with the gui manager.
+  /// The callback handler sets the setting's target property to the value passed to the callback.
+  /// For Enums, one callback is registered for each value between [Enum]::First and [Enum]::Last.
   template <typename T>
   void registerUICallback(Setting<T> const& setting) {
     if (std::string(setting.mName) == "") {
@@ -236,6 +245,9 @@ class Plugin : public cs::core::PluginBase {
     }
   };
 
+  /// Sets the value of the UI component with callback 'name' to 'value'.
+  /// Assumes checkboxes are used for boolean values, sliders for numerical values, dropdowns for
+  /// strings and radio buttons for enums.
   template <typename T>
   void setValueInUI(std::string                                                     name,
       std::conditional_t<std::is_arithmetic_v<T> || std::is_enum_v<T>, T, T const&> value) {
@@ -246,12 +258,16 @@ class Plugin : public cs::core::PluginBase {
     } else if constexpr (std::is_same_v<T, std::string>) {
       mGuiManager->getGui()->callJavascript("CosmoScout.gui.setDropdownValue", name, value);
     } else if constexpr (std::is_enum_v<T>) {
-      mGuiManager->setRadioChecked("volumeRendering." + name + std::to_string(static_cast<int>(value)));
+      mGuiManager->setRadioChecked(
+          "volumeRendering." + name + std::to_string(static_cast<int>(value)));
     } else {
       static_assert(false, "Unhandled type for setValueInUI");
     }
   };
 
+  /// Connects a handler function to a setting's target property.
+  /// The handler will update the corresponding UI component, pass the value to the active renderer
+  /// and execute a setter method.
   template <typename T>
   void connectSetting(Setting<T> const& setting) {
     if (std::string(setting.mName) == "" || !setting.mTarget.has_value()) {
