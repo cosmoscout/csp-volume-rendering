@@ -177,6 +177,9 @@ When the data has finished loading, a message will be displayed on the console:
 
 ![data finished loading](docs/img/console_data_finished.png)
 
+If multiple levels of detail are available, the lowest lod will be loaded first.
+Higher lods will be loaded asynchronously when the timestep did not change for 2 seconds.
+
 Afterwards there may be another delay of a few seconds before the first image is rendered.
 Rendered images will be displayed at the position specified in the transform settings of the plugin.
 
@@ -194,10 +197,10 @@ For configuring the plugin at runtime a new tab is added to the CosmoScout sideb
 ### Data
 
 The data section allows selecting the exact data that should be rendered.
-The scalar can be selected from a dropdown menu that is filled with values when the data for the initial timestep was loaded.
+The scalar can be selected from a dropdown menu that is filled with values when the data for the initial timestep is loaded.
 
 If multiple timesteps are available, the timestep that should be visualized can be changed using the `Timestep` slider.
-The slider is hidden, if only one data file matching the volumeDataPattern was found.
+The slider is hidden, if only one data file matching `data.namePattern` was found.
 
 In addition to manual timestep selection it is also possible to automatically and uniformly increase the timestep at a speed selectable using the `Animation speed` slider.
 The speed is given as indices per second, so starting at timestep `0` and at a speed of `100` after one second data for timestep `100` will be displayed.
@@ -207,8 +210,10 @@ The animation can be started and paused using the button at the bottom of the se
 
 ### Rendering
 
-The rendering section contains sliders for setting several the rendering parameters resolution, sampling rate, density scale and sun strength that can also be set using properties in the settings.json file.
+The rendering section contains sliders for setting the rendering parameters resolution, sampling rate, maximume amount of render passes and density scale, that can also be set using properties in the settings.json file.
 Information on these settings can be found under [Configuration - Rendering settings](#rendering-settings).
+
+The progressive rendering enabled by setting "Max Passes" to a value greater than `1` will run additional render passes to produce better quality images, as long as no parameters (such as camera perspective or most of the settings configurable in the UI) change.
 
 The section also allows disabling/enabling rendering new images using the checkbox at the top.
 When the box is unchecked no new images will be rendered and if there is an ongoing render process it is cancelled and its results are discarded.
@@ -218,29 +223,65 @@ The current progress of the rendering progress is shown using the bar next to th
 
 ![sidebar rendering section](docs/img/sidebar_rendering.png)
 
+### Lighting
+
+The lighting section allows setting the lighting parameters found under [Configuration - Lighting settings](#lighting-settings).
+
+Note that when the lighting is enabled, the relative position of the sun in CosmoScout will be used to calculate the direction of the sunlight.
+This means, that you can change this direction by changing the current time using CosmoScout's timeline.
+
+Note, that with enabled lighting you should pause CosmoScout's time if you want to use progressive rendering.
+Otherwise, the sun's position will continuously move, which means that no progressive rendering passes can be executed, as the lighting is constantly changing.
+
+![sidebar lighting section](docs/img/sidebar_lighting.png)
+
 ### Transfer Function
 
 The transfer function section contains an editor for setting the transfer function that is used for rendering.
 The leftmost value of the function will be used for the lowest scalar value present in the dataset, the rightmost will be used for the highest value present.
 
-The transfer function is defined by multiple control points which can dragged with the mouse.
+The transfer function is defined by multiple control points which can be dragged with the mouse.
 The y position of each point defines the opacity of the function for the corresponding scalar value.
-Between two points the opacity is interpolated.
+Between two points the opacity is linearly interpolated.
 
 In addition to the opacity values each point may also define a color value for the corresponding scalar value.
 Points that define a color value are shown slightly larger on the graph.
 The color function is calculated by interpolating between all control points that do have a color value.
 
 Whether a control point defines a color value can be set using the lock button below the transfer function graph.
-If the lock button shows a closed lock, the color of the currently selected control point (orange outline) can be selected using the button next to the lock button.
+If the lock button shows a closed lock, the color of the currently selected control point (larger, brighter outline) can be selected using the button next to the lock button.
 It he lock button shows an unlocked lock the control point does not carry any color information.
 The state of the lock button can be switched by clicking it.
 
-The current transfer function can be saved to a json file by entering a filename and then clicking the export button.
-Previously exported functions can be imported by selecting them from the dropdown at the bottom of the section and then clicking the import button.
+The current transfer function can be saved to a json file by entering a filename and then clicking the "Export" button.
+Previously exported functions can be imported by selecting them from the dropdown at the bottom of the section and then clicking the "Import" button.
 Transfer functions are exported to and imported from `<cosmoscout-installation-directory>/share/resources/transferfunctions/`.
 
+To make finetuning of the transfer function easier, you can zoom into the graph using the "X-Range" and "Y-Range" sliders.
+When importing a saved transfer function, all control points will be placed relative to the current x-range.
+This enables you to focus your transfer function on smaller ranges of the whole data extent.
+
 ![sidebar transfer function section](docs/img/sidebar_transfer_function.png)
+
+### Parallel Coordinates
+
+The parallel coordinates tab allows to use a parallel coordinates plot to limit the visible parts of the volume.
+
+Along each axis, min and max values can be specified, either by clicking and dragging on the axis or by selecting an axis by clicking on it and then changing min and max values in the corresponding text fields.
+Brushed axes can be reset by clicking on them outside the brushed area.
+
+Axes can be reordered by dragging and dropping them at their header.
+
+The current state can be saved to a json file by entering a filename and then clicking the "Export" button.
+Previously exported states can be imported by selecting them from the dropdown at the bottom of the section and then clicking the "Import" button.
+States are exported to and imported from `<cosmoscout-installation-directory>/share/resources/parcoords/`.
+
+![sidebar parallel coordinates section](docs/img/sidebar_parcoords.png)
+
+Using the button in the top right of the plot, the parallel coordinates plot can be moved to a draggable and resizable window, which allows a better overview of the plot.
+You can move the plot back to the sidebar by closing the window.
+    
+![parallel coordinates popout](docs/img/parcoords_popout.png)
 
 ### Display
 
@@ -311,6 +352,7 @@ For this, the volume will be sampled at the surface of the core, so make sure, t
 ### Settings
 
 These settings can only be changed in the settings file.
+They have to be children of the `"core"` category in the plugin configuration.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -325,6 +367,7 @@ Used to render precomputed pathlines inside the volume.
 ### Settings
 
 All settings apart from the path can be dynamically changed in the CosmoScout UI.
+They have to be children of the `"pathlines"` category in the plugin configuration.
 
 | Key | Type | Default | Description |
 | --- | --- | --- | --- |
@@ -343,5 +386,21 @@ Apart from the .vtk file, you also **have to** supply a .csv file containing the
 This will be used to allow restricting the rendered pathlines using a parallel coordinates plot.
 
 Scalars with the names `<name>_start` and `<name>_end` will be linked to a corresponding scalar `<name>` in the volume data, if such a scalar exists.
-This is used to copy scalar restrictions on the volume data to the pathline data.
-If a cell scalar named `"InjectionStepId_start"` is present, it will be used to only show lines spawned during the last 10 timesteps.
+If a cell scalar named `"InjectionStepId_start"` is present, it will be used to get the starting time of the pathlines.
+
+### Usage
+
+The pathlines section in the sidebar can be used to configure the rendering of the pathlines.
+The "Render pathlines" checkbox can be used to activate or deactivate the rendering of the pathlines and the "Line size" slider can be used to set the width of the rendered lines (in the same units as used by the volume).
+
+By default, the pathlines are also affected by the configuration in the [Parallel Coordinates](#parallel-coordinates) tab.
+Restrictions on scalars of the volume data will be applied to linked (as described under [Supported data](#supported-data)) scalars of the pathline data.
+Additionally, if a scalar for getting the starting time of each pathline is available (see [Supported data](#supported-data)), it will automatically be restricted to the current timestep set in the [Data](#data) tab and 9 previous timesteps.
+
+![sidebar pathlines section](docs/img/sidebar_pathlines.png)
+
+If this linking with the parallel coordinates plot for the volume data is not wanted, it can be deactivated by checking the "Separate parallel coordinates" checkbox.
+Doing so will add another parallel coordinates plot containing the pathline scalars to the "Pathlines" tab, which can be used to restrict the shown pathlines.
+To manually transfer the volume's parallel coordinate plot configuration to this one, you can use the "Copy to pathlines" button at the bottom of the "Parallel Coordinates" tab.
+
+![sidebar pathlines section with parcoords](docs/img/sidebar_pathlines_parcoords.png)
