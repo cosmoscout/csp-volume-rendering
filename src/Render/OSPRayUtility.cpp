@@ -60,8 +60,7 @@ void initOSPRay() {
   }
 
   OSPDevice dev = ospGetCurrentDevice();
-  ospDeviceSetErrorCallback(
-      dev,
+  ospDeviceSetErrorCallback(dev,
       [](void* userData, OSPError e, const char* errorDetails) {
         osprayLogger().error(errorDetails);
       },

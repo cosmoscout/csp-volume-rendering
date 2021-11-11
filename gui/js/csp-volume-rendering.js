@@ -88,8 +88,9 @@
           <button class="waves-effect waves-light block btn glass text">Copy to pathlines</button>
         </div>
       `;
-        copyToPathlinesWrapper.querySelector(".btn").addEventListener("click",
-            () => { this.copyParcoords(this._parcoordsVolume, this._parcoordsPathlines); });
+        copyToPathlinesWrapper.querySelector(".btn").addEventListener("click", () => {
+          this.copyParcoords(this._parcoordsVolume, this._parcoordsPathlines);
+        });
         this._parcoordsVolume.parcoordsControls.appendChild(copyToPathlinesWrapper);
       }
     }

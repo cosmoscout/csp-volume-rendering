@@ -21,9 +21,12 @@
       this.popoutContent = this.popout.querySelector(".window-content");
       this.popoutWrapper = this.popout.querySelector(".window-wrapper");
 
-      this.parcoordsUndockButton.addEventListener("click", () => { this.undock(); });
-      this.popout.querySelector(`[data-action="close"]`)
-          .addEventListener("click", () => { this.dock(); });
+      this.parcoordsUndockButton.addEventListener("click", () => {
+        this.undock();
+      });
+      this.popout.querySelector(`[data-action="close"]`).addEventListener("click", () => {
+        this.dock();
+      });
 
       this.exportLocation = this.parcoordsControls.querySelector(".parcoordsExportLocation");
       this.parcoordsControls.querySelector(".parcoordsExport").addEventListener("click", () => {
@@ -56,7 +59,7 @@
         this.pc.brushExtents({[this.activeBrush]: [min, this.brushMax.value]});
       });
 
-      this.heightOffset = 47;
+      this.heightOffset       = 47;
       this._handleBrushEvents = true;
 
       this.data                                    = d3.csvParse(csv);
@@ -113,8 +116,9 @@
 
     exportBrushState() {
       const brushExtents = this.pc.brushExtents();
-      Object.keys(brushExtents)
-          .forEach(e => { brushExtents[e] = brushExtents[e].selection.scaled.reverse(); });
+      Object.keys(brushExtents).forEach(e => {
+        brushExtents[e] = brushExtents[e].selection.scaled.reverse();
+      });
       return brushExtents;
     }
 
@@ -125,7 +129,9 @@
 
     setAvailableBrushStates(availableFiles) {
       let options = "";
-      availableFiles.forEach((file) => { options += `<option>${file}</option>`; });
+      availableFiles.forEach((file) => {
+        options += `<option>${file}</option>`;
+      });
       this.importSelect.innerHTML = options;
       $(this.importSelect).selectpicker();
       $(this.importSelect).selectpicker("refresh");
@@ -179,7 +185,11 @@
 
     _showHistogram(dimension, enable) {
       if (dimension != "") {
-        const newBars = this.pc.g()._groups[0].find(g => g.__data__ == dimension).querySelector(".histogram").children;
+        const newBars = this.pc.g()
+                            ._groups[0]
+                            .find(g => g.__data__ == dimension)
+                            .querySelector(".histogram")
+                            .children;
         for (let bar of newBars) {
           d3.select(bar).attr("hidden", enable ? null : false);
         }
@@ -211,7 +221,7 @@
 
     _generateHistograms() {
       const bincount = 20;
-      const columns = {};
+      const columns  = {};
       this.data.columns.forEach((c) => {
         columns[c] = this.data.map(d => d[c]);
       });
@@ -224,33 +234,34 @@
     }
 
     _insertHistograms() {
-      const self = this;
-      const xScale = d3.scaleLog()
-        .domain([1, this.data.length])
-        .range([0, 50]);
+      const self      = this;
+      const xScale    = d3.scaleLog().domain([1, this.data.length]).range([0, 50]);
       const histogram = this.pc.g()
-        .insert("svg:g", ".brush")
-        .attr("class", "histogram")
-        .selectAll("rect")
-        .data(d => this.bins[d]);
+                            .insert("svg:g", ".brush")
+                            .attr("class", "histogram")
+                            .selectAll("rect")
+                            .data(d => this.bins[d]);
       histogram.enter()
-        .append("rect")
-        .attr("x", 1)
-        .attr("y", function (d) {
-          const dimension = d3.select(this.parentNode).data()[0];
-          const scale = self.pc.dimensions()[dimension].yscale;
-          return scale(d.x1);
-        })
-        .attr("height", function (d) {
-          const dimension = d3.select(this.parentNode).data()[0];
-          const scale = self.pc.dimensions()[dimension].yscale;
-          const height = Math.abs(scale(d.x1) - scale(d.x0))
-          return height > 0 ? height : 0.1;
-        })
-        .attr("width", d => {
-          return d.length == 0 ? 0 : xScale(d.length);
-        })
-        .attr("hidden", true);
+          .append("rect")
+          .attr("x", 1)
+          .attr("y",
+              function(d) {
+                const dimension = d3.select(this.parentNode).data()[0];
+                const scale     = self.pc.dimensions()[dimension].yscale;
+                return scale(d.x1);
+              })
+          .attr("height",
+              function(d) {
+                const dimension = d3.select(this.parentNode).data()[0];
+                const scale     = self.pc.dimensions()[dimension].yscale;
+                const height    = Math.abs(scale(d.x1) - scale(d.x0))
+                return height > 0 ? height : 0.1;
+              })
+          .attr("width",
+              d => {
+                return d.length == 0 ? 0 : xScale(d.length);
+              })
+          .attr("hidden", true);
     }
   }
 
@@ -302,7 +313,9 @@
      */
     setAvailableBrushStates(availableFilesJson) {
       this._availableFiles = JSON.parse(availableFilesJson);
-      this._editors.forEach((editor) => { editor.setAvailableBrushStates(this._availableFiles); });
+      this._editors.forEach((editor) => {
+        editor.setAvailableBrushStates(this._availableFiles);
+      });
     }
 
     /**

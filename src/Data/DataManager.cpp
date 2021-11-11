@@ -417,8 +417,7 @@ std::shared_future<vtkSmartPointer<vtkDataSet>> DataManager::getFromCache(
 
 void DataManager::loadData(Timestep timestep, Lod lod) {
   logger().info("Loading data for timestep {}, level of detail {}...", timestep, lod);
-  auto data = std::async(
-      std::launch::async,
+  auto data             = std::async(std::launch::async,
       [this](Timestep timestep, Lod lod) {
         std::chrono::high_resolution_clock::time_point timer;
         vtkSmartPointer<vtkDataSet>                    data;

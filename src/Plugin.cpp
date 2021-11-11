@@ -393,7 +393,8 @@ void Plugin::onLoad() {
   for (auto const& node : mDisplayNodes) {
     node.second->setAnchorPosition(mPluginSettings.mTransform.mPosition.get());
     node.second->setAnchorScale(mPluginSettings.mTransform.mScale.get());
-    node.second->setAnchorRotation(cs::utils::convert::toRadians(mPluginSettings.mTransform.mRotation.get()));
+    node.second->setAnchorRotation(
+        cs::utils::convert::toRadians(mPluginSettings.mTransform.mRotation.get()));
 
     mSolarSystem->registerAnchor(node.second);
   }
@@ -918,7 +919,7 @@ std::vector<ScalarFilter> csp::volumerendering::Plugin::parseScalarFilters(
   std::vector<ScalarFilter> filters;
   for (auto const& [axis, value] : j.items()) {
     auto const& scalar = std::find_if(scalars.begin(), scalars.end(),
-        [&axis = axis](Scalar const& s) { return s.mName == axis; });
+        [& axis = axis](Scalar const& s) { return s.mName == axis; });
     if (scalar != scalars.end()) {
       ScalarFilter filter;
       filter.mAttrIndex = (int)std::distance(scalars.begin(), scalar);
