@@ -60,7 +60,8 @@ void initOSPRay() {
   }
 
   OSPDevice dev = ospGetCurrentDevice();
-  ospDeviceSetErrorCallback(dev,
+  ospDeviceSetErrorCallback(
+      dev,
       [](void* userData, OSPError e, const char* errorDetails) {
         osprayLogger().error(errorDetails);
       },
@@ -209,8 +210,6 @@ ospray::cpp::Volume createOSPRayVolume(
 
 ospray::cpp::Volume createOSPRayVolume(
     vtkSmartPointer<vtkStructuredGrid> vtkVolume, std::vector<Scalar> const& scalars) {
-  std::array<int, 6> extent;
-  vtkVolume->GetExtent(extent.data());
   std::array<double, 6> bounds;
   vtkVolume->GetBounds(bounds.data());
   std::array<int, 3> dimensions;
@@ -218,9 +217,64 @@ ospray::cpp::Volume createOSPRayVolume(
   std::array<double, 3> origin;
   vtkVolume->GetPoint(0, 0, 0, origin.data());
 
+  constexpr int OSP_RAD_AXIS = 0;
+  constexpr int OSP_LON_AXIS = 1;
+  constexpr int OSP_LAT_AXIS = 2;
+
+  DataManager::StructuredSphericalMetadata metadata;
+  metadata.mRadAxis = 1;
+  metadata.mLatAxis = 0;
+  metadata.mLonAxis = 2;
+
+  metadata.mLatRange = {0., 360.};
+  metadata.mLonRange = {0., 180.};
+  metadata.mRadRange = {origin[2], (bounds[3] - bounds[2]) / 2.};
+
+  rkcommon::math::vec3i dim;
+  rkcommon::math::vec3f spacing;
+  rkcommon::math::vec3f gridOrigin;
+
+  switch (scalars[0].mType) {
+  case ScalarType::ePointData:
+    dim[OSP_RAD_AXIS] = dimensions[metadata.mRadAxis];
+    dim[OSP_LON_AXIS] = dimensions[metadata.mLonAxis];
+    dim[OSP_LAT_AXIS] = dimensions[metadata.mLatAxis];
+
+    spacing[OSP_RAD_AXIS] = static_cast<float>(
+        (metadata.mRadRange[1] - metadata.mRadRange[0]) / (dim[OSP_RAD_AXIS] - 1));
+    spacing[OSP_LON_AXIS] = static_cast<float>(
+        (metadata.mLonRange[1] - metadata.mLonRange[0]) / (dim[OSP_LON_AXIS] - 1));
+    spacing[OSP_LAT_AXIS] = static_cast<float>(
+        (metadata.mLatRange[1] - metadata.mLatRange[0]) / (dim[OSP_LAT_AXIS] - 1));
+
+    gridOrigin[OSP_RAD_AXIS] = static_cast<float>(metadata.mRadRange[0]);
+    gridOrigin[OSP_LON_AXIS] = static_cast<float>(metadata.mLonRange[0]);
+    gridOrigin[OSP_LAT_AXIS] = static_cast<float>(metadata.mLatRange[0]);
+    break;
+
+  case ScalarType::eCellData:
+    dim[OSP_RAD_AXIS] = dimensions[metadata.mRadAxis] - 1;
+    dim[OSP_LON_AXIS] = dimensions[metadata.mLonAxis] - 1;
+    dim[OSP_LAT_AXIS] = dimensions[metadata.mLatAxis] - 1;
+
+    spacing[OSP_RAD_AXIS] =
+        static_cast<float>((metadata.mRadRange[1] - metadata.mRadRange[0]) / dim[OSP_RAD_AXIS]);
+    spacing[OSP_LON_AXIS] =
+        static_cast<float>((metadata.mLonRange[1] - metadata.mLonRange[0]) / dim[OSP_LON_AXIS]);
+    spacing[OSP_LAT_AXIS] =
+        static_cast<float>((metadata.mLatRange[1] - metadata.mLatRange[0]) / dim[OSP_LAT_AXIS]);
+
+    gridOrigin[OSP_RAD_AXIS] =
+        static_cast<float>(metadata.mRadRange[0]) + spacing[OSP_RAD_AXIS] / 2;
+    gridOrigin[OSP_LON_AXIS] =
+        static_cast<float>(metadata.mLonRange[0]) + spacing[OSP_LON_AXIS] / 2;
+    gridOrigin[OSP_LAT_AXIS] =
+        static_cast<float>(metadata.mLatRange[0]) + spacing[OSP_LAT_AXIS] / 2;
+    break;
+  }
+
   std::vector<ospray::cpp::CopiedData> ospData;
   vtkSmartPointer<vtkDataArray>        vtkData;
-  rkcommon::math::vec3i                dim;
 
   for (size_t i = 0; i < scalars.size(); i++) {
     if (scalars[i].mType != scalars[0].mType) {
@@ -228,17 +282,34 @@ ospray::cpp::Volume createOSPRayVolume(
     }
     switch (scalars[i].mType) {
     case ScalarType::ePointData:
-      dim     = {dimensions[1], dimensions[2], dimensions[0]};
       vtkData = vtkVolume->GetPointData()->GetScalars(scalars[i].mName.c_str());
       break;
     case ScalarType::eCellData:
-      dim     = {dimensions[1] - 1, dimensions[2] - 1, dimensions[0] - 1};
       vtkData = vtkVolume->GetCellData()->GetScalars(scalars[i].mName.c_str());
       break;
     }
 
     int                   dataSize = vtkData->GetDataTypeSize();
-    rkcommon::math::vec3i stride{dataSize * dim[2], dataSize * dim[2] * dim[0], dataSize};
+    rkcommon::math::vec3i stride{dataSize, dataSize, dataSize};
+    if (metadata.mRadAxis > metadata.mLatAxis) {
+      stride[OSP_RAD_AXIS] *= dim[OSP_LAT_AXIS];
+    }
+    if (metadata.mRadAxis > metadata.mLonAxis) {
+      stride[OSP_RAD_AXIS] *= dim[OSP_LON_AXIS];
+    }
+    if (metadata.mLonAxis > metadata.mRadAxis) {
+      stride[OSP_LON_AXIS] *= dim[OSP_RAD_AXIS];
+    }
+    if (metadata.mLonAxis > metadata.mLatAxis) {
+      stride[OSP_LON_AXIS] *= dim[OSP_LAT_AXIS];
+    }
+    if (metadata.mLatAxis > metadata.mRadAxis) {
+      stride[OSP_LAT_AXIS] *= dim[OSP_RAD_AXIS];
+    }
+    if (metadata.mLatAxis > metadata.mLonAxis) {
+      stride[OSP_LAT_AXIS] *= dim[OSP_LON_AXIS];
+    }
+
     switch (vtkData->GetDataType()) {
     case VTK_FLOAT:
       ospData.emplace_back((float*)vtkData->GetVoidPointer(0), OSP_FLOAT, dim, stride);
@@ -253,20 +324,13 @@ ospray::cpp::Volume createOSPRayVolume(
       ospData.emplace_back((int8_t*)vtkData->GetVoidPointer(0), OSP_UCHAR, dim, stride);
       break;
     case VTK_SHORT:
-      ospData.emplace_back((int16_t*)vtkData->GetVoidPointer(0), OSP_SHORT,
-          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      ospData.emplace_back((int16_t*)vtkData->GetVoidPointer(0), OSP_SHORT, dim, stride);
       break;
     case VTK_UNSIGNED_SHORT:
-      ospData.emplace_back((uint16_t*)vtkData->GetVoidPointer(0), OSP_USHORT,
-          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      ospData.emplace_back((uint16_t*)vtkData->GetVoidPointer(0), OSP_USHORT, dim, stride);
       break;
     }
   }
-
-  rkcommon::math::vec3f spacing = {((float)(bounds[3] - bounds[2]) / 2 - (float)origin[2]) / dim[0],
-      180.f / dim[1], 360.f / dim[2]};
-  rkcommon::math::vec3f gridOrigin =
-      rkcommon::math::vec3f{(float)origin[2], spacing[1] / 2, spacing[2] / 2};
 
   ospray::cpp::Volume volume("structuredSpherical");
   volume.setParam("gridSpacing", spacing);

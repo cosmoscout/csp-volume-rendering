@@ -60,6 +60,16 @@ class DataManager {
     }
   };
 
+  struct StructuredSphericalMetadata {
+    int mRadAxis;
+    int mLonAxis;
+    int mLatAxis;
+
+    std::array<double, 2> mLonRange;
+    std::array<double, 2> mLatRange;
+    std::array<double, 2> mRadRange;
+  };
+
   DataManager(std::string const& path, std::string const& filenamePattern,
       std::unique_ptr<FileLoader> fileLoader, std::optional<std::string> const& pathlinesPath = {});
   ~DataManager();
