@@ -7,6 +7,8 @@
 #include "DataManager.hpp"
 
 #include "../logger.hpp"
+#include "NetCDFFileLoader.hpp"
+#include "VtkFileLoader.hpp"
 
 #include "../../../../src/cs-utils/filesystem.hpp"
 #include "../../../../src/cs-utils/utils.hpp"
@@ -29,21 +31,28 @@ const char* DataManagerException::what() const noexcept {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-DataManager::DataManager(std::string const& path, std::string const& filenamePattern,
-    std::unique_ptr<FileLoader> fileLoader, std::optional<std::string> const& pathlinesPath)
-    : mFileLoader(std::move(fileLoader)) {
-  // Initialize pathlines if path is given
-  if (pathlinesPath.has_value()) {
-    mPathlines = std::make_unique<Pathlines>(pathlinesPath.value());
+DataManager::DataManager(Settings::Data const& dataSettings) {
+  // Create appropriate file loader
+  switch (dataSettings.mType.get()) {
+  case VolumeFileType::eVtk:
+    mFileLoader = std::make_unique<VtkFileLoader>();
+    break;
+  case VolumeFileType::eNetCdf:
+    mFileLoader = std::make_unique<VtkFileLoader>();
+    break;
+  default:
+    logger().error("Invalid volume data type given in settings! Should be 'vtk' or 'netcdf'.");
+    throw DataManagerException();
+    break;
   }
 
   // Parse regex
   std::regex patternRegex;
   try {
-    patternRegex = std::regex(".*" + filenamePattern);
+    patternRegex = std::regex(".*" + dataSettings.mNamePattern.get());
   } catch (const std::regex_error& e) {
-    logger().error(
-        "Filename pattern '{}' is not a valid regular expression: {}", filenamePattern, e.what());
+    logger().error("Filename pattern '{}' is not a valid regular expression: {}",
+        dataSettings.mNamePattern.get(), e.what());
     throw DataManagerException();
   }
 
@@ -55,32 +64,32 @@ DataManager::DataManager(std::string const& path, std::string const& filenamePat
     logger().error(
         "Filename pattern '{}' has the wrong amount of capture groups: {}! The pattern should "
         "contain only one capture group capturing the timestep component of the filename.",
-        filenamePattern, patternRegex.mark_count());
+        dataSettings.mNamePattern.get(), patternRegex.mark_count());
     throw DataManagerException();
   }
 
   // Get all files matching the regex
   std::set<std::string> files;
   try {
-    files = cs::utils::filesystem::listFiles(path, patternRegex);
+    files = cs::utils::filesystem::listFiles(dataSettings.mPath.get(), patternRegex);
   } catch (const boost::filesystem::filesystem_error& e) {
-    logger().error("Loading volume data from '{}' failed: {}", path, e.what());
+    logger().error("Loading volume data from '{}' failed: {}", dataSettings.mPath.get(), e.what());
     throw DataManagerException();
   }
 
   // Try to get csv data
-  std::string csvPattern = filenamePattern;
+  std::string csvPattern = dataSettings.mNamePattern.get();
   cs::utils::replaceString(csvPattern, boost::filesystem::extension(csvPattern), ".csv");
   try {
     std::set<std::string> files =
-        cs::utils::filesystem::listFiles(path, std::regex(".*" + csvPattern));
+        cs::utils::filesystem::listFiles(dataSettings.mPath.get(), std::regex(".*" + csvPattern));
     if (files.size() == 0) {
-      logger().error("No csv data found in '{}'!", path);
+      logger().error("No csv data found in '{}'!", dataSettings.mPath.get());
       throw DataManagerException();
     }
     mCsvData = cs::utils::filesystem::loadToString(*files.begin());
   } catch (const boost::filesystem::filesystem_error& e) {
-    logger().error("Loading csv data from '{}' failed: {}", path, e.what());
+    logger().error("Loading csv data from '{}' failed: {}", dataSettings.mPath.get(), e.what());
     throw DataManagerException();
   }
 
@@ -96,17 +105,21 @@ DataManager::DataManager(std::string const& path, std::string const& filenamePat
     try {
       timestep = std::stoi(match[haveLodFiles ? 2 : 1].str());
     } catch (const std::invalid_argument&) {
-      logger().error("Capture group in filename pattern '{}' does not match an integer for file "
-                     "'{}': Match of group is '{}'! A suitable capture group could be '([0-9])+'.",
-          filenamePattern, file, match[haveLodFiles ? 2 : 1].str());
+      logger().error("Capture group in filename pattern '{}' does "
+                     "not match an integer for file "
+                     "'{}': Match of group is '{}'! A suitable "
+                     "capture group could be '([0-9])+'.",
+          dataSettings.mNamePattern.get(), file, match[haveLodFiles ? 2 : 1].str());
       throw DataManagerException();
     }
     try {
       lod = haveLodFiles ? std::stoi(match[1].str()) : 0;
     } catch (const std::invalid_argument&) {
-      logger().error("Capture group in filename pattern '{}' does not match an integer for file "
-                     "'{}': Match of group is '{}'! A suitable capture group could be '([0-9])+'.",
-          filenamePattern, file, match[1].str());
+      logger().error("Capture group in filename pattern '{}' does "
+                     "not match an integer for file "
+                     "'{}': Match of group is '{}'! A suitable "
+                     "capture group could be '([0-9])+'.",
+          dataSettings.mNamePattern.get(), file, match[1].str());
       throw DataManagerException();
     }
 
@@ -114,7 +127,8 @@ DataManager::DataManager(std::string const& path, std::string const& filenamePat
     mFiles[timestep][lod] = file;
   }
   if (timesteps.size() == 0) {
-    logger().error("No files matching '{}' found in '{}'!", filenamePattern, path);
+    logger().error("No files matching '{}' found in '{}'!", dataSettings.mNamePattern.get(),
+        dataSettings.mPath.get());
     throw DataManagerException();
   }
   pTimesteps.set(timesteps);
@@ -127,6 +141,12 @@ DataManager::DataManager(std::string const& path, std::string const& filenamePat
   }
   setTimestep(timestep);
   mInitScalarsThread = std::thread(&DataManager::initScalars, this);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void DataManager::addPathlines(Settings::Pathlines const& pathlinesSettings) {
+  mPathlines = std::make_unique<Pathlines>(pathlinesSettings.mPath.get());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -173,7 +193,8 @@ void DataManager::setTimestep(int timestep) {
         pTimesteps.get().end()) {
       mCurrentTimestep = timestep;
     } else {
-      logger().warn("'{}' is not a timestep in the current dataset. '{}' will be used instead.",
+      logger().warn("'{}' is not a timestep in the current "
+                    "dataset. '{}' will be used instead.",
           timestep, mCurrentTimestep);
       timestep = mCurrentTimestep;
     }
@@ -187,8 +208,9 @@ void DataManager::setTimestep(int timestep) {
 void DataManager::cacheTimestep(int timestep) {
   if (std::find(pTimesteps.get().begin(), pTimesteps.get().end(), timestep) ==
       pTimesteps.get().end()) {
-    logger().warn(
-        "'{}' is not a timestep in the current dataset. No timestep will be cached.", timestep);
+    logger().warn("'{}' is not a timestep in the current dataset. "
+                  "No timestep will be cached.",
+        timestep);
     return;
   }
   getFromCache(timestep);
@@ -203,7 +225,8 @@ void DataManager::setActiveScalar(std::string const& scalarId) {
   if (scalar != pScalars.get().end()) {
     mActiveScalar = *scalar;
   } else {
-    logger().warn("'{}' is not a scalar in the current dataset. '{}' will be used instead.",
+    logger().warn("'{}' is not a scalar in the current dataset. "
+                  "'{}' will be used instead.",
         scalarId, mActiveScalar.getId());
   }
 }
@@ -254,7 +277,8 @@ vtkSmartPointer<vtkDataSet> DataManager::getData(
       getFromCache(state.mTimestep, optLod);
   vtkSmartPointer<vtkDataSet> dataset = futureData.get();
   if (!dataset) {
-    logger().error("Loaded data is null! Is the data type correctly set in the settings?");
+    logger().error("Loaded data is null! Is the data type "
+                   "correctly set in the settings?");
     throw std::runtime_error("Loaded data is null.");
   }
   if (state.mScalar.mName != "") {
@@ -320,7 +344,9 @@ int DataManager::getMinLod(State state) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Pathlines const& DataManager::getPathlines() const {
-  assert(("getPathlines must not be called when pathlines are deactivated.", mPathlines));
+  assert(("getPathlines must not be called when pathlines are "
+          "deactivated.",
+      mPathlines));
   return *mPathlines;
 }
 
@@ -336,7 +362,8 @@ void DataManager::initScalars() {
   try {
     data = getData();
   } catch (const std::exception&) {
-    logger().error("Could not load initial data for determining available scalars! "
+    logger().error("Could not load initial data for determining "
+                   "available scalars! "
                    "Requested data may have no active scalar.");
     return;
   }
@@ -367,7 +394,8 @@ void DataManager::initScalars() {
       }
     }
     if (scalars.size() == 0) {
-      logger().error("No scalars found in volume data! Requested data may have no active scalar.");
+      logger().error("No scalars found in volume data! Requested "
+                     "data may have no active scalar.");
       return;
     }
     mActiveScalar = scalars[0];
@@ -417,7 +445,8 @@ std::shared_future<vtkSmartPointer<vtkDataSet>> DataManager::getFromCache(
 
 void DataManager::loadData(Timestep timestep, Lod lod) {
   logger().info("Loading data for timestep {}, level of detail {}...", timestep, lod);
-  auto data             = std::async(std::launch::async,
+  auto data = std::async(
+      std::launch::async,
       [this](Timestep timestep, Lod lod) {
         std::chrono::high_resolution_clock::time_point timer;
         vtkSmartPointer<vtkDataSet>                    data;
@@ -465,7 +494,8 @@ void DataManager::loadData(Timestep timestep, Lod lod) {
           mOnScalarRangeUpdated.emit(scalar.first);
         }
 
-        logger().info("Finished loading data for timestep {}, level of detail {}. Took {}s.",
+        logger().info("Finished loading data for timestep {}, "
+                      "level of detail {}. Took {}s.",
             timestep, lod,
             (float)(std::chrono::high_resolution_clock::now() - timer).count() / 1000000000);
 

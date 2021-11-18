@@ -9,7 +9,7 @@
 
 #include "../logger.hpp"
 
-#include "../Enums.hpp"
+#include "../Settings.hpp"
 #include "FileLoader.hpp"
 #include "Pathlines.hpp"
 #include "Scalar.hpp"
@@ -70,9 +70,10 @@ class DataManager {
     std::array<double, 2> mRadRange;
   };
 
-  DataManager(std::string const& path, std::string const& filenamePattern,
-      std::unique_ptr<FileLoader> fileLoader, std::optional<std::string> const& pathlinesPath = {});
+  DataManager(Settings::Data const& dataSettings);
   ~DataManager();
+
+  void addPathlines(Settings::Pathlines const& pathlinesSettings);
 
   /// List of timesteps for which files were found.
   cs::utils::Property<std::vector<int>> pTimesteps;
