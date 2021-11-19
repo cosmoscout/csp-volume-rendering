@@ -15,6 +15,7 @@
 
 #include <vtkCellData.h>
 #include <vtkPointData.h>
+#include <vtkStructuredGrid.h>
 
 #include <algorithm>
 #include <future>
@@ -31,9 +32,10 @@ const char* DataManagerException::what() const noexcept {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-DataManager::DataManager(Settings::Data const& dataSettings) {
+DataManager::DataManager(Settings::Data const& dataSettings)
+    : mDataSettings(dataSettings) {
   // Create appropriate file loader
-  switch (dataSettings.mType.get()) {
+  switch (mDataSettings.mType.get()) {
   case VolumeFileType::eVtk:
     mFileLoader = std::make_unique<VtkFileLoader>();
     break;
@@ -49,10 +51,10 @@ DataManager::DataManager(Settings::Data const& dataSettings) {
   // Parse regex
   std::regex patternRegex;
   try {
-    patternRegex = std::regex(".*" + dataSettings.mNamePattern.get());
+    patternRegex = std::regex(".*" + mDataSettings.mNamePattern.get());
   } catch (const std::regex_error& e) {
     logger().error("Filename pattern '{}' is not a valid regular expression: {}",
-        dataSettings.mNamePattern.get(), e.what());
+        mDataSettings.mNamePattern.get(), e.what());
     throw DataManagerException();
   }
 
@@ -64,32 +66,32 @@ DataManager::DataManager(Settings::Data const& dataSettings) {
     logger().error(
         "Filename pattern '{}' has the wrong amount of capture groups: {}! The pattern should "
         "contain only one capture group capturing the timestep component of the filename.",
-        dataSettings.mNamePattern.get(), patternRegex.mark_count());
+        mDataSettings.mNamePattern.get(), patternRegex.mark_count());
     throw DataManagerException();
   }
 
   // Get all files matching the regex
   std::set<std::string> files;
   try {
-    files = cs::utils::filesystem::listFiles(dataSettings.mPath.get(), patternRegex);
+    files = cs::utils::filesystem::listFiles(mDataSettings.mPath.get(), patternRegex);
   } catch (const boost::filesystem::filesystem_error& e) {
-    logger().error("Loading volume data from '{}' failed: {}", dataSettings.mPath.get(), e.what());
+    logger().error("Loading volume data from '{}' failed: {}", mDataSettings.mPath.get(), e.what());
     throw DataManagerException();
   }
 
   // Try to get csv data
-  std::string csvPattern = dataSettings.mNamePattern.get();
+  std::string csvPattern = mDataSettings.mNamePattern.get();
   cs::utils::replaceString(csvPattern, boost::filesystem::extension(csvPattern), ".csv");
   try {
     std::set<std::string> files =
-        cs::utils::filesystem::listFiles(dataSettings.mPath.get(), std::regex(".*" + csvPattern));
+        cs::utils::filesystem::listFiles(mDataSettings.mPath.get(), std::regex(".*" + csvPattern));
     if (files.size() == 0) {
-      logger().error("No csv data found in '{}'!", dataSettings.mPath.get());
+      logger().error("No csv data found in '{}'!", mDataSettings.mPath.get());
       throw DataManagerException();
     }
     mCsvData = cs::utils::filesystem::loadToString(*files.begin());
   } catch (const boost::filesystem::filesystem_error& e) {
-    logger().error("Loading csv data from '{}' failed: {}", dataSettings.mPath.get(), e.what());
+    logger().error("Loading csv data from '{}' failed: {}", mDataSettings.mPath.get(), e.what());
     throw DataManagerException();
   }
 
@@ -109,7 +111,7 @@ DataManager::DataManager(Settings::Data const& dataSettings) {
                      "not match an integer for file "
                      "'{}': Match of group is '{}'! A suitable "
                      "capture group could be '([0-9])+'.",
-          dataSettings.mNamePattern.get(), file, match[haveLodFiles ? 2 : 1].str());
+          mDataSettings.mNamePattern.get(), file, match[haveLodFiles ? 2 : 1].str());
       throw DataManagerException();
     }
     try {
@@ -119,7 +121,7 @@ DataManager::DataManager(Settings::Data const& dataSettings) {
                      "not match an integer for file "
                      "'{}': Match of group is '{}'! A suitable "
                      "capture group could be '([0-9])+'.",
-          dataSettings.mNamePattern.get(), file, match[1].str());
+          mDataSettings.mNamePattern.get(), file, match[1].str());
       throw DataManagerException();
     }
 
@@ -127,8 +129,8 @@ DataManager::DataManager(Settings::Data const& dataSettings) {
     mFiles[timestep][lod] = file;
   }
   if (timesteps.size() == 0) {
-    logger().error("No files matching '{}' found in '{}'!", dataSettings.mNamePattern.get(),
-        dataSettings.mPath.get());
+    logger().error("No files matching '{}' found in '{}'!", mDataSettings.mNamePattern.get(),
+        mDataSettings.mPath.get());
     throw DataManagerException();
   }
   pTimesteps.set(timesteps);
@@ -235,6 +237,42 @@ void DataManager::setActiveScalar(std::string const& scalarId) {
 
 std::string const& DataManager::getCsvData() {
   return mCsvData;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+DataManager::Metadata DataManager::calculateMetadata() {
+  Metadata meta;
+  switch (mDataSettings.mStructure.get()) {
+  case VolumeStructure::eStructuredSpherical: {
+    vtkSmartPointer<vtkStructuredGrid> volume = vtkStructuredGrid::SafeDownCast(getData());
+    std::array<double, 3>              origin;
+    volume->GetPoint(0, 0, 0, origin.data());
+    std::array<double, 6> bounds;
+    volume->GetBounds(bounds.data());
+
+    Metadata::StructuredSpherical metadata;
+    metadata.mAxes.mRad = 1;
+    metadata.mAxes.mLon = 2;
+    metadata.mAxes.mLat = 0;
+
+    metadata.mRanges.mLat = {0., 360.};
+    metadata.mRanges.mLon = {0., 180.};
+    metadata.mRanges.mRad = {origin[2], (bounds[3] - bounds[2]) / 2.};
+
+    meta.mStructuredSpherical = metadata;
+    break;
+  }
+  }
+  return meta;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+DataManager::Metadata::StructuredSpherical const& DataManager::getMetadata() {
+	assert(("getMetadata must not be called when metadata is not set in the plugin settings.",
+      mDataSettings.mMetadata.has_value()));
+  return mDataSettings.mMetadata->mStructuredSpherical;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

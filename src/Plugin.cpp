@@ -130,6 +130,9 @@ void Plugin::update() {
   case RenderState::eWaitForData:
     if (mDataManager->isReady()) {
       mRenderState = RenderState::eIdle;
+      if (!mPluginSettings.mData.mMetadata.has_value()) {
+        mPluginSettings.mData.mMetadata = mDataManager->calculateMetadata();
+      }
       // Make sure that the correct scalar is selected in the DataManager
       mPluginSettings.mData.mActiveScalar.touch();
     }

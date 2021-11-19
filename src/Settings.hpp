@@ -27,6 +27,20 @@ struct Settings {
     cs::utils::Property<VolumeStructure>    mStructure;
     cs::utils::Property<VolumeShape>        mShape;
     cs::utils::DefaultProperty<std::string> mActiveScalar{""};
+
+    union Metadata {
+      struct StructuredSpherical {
+        template <typename T>
+        struct Axes {
+          T mRad;
+          T mLon;
+          T mLat;
+        };
+        Axes<std::array<double, 2>> mRanges;
+        Axes<int>                   mAxes;
+      } mStructuredSpherical;
+    };
+    std::optional<Metadata> mMetadata;
   } mData;
 
   struct Rendering {
@@ -77,6 +91,20 @@ struct Settings {
   std::optional<Pathlines> mPathlines;
 };
 
+template <typename T>
+void from_json(nlohmann::json const& j, Settings::Data::Metadata::StructuredSpherical::Axes<T>& o) {
+  cs::core::Settings::deserialize(j, "radial", o.mRad);
+  cs::core::Settings::deserialize(j, "lon", o.mLon);
+  cs::core::Settings::deserialize(j, "lat", o.mLat);
+}
+template <typename T>
+void to_json(nlohmann::json& j, Settings::Data::Metadata::StructuredSpherical::Axes<T> const& o) {
+  cs::core::Settings::serialize(j, "radial", o.mRad);
+  cs::core::Settings::serialize(j, "lon", o.mLon);
+  cs::core::Settings::serialize(j, "lat", o.mLat);
+}
+void from_json(nlohmann::json const& j, Settings::Data::Metadata::StructuredSpherical& o);
+void to_json(nlohmann::json& j, Settings::Data::Metadata::StructuredSpherical const& o);
 void from_json(nlohmann::json const& j, Settings::Data& o);
 void to_json(nlohmann::json& j, Settings::Data const& o);
 void from_json(nlohmann::json const& j, Settings::Rendering& o);

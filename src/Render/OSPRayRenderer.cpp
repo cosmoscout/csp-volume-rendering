@@ -159,8 +159,8 @@ OSPRayRenderer::Volume OSPRayRenderer::loadVolume(DataManager::State const& stat
   case VolumeStructure::eStructuredSpherical: {
     std::vector<Scalar> scalars = mDataManager->pScalars.get();
     scalars.insert(scalars.begin(), state.mScalar);
-    volume.mOsprayData =
-        OSPRayUtility::createOSPRayVolume(vtkStructuredGrid::SafeDownCast(volumeData), scalars);
+    volume.mOsprayData = OSPRayUtility::createOSPRayVolume(
+        vtkStructuredGrid::SafeDownCast(volumeData), scalars, mDataManager->getMetadata());
     break;
   }
   case VolumeStructure::eInvalid:

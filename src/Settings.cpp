@@ -46,6 +46,16 @@ NLOHMANN_JSON_SERIALIZE_ENUM(DepthMode, {
                                             {DepthMode::eMultiThreshold, "multiThreshold"},
                                         })
 
+void from_json(nlohmann::json const& j, Settings::Data::Metadata::StructuredSpherical& o) {
+  cs::core::Settings::deserialize(j, "axes", o.mAxes);
+  cs::core::Settings::deserialize(j, "ranges", o.mRanges);
+}
+
+void to_json(nlohmann::json& j, Settings::Data::Metadata::StructuredSpherical const& o) {
+  cs::core::Settings::serialize(j, "axes", o.mAxes);
+  cs::core::Settings::serialize(j, "ranges", o.mRanges);
+}
+
 void from_json(nlohmann::json const& j, Settings::Data& o) {
   cs::core::Settings::deserialize(j, "path", o.mPath);
   cs::core::Settings::deserialize(j, "namePattern", o.mNamePattern);
@@ -53,6 +63,16 @@ void from_json(nlohmann::json const& j, Settings::Data& o) {
   cs::core::Settings::deserialize(j, "structure", o.mStructure);
   cs::core::Settings::deserialize(j, "shape", o.mShape);
   cs::core::Settings::deserialize(j, "activeScalar", o.mActiveScalar);
+
+  if (j.contains("metadata")) {
+    switch (o.mStructure.get()) {
+    case VolumeStructure::eStructuredSpherical:
+      Settings::Data::Metadata::StructuredSpherical metadata;
+      cs::core::Settings::deserialize(j, "metadata", metadata);
+      o.mMetadata = {metadata};
+      break;
+    }
+  }
 };
 
 void to_json(nlohmann::json& j, Settings::Data const& o) {
@@ -62,6 +82,14 @@ void to_json(nlohmann::json& j, Settings::Data const& o) {
   cs::core::Settings::serialize(j, "structure", o.mStructure);
   cs::core::Settings::serialize(j, "shape", o.mShape);
   cs::core::Settings::serialize(j, "activeScalar", o.mActiveScalar);
+
+  if (o.mMetadata.has_value()) {
+    switch (o.mStructure.get()) {
+    case VolumeStructure::eStructuredSpherical:
+      cs::core::Settings::serialize(j, "metadata", o.mMetadata->mStructuredSpherical);
+      break;
+    }
+  }
 };
 
 void from_json(nlohmann::json const& j, Settings::Rendering& o) {
