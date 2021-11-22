@@ -10,12 +10,16 @@
 #include "NetCDFFileLoader.hpp"
 #include "VtkFileLoader.hpp"
 
+#include "../../../../src/cs-utils/convert.hpp"
 #include "../../../../src/cs-utils/filesystem.hpp"
 #include "../../../../src/cs-utils/utils.hpp"
 
 #include <vtkCellData.h>
 #include <vtkPointData.h>
 #include <vtkStructuredGrid.h>
+
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/norm.hpp>
 
 #include <algorithm>
 #include <future>
@@ -245,20 +249,81 @@ DataManager::Metadata DataManager::calculateMetadata() {
   Metadata meta;
   switch (mDataSettings.mStructure.get()) {
   case VolumeStructure::eStructuredSpherical: {
+    Metadata::StructuredSpherical      metadata;
     vtkSmartPointer<vtkStructuredGrid> volume = vtkStructuredGrid::SafeDownCast(getData());
-    std::array<double, 3>              origin;
-    volume->GetPoint(0, 0, 0, origin.data());
+
+    glm::dvec3            origin;
     std::array<double, 6> bounds;
+    std::array<int, 3>    dimensions;
+    volume->GetPoint(0, 0, 0, glm::value_ptr(origin));
     volume->GetBounds(bounds.data());
+    volume->GetDimensions(dimensions.data());
 
-    Metadata::StructuredSpherical metadata;
-    metadata.mAxes.mRad = 1;
-    metadata.mAxes.mLon = 2;
-    metadata.mAxes.mLat = 0;
+    std::array<glm::dvec3, 3> increments;
+    volume->GetPoint(1, 0, 0, glm::value_ptr(increments[0]));
+    volume->GetPoint(0, 1, 0, glm::value_ptr(increments[1]));
+    volume->GetPoint(0, 0, 1, glm::value_ptr(increments[2]));
+    std::array<glm::dvec3, 3> maxPoints;
+    volume->GetPoint(dimensions[0] - 1, 0, 0, glm::value_ptr(maxPoints[0]));
+    volume->GetPoint(0, dimensions[1] - 1, 0, glm::value_ptr(maxPoints[1]));
+    volume->GetPoint(0, 0, dimensions[2] - 1, glm::value_ptr(maxPoints[2]));
 
-    metadata.mRanges.mLat = {0., 360.};
+    double maxDist = 0.;
+    for (int i = 0; i < 3; i++) {
+      double dist = glm::length(increments[i]) - glm::length(origin);
+      if (dist > maxDist) {
+        maxDist             = dist;
+        metadata.mAxes.mRad = i;
+      }
+    }
+    metadata.mRanges.mRad = {glm::length(origin), glm::length(maxPoints[metadata.mAxes.mRad])};
+
+    for (int axisOffset = 1; axisOffset < 3; axisOffset++) {
+      int                                  axis      = (metadata.mAxes.mRad + axisOffset) % 3;
+      int                                  otherAxis = (metadata.mAxes.mRad + 3 - axisOffset) % 3;
+      std::array<std::array<double, 3>, 2> maxDiffs;
+      for (int i = 0; i < 2; i++) {
+        maxDiffs[i] = {0, 0, 0};
+        glm::dvec3         point;
+        glm::dvec3         pointPrev;
+        std::array<int, 3> pos = {0, 0, 0};
+        pos[otherAxis]         = i;
+        volume->GetPoint(pos[0], pos[1], pos[2], glm::value_ptr(point));
+        for (int j = 1; j < dimensions[axis]; j++) {
+          pointPrev = point;
+          switch (axis) {
+          case 0:
+            volume->GetPoint(j, pos[1], pos[2], glm::value_ptr(point));
+            break;
+          case 1:
+            volume->GetPoint(pos[0], j, pos[2], glm::value_ptr(point));
+            break;
+          case 2:
+            volume->GetPoint(pos[0], pos[1], j, glm::value_ptr(point));
+            break;
+          }
+          for (int k = 0; k < 3; k++) {
+            maxDiffs[i][k] = std::max(maxDiffs[i][k], std::abs(pointPrev[k] - point[k]));
+          }
+        }
+      }
+      std::array<int, 2> zeroAxes = {-1, -1};
+      for (int i = 0; i < 2; i++) {
+        for (int k = 0; k < 3; k++) {
+          if (maxDiffs[i][k] == 0) {
+            zeroAxes[i] = k;
+          }
+        }
+      }
+      if (zeroAxes[0] == zeroAxes[1] && zeroAxes[0] != -1) {
+        metadata.mAxes.mLat = axis;
+        metadata.mAxes.mLon = otherAxis;
+      }
+    }
+
+    // TODO calculate
+    metadata.mRanges.mLat = {0., 361.};
     metadata.mRanges.mLon = {0., 180.};
-    metadata.mRanges.mRad = {origin[2], (bounds[3] - bounds[2]) / 2.};
 
     meta.mStructuredSpherical = metadata;
     break;
@@ -270,7 +335,7 @@ DataManager::Metadata DataManager::calculateMetadata() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 DataManager::Metadata::StructuredSpherical const& DataManager::getMetadata() {
-	assert(("getMetadata must not be called when metadata is not set in the plugin settings.",
+  assert(("getMetadata must not be called when metadata is not set in the plugin settings.",
       mDataSettings.mMetadata.has_value()));
   return mDataSettings.mMetadata->mStructuredSpherical;
 }
