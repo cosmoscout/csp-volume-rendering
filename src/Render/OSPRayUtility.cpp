@@ -29,7 +29,10 @@
 
 namespace {
 oidn::DeviceRef oidnDevice;
-}
+
+bool warnedLatRange = false;
+bool warnedLonRange = false;
+} // namespace
 
 namespace csp::volumerendering::OSPRayUtility {
 
@@ -222,22 +225,66 @@ ospray::cpp::Volume createOSPRayVolume(vtkSmartPointer<vtkStructuredGrid> vtkVol
   rkcommon::math::vec3f spacing;
   rkcommon::math::vec3f gridOrigin;
 
+  std::array<double, 2> latRange = metadata.mRanges.mLat;
+  std::array<double, 2> lonRange = metadata.mRanges.mLon;
+
+  bool   warnLat = false;
+  double minLat  = std::min(latRange[0], latRange[1]);
+  if (minLat < 0.) {
+    latRange[0] += minLat;
+    latRange[1] += minLat;
+    warnLat = true;
+  }
+  for (int i = 0; i < 2; i++) {
+    if (latRange[i] > 360.) {
+      latRange[i] = 360.;
+      warnLat     = true;
+    }
+  }
+  if (warnLat && !warnedLatRange) {
+    logger().warn("The latitudinal range of the dataset is [{}, {}], which is outside the maximum "
+                  "range supported by OSPRay ([0, 360]). [{}, {}] will be used as a range instead.",
+        metadata.mRanges.mLat[0], metadata.mRanges.mLat[1], latRange[0], latRange[1]);
+    warnedLatRange = true;
+  }
+
+  double minLon  = std::min(lonRange[0], lonRange[1]);
+  bool   warnLon = false;
+  if (minLon < 0.) {
+    lonRange[0] += minLon;
+    lonRange[1] += minLon;
+    warnLon = true;
+  }
+  for (int i = 0; i < 2; i++) {
+    if (lonRange[i] > 180) {
+      lonRange[i] = 180.;
+      warnLon     = true;
+    }
+  }
+  if (warnLon && !warnedLonRange) {
+    logger().warn("The longitudinal range of the dataset is [{}, {}], which is outside the maximum "
+                  "range supported by OSPRay ([0, 180]). [{}, {}] will be used as a range instead.",
+        metadata.mRanges.mLon[0], metadata.mRanges.mLon[1], lonRange[0], lonRange[1]);
+    warnedLonRange = true;
+  }
+
   switch (scalars[0].mType) {
   case ScalarType::ePointData:
     dim[OSP_RAD_AXIS] = dimensions[metadata.mAxes.mRad];
     dim[OSP_LON_AXIS] = dimensions[metadata.mAxes.mLon];
     dim[OSP_LAT_AXIS] = dimensions[metadata.mAxes.mLat];
 
-    spacing[OSP_RAD_AXIS] = static_cast<float>(
-        (metadata.mRanges.mRad[1] - metadata.mRanges.mRad[0]) / (dim[OSP_RAD_AXIS] - 1));
-    spacing[OSP_LON_AXIS] = static_cast<float>(
-        (metadata.mRanges.mLon[1] - metadata.mRanges.mLon[0]) / (dim[OSP_LON_AXIS] - 1));
-    spacing[OSP_LAT_AXIS] = static_cast<float>(
-        (metadata.mRanges.mLat[1] - metadata.mRanges.mLat[0]) / (dim[OSP_LAT_AXIS] - 1));
+    spacing[OSP_RAD_AXIS] =
+        static_cast<float>((metadata.mRanges.mRad[1] - metadata.mRanges.mRad[0])) /
+        (dim[OSP_RAD_AXIS] - 1);
+    spacing[OSP_LON_AXIS] =
+        static_cast<float>((lonRange[1] - lonRange[0])) / (dim[OSP_LON_AXIS] - 1);
+    spacing[OSP_LAT_AXIS] =
+        static_cast<float>((latRange[1] - latRange[0])) / (dim[OSP_LAT_AXIS] - 1);
 
     gridOrigin[OSP_RAD_AXIS] = static_cast<float>(metadata.mRanges.mRad[0]);
-    gridOrigin[OSP_LON_AXIS] = static_cast<float>(metadata.mRanges.mLon[0]);
-    gridOrigin[OSP_LAT_AXIS] = static_cast<float>(metadata.mRanges.mLat[0]);
+    gridOrigin[OSP_LON_AXIS] = static_cast<float>(lonRange[0]);
+    gridOrigin[OSP_LAT_AXIS] = static_cast<float>(latRange[0]);
     break;
 
   case ScalarType::eCellData:
@@ -245,19 +292,16 @@ ospray::cpp::Volume createOSPRayVolume(vtkSmartPointer<vtkStructuredGrid> vtkVol
     dim[OSP_LON_AXIS] = dimensions[metadata.mAxes.mLon] - 1;
     dim[OSP_LAT_AXIS] = dimensions[metadata.mAxes.mLat] - 1;
 
-    spacing[OSP_RAD_AXIS] = static_cast<float>(
-        (metadata.mRanges.mRad[1] - metadata.mRanges.mRad[0]) / dim[OSP_RAD_AXIS]);
-    spacing[OSP_LON_AXIS] = static_cast<float>(
-        (metadata.mRanges.mLon[1] - metadata.mRanges.mLon[0]) / dim[OSP_LON_AXIS]);
-    spacing[OSP_LAT_AXIS] = static_cast<float>(
-        (metadata.mRanges.mLat[1] - metadata.mRanges.mLat[0]) / dim[OSP_LAT_AXIS]);
+    spacing[OSP_RAD_AXIS] =
+        static_cast<float>((metadata.mRanges.mRad[1] - metadata.mRanges.mRad[0])) /
+        dim[OSP_RAD_AXIS];
+    spacing[OSP_LON_AXIS] = static_cast<float>((lonRange[1] - lonRange[0])) / dim[OSP_LON_AXIS];
+    spacing[OSP_LAT_AXIS] = static_cast<float>((latRange[1] - latRange[0])) / dim[OSP_LAT_AXIS];
 
     gridOrigin[OSP_RAD_AXIS] =
         static_cast<float>(metadata.mRanges.mRad[0]) + spacing[OSP_RAD_AXIS] / 2;
-    gridOrigin[OSP_LON_AXIS] =
-        static_cast<float>(metadata.mRanges.mLon[0]) + spacing[OSP_LON_AXIS] / 2;
-    gridOrigin[OSP_LAT_AXIS] =
-        static_cast<float>(metadata.mRanges.mLat[0]) + spacing[OSP_LAT_AXIS] / 2;
+    gridOrigin[OSP_LON_AXIS] = static_cast<float>(lonRange[0]) + spacing[OSP_LON_AXIS] / 2;
+    gridOrigin[OSP_LAT_AXIS] = static_cast<float>(latRange[0]) + spacing[OSP_LAT_AXIS] / 2;
     break;
   }
 
