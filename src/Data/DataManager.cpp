@@ -282,6 +282,7 @@ DataManager::Metadata DataManager::calculateMetadata() {
     for (int axisOffset = 1; axisOffset < 3; axisOffset++) {
       int                                  axis      = (metadata.mAxes.mRad + axisOffset) % 3;
       int                                  otherAxis = (metadata.mAxes.mRad + 3 - axisOffset) % 3;
+      std::array<double, 3>                angles    = {0., 0., 0.};
       std::array<std::array<double, 3>, 2> maxDiffs;
       for (int i = 0; i < 2; i++) {
         maxDiffs[i] = {0, 0, 0};
@@ -306,6 +307,14 @@ DataManager::Metadata DataManager::calculateMetadata() {
           for (int k = 0; k < 3; k++) {
             maxDiffs[i][k] = std::max(maxDiffs[i][k], std::abs(pointPrev[k] - point[k]));
           }
+          if (i == 0) {
+            angles[0] += glm::acos(glm::dot(glm::normalize(point * glm::dvec3(0, 1, 1)),
+                glm::normalize(pointPrev * glm::dvec3(0, 1, 1))));
+            angles[1] += glm::acos(glm::dot(glm::normalize(point * glm::dvec3(1, 0, 1)),
+                glm::normalize(pointPrev * glm::dvec3(1, 0, 1))));
+            angles[2] += glm::acos(glm::dot(glm::normalize(point * glm::dvec3(1, 1, 0)),
+                glm::normalize(pointPrev * glm::dvec3(1, 1, 0))));
+          }
         }
       }
       std::array<int, 2> zeroAxes = {-1, -1};
@@ -319,12 +328,35 @@ DataManager::Metadata DataManager::calculateMetadata() {
       if (zeroAxes[0] == zeroAxes[1] && zeroAxes[0] != -1) {
         metadata.mAxes.mLat = axis;
         metadata.mAxes.mLon = otherAxis;
+
+        int    upAxis   = -1;
+        double maxAngle = 0.;
+        for (int i = 0; i < 3; i++) {
+          if (angles[i] > maxAngle) {
+            maxAngle = angles[i];
+            upAxis   = i;
+          }
+        }
+        maxAngle = cs::utils::convert::toDegrees(maxAngle);
+
+        glm::dvec3 up{0., 0., 0.};
+        up[upAxis] = 1.;
+
+        bool flipped = glm::dot(glm::cross(origin, increments[metadata.mAxes.mLat]), up) < 0.;
+        if (flipped) {
+          metadata.mRanges.mLat = {0., maxAngle};
+        } else {
+          metadata.mRanges.mLat = {maxAngle, 0.};
+        }
+
+        metadata.mRanges.mLon = {
+            cs::utils::convert::toDegrees(glm::acos(glm::dot(glm::normalize(origin), -up))),
+            cs::utils::convert::toDegrees(
+                glm::acos(glm::dot(glm::normalize(maxPoints[metadata.mAxes.mLon]), -up)))};
+
+        break;
       }
     }
-
-    // TODO calculate
-    metadata.mRanges.mLat = {0., 361.};
-    metadata.mRanges.mLon = {0., 180.};
 
     meta.mStructuredSpherical = metadata;
     break;
