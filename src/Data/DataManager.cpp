@@ -270,9 +270,10 @@ DataManager::Metadata DataManager::calculateMetadata() {
 
     double maxDist = 0.;
     for (int i = 0; i < 3; i++) {
-      double dist = glm::length(increments[i]) - glm::length(origin);
-      if (dist > maxDist) {
-        maxDist             = dist;
+      double dist    = glm::length(increments[i]) - glm::length(origin);
+      double distAbs = std::abs(dist);
+      if (distAbs > maxDist) {
+        maxDist             = distAbs;
         metadata.mAxes.mRad = i;
       }
     }
