@@ -268,6 +268,9 @@ DataManager::Metadata DataManager::calculateMetadata() {
     volume->GetPoint(0, dimensions[1] - 1, 0, glm::value_ptr(maxPoints[1]));
     volume->GetPoint(0, 0, dimensions[2] - 1, glm::value_ptr(maxPoints[2]));
 
+    // Get the radial axis in the VTK data.
+    // This should be the axis, where each step results in the biggest movement relative to
+    // the center of the carthesian coordinates.
     double maxDist = 0.;
     for (int i = 0; i < 3; i++) {
       double dist    = glm::length(increments[i]) - glm::length(origin);
@@ -279,17 +282,27 @@ DataManager::Metadata DataManager::calculateMetadata() {
     }
     metadata.mRanges.mRad = {glm::length(origin), glm::length(maxPoints[metadata.mAxes.mRad])};
 
+    // Check the other two axes to see which is the latitudinal and which is the longitudinal axis.
     for (int axisOffset = 1; axisOffset < 3; axisOffset++) {
-      int                                  axis      = (metadata.mAxes.mRad + axisOffset) % 3;
-      int                                  otherAxis = (metadata.mAxes.mRad + 3 - axisOffset) % 3;
-      std::array<double, 3>                angles    = {0., 0., 0.};
+      // Grid axis, that is checked in this iteration
+      int axis = (metadata.mAxes.mRad + axisOffset) % 3;
+      // Grid axis, that is neither the radial, nor the currently checked grid axis
+      int otherAxis = (metadata.mAxes.mRad + 3 - axisOffset) % 3;
+
+      std::array<double, 3>                angles = {0., 0., 0.};
       std::array<std::array<double, 3>, 2> maxDiffs;
+
+      // Do the check for two times with different positions along the other axis.
       for (int i = 0; i < 2; i++) {
         maxDiffs[i] = {0, 0, 0};
         glm::dvec3         point;
         glm::dvec3         pointPrev;
         std::array<int, 3> pos = {0, 0, 0};
         pos[otherAxis]         = i;
+
+        // Iterate over all points of the checked axis, with constant values for the other two axes.
+        // Keep track of the total angle of rotation along each of the carthesian axes, as well as
+        // the maximal translation along each of the carthesian axes between two neighboured points.
         volume->GetPoint(pos[0], pos[1], pos[2], glm::value_ptr(point));
         for (int j = 1; j < dimensions[axis]; j++) {
           pointPrev = point;
@@ -317,6 +330,10 @@ DataManager::Metadata DataManager::calculateMetadata() {
           }
         }
       }
+
+      // Check, for which carthesian axis there was no translation when iterating over all points.
+      // If there was no translation, the points on the currently checked grid axis rotate around
+      // the carthesian axis. This carthesian axis is a candidate for the up axis.
       std::array<int, 2> zeroAxes = {-1, -1};
       for (int i = 0; i < 2; i++) {
         for (int k = 0; k < 3; k++) {
@@ -325,6 +342,9 @@ DataManager::Metadata DataManager::calculateMetadata() {
           }
         }
       }
+
+      // If the points rotate around the same carthesian axis for both iterations, the currently
+      // checked grid axis probably is the latitudinal axis.
       if (zeroAxes[0] == zeroAxes[1] && zeroAxes[0] != -1) {
         metadata.mAxes.mLat = axis;
         metadata.mAxes.mLon = otherAxis;
@@ -342,6 +362,7 @@ DataManager::Metadata DataManager::calculateMetadata() {
         glm::dvec3 up{0., 0., 0.};
         up[upAxis] = 1.;
 
+        // Check the direction of rotation around the up axis.
         bool flipped = glm::dot(glm::cross(origin, increments[metadata.mAxes.mLat]), up) < 0.;
         if (flipped) {
           metadata.mRanges.mLat = {0., maxAngle};
@@ -349,6 +370,8 @@ DataManager::Metadata DataManager::calculateMetadata() {
           metadata.mRanges.mLat = {maxAngle, 0.};
         }
 
+        // The minimum and maximum longitude is determined by calculating the angle between the down
+        // vector and the first and last point on the longitudinal grid axis.
         metadata.mRanges.mLon = {
             cs::utils::convert::toDegrees(glm::acos(glm::dot(glm::normalize(origin), -up))),
             cs::utils::convert::toDegrees(
