@@ -33,8 +33,8 @@ struct Settings {
         template <typename T>
         struct Axes {
           T mRad;
-          T mLon;
           T mLat;
+          T mLon;
         };
         Axes<std::array<double, 2>> mRanges;
         Axes<int>                   mAxes;

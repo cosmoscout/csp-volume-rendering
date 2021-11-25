@@ -344,10 +344,10 @@ DataManager::Metadata DataManager::calculateMetadata() {
       }
 
       // If the points rotate around the same carthesian axis for both iterations, the currently
-      // checked grid axis probably is the latitudinal axis.
+      // checked grid axis probably is the longitudinal axis.
       if (zeroAxes[0] == zeroAxes[1] && zeroAxes[0] != -1) {
-        metadata.mAxes.mLat = axis;
-        metadata.mAxes.mLon = otherAxis;
+        metadata.mAxes.mLon = axis;
+        metadata.mAxes.mLat = otherAxis;
 
         int    upAxis   = -1;
         double maxAngle = 0.;
@@ -363,19 +363,19 @@ DataManager::Metadata DataManager::calculateMetadata() {
         up[upAxis] = 1.;
 
         // Check the direction of rotation around the up axis.
-        bool flipped = glm::dot(glm::cross(origin, increments[metadata.mAxes.mLat]), up) < 0.;
+        bool flipped = glm::dot(glm::cross(origin, increments[metadata.mAxes.mLon]), up) < 0.;
         if (flipped) {
-          metadata.mRanges.mLat = {0., maxAngle};
+          metadata.mRanges.mLon = {0., maxAngle};
         } else {
-          metadata.mRanges.mLat = {maxAngle, 0.};
+          metadata.mRanges.mLon = {maxAngle, 0.};
         }
 
-        // The minimum and maximum longitude is determined by calculating the angle between the down
-        // vector and the first and last point on the longitudinal grid axis.
-        metadata.mRanges.mLon = {
+        // The minimum and maximum latitude is determined by calculating the angle between the down
+        // vector and the first and last point on the latitudinal grid axis.
+        metadata.mRanges.mLat = {
             cs::utils::convert::toDegrees(glm::acos(glm::dot(glm::normalize(origin), -up))),
             cs::utils::convert::toDegrees(
-                glm::acos(glm::dot(glm::normalize(maxPoints[metadata.mAxes.mLon]), -up)))};
+                glm::acos(glm::dot(glm::normalize(maxPoints[metadata.mAxes.mLat]), -up)))};
 
         break;
       }
