@@ -365,9 +365,9 @@ DataManager::Metadata DataManager::calculateMetadata() {
         // Check the direction of rotation around the up axis.
         bool flipped = glm::dot(glm::cross(origin, increments[metadata.mAxes.mLon]), up) < 0.;
         if (flipped) {
-          metadata.mRanges.mLon = {0., maxAngle};
-        } else {
           metadata.mRanges.mLon = {maxAngle, 0.};
+        } else {
+          metadata.mRanges.mLon = {0., maxAngle};
         }
 
         // The minimum and maximum latitude is determined by calculating the angle between the down

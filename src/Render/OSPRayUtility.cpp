@@ -268,6 +268,11 @@ ospray::cpp::Volume createOSPRayVolume(vtkSmartPointer<vtkStructuredGrid> vtkVol
     warnedLatRange = true;
   }
 
+  // The latitude is given as angles relative to the down axis, but OSPRay expects angles relative
+  // to the up axis, so we have to flip the angles.
+  latRange[0] = 180 - latRange[0];
+  latRange[1] = 180 - latRange[1];
+
   switch (scalars[0].mType) {
   case ScalarType::ePointData:
     dim[OSP_RAD_AXIS] = dimensions[metadata.mAxes.mRad];
