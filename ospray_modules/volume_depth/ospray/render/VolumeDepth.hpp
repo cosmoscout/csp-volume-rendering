@@ -5,6 +5,8 @@
 
 #include "ospray_module_volume_depth_export.h"
 
+#include <vector>
+
 #if defined(_MSC_VER)
 #pragma warning(push)
 #pragma warning(disable : 4275)
@@ -18,15 +20,23 @@ namespace ospray {
 
 namespace volumedepth {
 
+struct ScalarFilter {
+  int   attrIndex;
+  float min;
+  float max;
+};
+
 struct OSPRAY_MODULE_VOLUME_DEPTH_EXPORT VolumeDepth : public Renderer {
-  VolumeDepth(int defaultAOSamples = 0, bool defaultShadowsEnabled = false);
+  VolumeDepth();
   std::string toString() const override;
   void        commit() override;
   void*       beginFrame(FrameBuffer*, World*) override;
 
  private:
-  int  aoSamples{0};
-  bool shadowsEnabled{false};
+  bool visibleLights{false};
+  bool rendererValid{false};
+
+  std::vector<ScalarFilter> filters;
 };
 
 } // namespace volumedepth

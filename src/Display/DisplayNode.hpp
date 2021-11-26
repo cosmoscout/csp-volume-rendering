@@ -31,8 +31,7 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   /// Create a DisplayNode positioned at the given anchor using properties found in settings.
   /// It will automatically be added to the Vista scene graph on construction and removed on
   /// destruction. The depthResolution is used as an initial mesh resolution of the created objects.
-  DisplayNode(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor,
-      int depthResolution);
+  DisplayNode(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor);
   virtual ~DisplayNode();
 
   DisplayNode(DisplayNode const& other) = delete;
@@ -46,15 +45,16 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
 
   /// Set the color image that should be displayed.
   /// The color data should be given as an array of rgba values (8 bit per channel).
-  void setTexture(std::vector<uint8_t>& texture, int width, int height);
+  void setTexture(uint8_t* texture, int width, int height);
+  void setTexture(float* texture, int width, int height);
   /// Set the depth information for displaying the image.
   /// The depth data should be given as an array of z-positions in clip space per pixel.
-  void setDepthTexture(std::vector<float>& texture, int width, int height);
+  void setDepthTexture(float* texture, int width, int height);
   /// Sets the base transform of the display node.
   /// This should correspond to the perspective, from which the image was rendered.
   void setTransform(glm::mat4 transform);
-  /// Sets the model view projection matrix used in rendering the color image.
-  void setMVPMatrix(glm::mat4 mvp);
+  /// Sets the model view and projection matrices used in rendering the color image.
+  void setRendererMatrices(glm::mat4 modelView, glm::mat4 projection);
 
   /// Enables using the depth information for image based rendering.
   void setUseDepth(bool useDepth);
@@ -76,13 +76,14 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
 
   glm::mat4       mTransform;
   VistaTexture    mTexture;
+  VistaTexture    mDepthTexture;
   VistaGLSLShader mShader;
 
-  glm::mat4                               mRendererMVP;
-  cs::utils::Property<std::vector<float>> pDepthValues;
-  int                                     mDepthResolution;
-  bool                                    mUseDepth  = true;
-  bool                                    mDrawDepth = false;
+  glm::mat4 mRendererModelView;
+  glm::mat4 mRendererProjection;
+  glm::mat4 mRendererMVP;
+  bool      mUseDepth  = true;
+  bool      mDrawDepth = false;
 
   bool mShaderDirty;
 };

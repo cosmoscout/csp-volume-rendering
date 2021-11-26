@@ -8,9 +8,12 @@
 
 #include "../logger.hpp"
 
+#include "../../../../src/cs-utils/utils.hpp"
+
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
+#include <vtkCellData.h>
 #include <vtkPointData.h>
 #include <vtkStructuredPoints.h>
 
@@ -30,16 +33,13 @@ namespace csp::volumerendering {
 OSPRayRenderer::OSPRayRenderer(
     std::shared_ptr<DataManager> dataManager, VolumeStructure structure, VolumeShape shape)
     : Renderer(dataManager, structure, shape) {
-  OSPRayUtility::initOSPRay();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 OSPRayRenderer::~OSPRayRenderer() {
-  mCachedVolumes.clear();
+  mCache.mVolumes.clear();
   mRenderFuture.reset();
-
-  ospShutdown();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,9 +56,16 @@ float OSPRayRenderer::getProgress() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void OSPRayRenderer::preloadData(DataManager::State state) {
-  if (mCachedVolumes.find(state) == mCachedVolumes.end()) {
-    mCachedVolumes[state] =
-        std::async(std::launch::async, [this, state]() { return loadVolume(state); });
+  if (mCache.mVolumes.find(state) == mCache.mVolumes.end()) {
+    int lod = mDataManager->getMinLod(state);
+    mCache.mVolumes[state][lod] =
+        std::async(std::launch::async, [this, state, lod]() { return loadVolume(state, lod); });
+    DataManager::State anomalyState = state;
+    anomalyState.mScalar =
+        *std::find_if(mDataManager->pScalars.get().begin(), mDataManager->pScalars.get().end(),
+            [](Scalar s) { return s.getId() == "cell_temperature anomaly"; });
+    mCache.mVolumes[anomalyState][lod] = std::async(
+        std::launch::async, [this, anomalyState, lod]() { return loadVolume(anomalyState, lod); });
   }
 }
 
@@ -74,51 +81,94 @@ void OSPRayRenderer::cancelRendering() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Renderer::RenderedImage OSPRayRenderer::getFrameImpl(
-    glm::mat4 cameraTransform, Parameters parameters, DataManager::State dataState) {
-  mRenderingCancelled = false;
-  RenderedImage renderedImage;
-  try {
-    const Volume&            volume = getVolume(dataState);
-    ospray::cpp::World       world  = getWorld(volume, parameters);
-    Camera                   camera = getCamera(volume.mHeight, cameraTransform);
-    ospray::cpp::FrameBuffer frame  = renderFrame(world, camera.mOsprayCamera, parameters);
-    renderedImage                   = extractImageData(frame, camera, volume.mHeight, parameters);
-    renderedImage.mValid            = !mRenderingCancelled;
-  } catch (const std::exception&) { renderedImage.mValid = false; }
-  return renderedImage;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-const OSPRayRenderer::Volume& OSPRayRenderer::getVolume(DataManager::State state) {
-  auto cachedVolume = mCachedVolumes.find(state);
-  if (cachedVolume == mCachedVolumes.end()) {
-    mCachedVolumes[state] =
-        std::async(std::launch::deferred, [this, state]() { return loadVolume(state); });
+std::unique_ptr<Renderer::RenderedImage> OSPRayRenderer::getFrameImpl(
+    glm::mat4 const& cameraTransform, Parameters parameters, DataManager::State const& dataState) {
+  // Shift filter attribute indices by one, because the scalar list used by the renderer is shifted
+  // by one so that the active scalar can be placed at index 0.
+  for (ScalarFilter& filter : parameters.mScalarFilters) {
+    filter.mAttrIndex += 1;
   }
-  return mCachedVolumes[state].get();
+
+  mRenderingCancelled = false;
+  try {
+    Volume const& volume = getVolume(dataState, parameters.mMaxLod);
+    Cache::State  state{cameraTransform, parameters, dataState, volume.mLod};
+    if (mCache.mState == state && mFrameBufferAccumulationPasses >= parameters.mMaxRenderPasses) {
+      return {};
+    }
+    if (!(parameters.mWorld == mCache.mState.mParameters.mWorld &&
+            dataState == mCache.mState.mDataState && volume.mLod == mCache.mState.mVolumeLod)) {
+      updateWorld(volume, parameters, dataState);
+    }
+    if (!(cameraTransform == mCache.mState.mCameraTransform &&
+            dataState == mCache.mState.mDataState && volume.mLod == mCache.mState.mVolumeLod)) {
+      mCache.mCamera = getCamera(volume.mHeight, cameraTransform);
+    }
+    renderFrame(mCache.mWorld, mCache.mCamera.mOsprayCamera, parameters, !(mCache.mState == state));
+    RenderedImage renderedImage(
+        mCache.mFrameBuffer, mCache.mCamera, volume.mHeight, parameters, cameraTransform);
+    renderedImage.setValid(!mRenderingCancelled);
+    mCache.mState = state;
+    return std::make_unique<RenderedImage>(std::move(renderedImage));
+  } catch (const std::exception&) { return {}; }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-OSPRayRenderer::Volume OSPRayRenderer::loadVolume(DataManager::State state) {
+OSPRayRenderer::Volume const& OSPRayRenderer::getVolume(
+    DataManager::State const& state, std::optional<int> const& maxLod) {
+  int         lod        = mDataManager->getMaxLod(state, maxLod);
+  auto const& stateCache = mCache.mVolumes.find(state);
+  if (stateCache == mCache.mVolumes.end()) {
+    mCache.mVolumes[state][lod] =
+        std::async(std::launch::deferred, [this, state, lod]() { return loadVolume(state, lod); });
+  } else {
+    auto const& cachedVolume = stateCache->second.find(lod);
+    if (cachedVolume == stateCache->second.end()) {
+      mCache.mVolumes[state][lod] =
+          std::async(std::launch::async, [this, state, lod]() { return loadVolume(state, lod); });
+    }
+    for (auto const& cacheEntry : stateCache->second) {
+      if (cacheEntry.second.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
+        if (!maxLod.has_value() || cacheEntry.first <= maxLod) {
+          lod = cacheEntry.first;
+        }
+      }
+    }
+  }
+  return mCache.mVolumes[state][lod].get();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+OSPRayRenderer::Volume OSPRayRenderer::loadVolume(DataManager::State const& state, int lod) {
   Volume                      volume;
-  vtkSmartPointer<vtkDataSet> volumeData = mDataManager->getData(state);
+  vtkSmartPointer<vtkDataSet> volumeData = mDataManager->getData(state, lod);
   switch (mStructure) {
   case VolumeStructure::eUnstructured:
-    volume.mOsprayData = OSPRayUtility::createOSPRayVolumeUnstructured(
-        vtkUnstructuredGrid::SafeDownCast(volumeData));
+    volume.mOsprayData = OSPRayUtility::createOSPRayVolume(
+        vtkUnstructuredGrid::SafeDownCast(volumeData), state.mScalar.mType);
     break;
-  case VolumeStructure::eStructured:
+  case VolumeStructure::eStructured: {
+    std::vector<Scalar> scalars = mDataManager->pScalars.get();
+    scalars.insert(scalars.begin(), state.mScalar);
     volume.mOsprayData =
-        OSPRayUtility::createOSPRayVolumeStructured(vtkStructuredPoints::SafeDownCast(volumeData));
+        OSPRayUtility::createOSPRayVolume(vtkStructuredPoints::SafeDownCast(volumeData), scalars);
     break;
+  }
+  case VolumeStructure::eStructuredSpherical: {
+    std::vector<Scalar> scalars = mDataManager->pScalars.get();
+    scalars.insert(scalars.begin(), state.mScalar);
+    volume.mOsprayData =
+        OSPRayUtility::createOSPRayVolume(vtkStructuredGrid::SafeDownCast(volumeData), scalars);
+    break;
+  }
   case VolumeStructure::eInvalid:
     throw std::runtime_error("Trying to load volume with unknown/invalid structure!");
   }
   volume.mHeight       = getHeight(volumeData);
-  volume.mScalarBounds = getScalarBounds(volumeData);
+  volume.mScalarBounds = mDataManager->getScalarRange(state.mScalar);
+  volume.mLod          = lod;
   return volume;
 }
 
@@ -156,20 +206,11 @@ float OSPRayRenderer::getHeight(vtkSmartPointer<vtkDataSet> data) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::array<float, 2> OSPRayRenderer::getScalarBounds(vtkSmartPointer<vtkDataSet> data) {
-  std::array<float, 2> bounds;
-  bounds[0] = (float)data->GetPointData()->GetScalars()->GetRange()[0];
-  bounds[1] = (float)data->GetPointData()->GetScalars()->GetRange()[1];
-  return bounds;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 ospray::cpp::TransferFunction OSPRayRenderer::getTransferFunction(
-    const Volume& volume, const Parameters& parameters) {
-  if (parameters.mTransferFunction.size() > 0) {
-    return OSPRayUtility::createOSPRayTransferFunction(
-        volume.mScalarBounds[0], volume.mScalarBounds[1], parameters.mTransferFunction);
+    Volume const& volume, Parameters const& parameters) {
+  if (parameters.mWorld.mVolume.mTransferFunction.size() > 0) {
+    return OSPRayUtility::createOSPRayTransferFunction((float)volume.mScalarBounds[0],
+        (float)volume.mScalarBounds[1], parameters.mWorld.mVolume.mTransferFunction);
   } else {
     return OSPRayUtility::createOSPRayTransferFunction();
   }
@@ -177,60 +218,171 @@ ospray::cpp::TransferFunction OSPRayRenderer::getTransferFunction(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ospray::cpp::World OSPRayRenderer::getWorld(const Volume& volume, const Parameters& parameters) {
+void OSPRayRenderer::updateWorld(
+    Volume const& volume, Parameters const& parameters, DataManager::State const& dataState) {
+  bool updateGroup = false;
+
   ospray::cpp::TransferFunction transferFunction = getTransferFunction(volume, parameters);
 
-  ospray::cpp::VolumetricModel volumetricModel(volume.mOsprayData);
-  volumetricModel.setParam("transferFunction", transferFunction);
-  volumetricModel.setParam("densityScale", parameters.mDensityScale);
-  volumetricModel.setParam("gradientShadingScale", parameters.mShading ? 1.f : 0.f);
-  volumetricModel.commit();
-
-  ospray::cpp::Group group;
-  group.setParam("volume", ospray::cpp::Data(volumetricModel));
-  if (parameters.mDepthMode == DepthMode::eIsosurface) {
-    ospray::cpp::Geometry isosurface("isosurface");
-    isosurface.setParam("isovalue", 0.8f);
-    isosurface.setParam("volume", volumetricModel.handle());
-    isosurface.commit();
-
-    rkcommon::math::vec4f       color{1.f, 1.f, 1.f, 0.f};
-    ospray::cpp::GeometricModel isoModel(isosurface);
-    isoModel.setParam("color", ospray::cpp::Data(color));
-    isoModel.commit();
-
-    group.setParam("geometry", ospray::cpp::Data(isoModel));
-  }
-  group.commit();
-
-  ospray::cpp::Instance instance(group);
-  instance.commit();
-
-  std::vector<ospray::cpp::Light> lights;
-
-  ospray::cpp::Light light("ambient");
-  light.setParam("intensity", parameters.mShading ? parameters.mAmbientLight : 1);
-  light.setParam("color", rkcommon::math::vec3f(1, 1, 1));
-  light.commit();
-  lights.push_back(light);
-
-  if (parameters.mShading) {
-    ospray::cpp::Light sun("distant");
-    sun.setParam("intensity", parameters.mSunStrength);
-    sun.setParam("color", rkcommon::math::vec3f(1, 1, 1));
-    sun.setParam("direction", rkcommon::math::vec3f{-parameters.mSunDirection[0],
-                                  -parameters.mSunDirection[1], -parameters.mSunDirection[2]});
-    sun.setParam("angularDiameter", .53f);
-    sun.commit();
-    lights.push_back(sun);
+  if (!(dataState == mCache.mState.mDataState && volume.mLod == mCache.mState.mVolumeLod)) {
+    mCache.mVolumeModel.setParam("volume", volume.mOsprayData);
+    mCache.mVolumeModel.setParam("transferFunction", transferFunction);
+    mCache.mVolumeModel.commit();
+    updateGroup = true;
   }
 
-  ospray::cpp::World world;
-  world.setParam("instance", ospray::cpp::Data(instance));
-  world.setParam("light", ospray::cpp::Data(lights));
-  world.commit();
+  if (!(dataState == mCache.mState.mDataState && volume.mLod == mCache.mState.mVolumeLod &&
+          parameters.mWorld.mCore == mCache.mState.mParameters.mWorld.mCore)) {
+    if (parameters.mWorld.mCore.mEnable) {
+      DataManager::State scalarState = dataState;
+      auto               scalar =
+          std::find_if(mDataManager->pScalars.get().begin(), mDataManager->pScalars.get().end(),
+              [&parameters](Scalar s) { return s.getId() == parameters.mWorld.mCore.mScalar; });
 
-  return world;
+      if (scalar != mDataManager->pScalars.get().end()) {
+        scalarState.mScalar = *scalar;
+        Volume coreVolume   = getVolume(scalarState, volume.mLod);
+
+        rkcommon::math::vec2f valueRange = {
+            (float)coreVolume.mScalarBounds[0], (float)coreVolume.mScalarBounds[1]};
+        mCache.mCoreTransferFunction.setParam("valueRange", valueRange);
+        mCache.mCoreTransferFunction.commit();
+
+        mCache.mCoreTexture.setParam("volume", coreVolume.mOsprayData);
+        mCache.mCoreTexture.commit();
+
+        mCache.mCoreMaterial.removeParam("kd");
+        mCache.mCoreMaterial.setParam("map_kd", mCache.mCoreTexture);
+        mCache.mCoreMaterial.commit();
+      } else {
+        rkcommon::math::vec3f color = {0.8f, 0.8f, 0.8f};
+        mCache.mCoreMaterial.removeParam("map_kd");
+        mCache.mCoreMaterial.setParam("kd", color);
+        mCache.mCoreMaterial.commit();
+      }
+
+      mCache.mCore.setParam("radius", parameters.mWorld.mCore.mRadius);
+      mCache.mCore.commit();
+    }
+  }
+
+  if (!(parameters.mWorld.mVolume == mCache.mState.mParameters.mWorld.mVolume &&
+          parameters.mWorld.mLights.mShading ==
+              mCache.mState.mParameters.mWorld.mLights.mShading)) {
+    mCache.mVolumeModel.setParam("transferFunction", transferFunction);
+    mCache.mVolumeModel.setParam("densityScale", parameters.mWorld.mVolume.mDensityScale);
+    mCache.mVolumeModel.setParam(
+        "gradientShadingScale", parameters.mWorld.mLights.mShading ? 1.f : 0.f);
+    mCache.mVolumeModel.commit();
+  }
+
+  bool pathlinesPresent = true;
+  if (parameters.mWorld.mPathlines.mEnable &&
+      !(parameters.mWorld.mPathlines == mCache.mState.mParameters.mWorld.mPathlines)) {
+    std::vector<uint32_t> indices =
+        mDataManager->getPathlines().getIndices(parameters.mWorld.mPathlines.mScalarFilters);
+    if (indices.size() <= 0) {
+      pathlinesPresent = false;
+    } else {
+      std::vector<rkcommon::math::vec4f> vertices =
+          mDataManager->getPathlines().getVertices(parameters.mWorld.mPathlines.mLineSize);
+      std::vector<rkcommon::math::vec2f> texCoords =
+          mDataManager->getPathlines().getTexCoords("point_ParticleAge", "point_ParticleAge");
+
+      mCache.mPathlines.setParam("type", OSP_FLAT);
+      mCache.mPathlines.setParam("basis", OSP_LINEAR);
+      mCache.mPathlines.setParam("vertex.position_radius", ospray::cpp::Data(vertices));
+      mCache.mPathlines.setParam("vertex.texcoord", ospray::cpp::Data(texCoords));
+      mCache.mPathlines.setParam("index", ospray::cpp::Data(indices));
+      mCache.mPathlines.commit();
+
+      updateGroup = true;
+    }
+  }
+
+  if (parameters.mWorld.mPathlines.mEnable &&
+      !(parameters.mWorld.mPathlinesTexture == mCache.mState.mParameters.mWorld.mPathlinesTexture &&
+          parameters.mWorld.mPathlines == mCache.mState.mParameters.mWorld.mPathlines)) {
+    std::vector<uint8_t> pixels(256 * 256 * 4);
+    for (int x = 0; x < 256; x++) {
+      for (int y = 0; y < 256; y++) {
+        pixels[4 * (y * 256 + x) + 0] = x < 128 ? x * 2 : 255;
+        pixels[4 * (y * 256 + x) + 1] = 255 - std::abs((x - 128) * 2);
+        pixels[4 * (y * 256 + x) + 2] = x > 128 ? 255 - (x - 128) * 2 : 255;
+        pixels[4 * (y * 256 + x) + 3] = 255;
+      }
+    }
+    ospray::cpp::Data texData(pixels.data(), OSP_VEC4UC, rkcommon::math::vec2i{256, 256});
+
+    ospray::cpp::Texture tex("texture2d");
+    tex.setParam("format", OSPTextureFormat::OSP_TEXTURE_RGBA8);
+    tex.setParam("data", texData);
+    tex.commit();
+
+    ospray::cpp::Material mat("scivis", "obj");
+    mat.setParam("map_kd", tex);
+    mat.setParam("d", 1.f);
+    mat.commit();
+
+    mCache.mPathlinesModel.setParam("material", mat);
+    mCache.mPathlinesModel.commit();
+  }
+
+  if (!(parameters.mWorld.mDepthMode == mCache.mState.mParameters.mWorld.mDepthMode &&
+          parameters.mWorld.mPathlines.mEnable ==
+              mCache.mState.mParameters.mWorld.mPathlines.mEnable &&
+          parameters.mWorld.mCore.mEnable == mCache.mState.mParameters.mWorld.mCore.mEnable)) {
+    std::vector<ospray::cpp::GeometricModel> geometries;
+    if (parameters.mWorld.mDepthMode == DepthMode::eIsosurface) {
+      ospray::cpp::Geometry isosurface("isosurface");
+      isosurface.setParam("isovalue", 0.8f);
+      isosurface.setParam("volume", mCache.mVolumeModel.handle());
+      isosurface.commit();
+
+      rkcommon::math::vec4f       color{1.f, 1.f, 1.f, 0.f};
+      ospray::cpp::GeometricModel isoModel(isosurface);
+      isoModel.setParam("color", ospray::cpp::Data(color));
+      isoModel.commit();
+
+      geometries.push_back(isoModel);
+    }
+    if (parameters.mWorld.mCore.mEnable) {
+      geometries.push_back(mCache.mCoreModel);
+    }
+    if (parameters.mWorld.mPathlines.mEnable && pathlinesPresent) {
+      geometries.push_back(mCache.mPathlinesModel);
+    }
+    if (geometries.size() > 0) {
+      mCache.mGroup.setParam("geometry", ospray::cpp::Data(geometries));
+    } else {
+      mCache.mGroup.setParam("geometry", NULL);
+    }
+    updateGroup = true;
+  }
+
+  if (updateGroup) {
+    mCache.mGroup.commit();
+    mCache.mInstance.commit();
+  }
+
+  if (!(parameters.mWorld.mLights == mCache.mState.mParameters.mWorld.mLights)) {
+    mCache.mAmbientLight.setParam("intensity",
+        parameters.mWorld.mLights.mShading ? parameters.mWorld.mLights.mAmbientStrength : 1);
+    mCache.mAmbientLight.setParam("color", rkcommon::math::vec3f(1, 1, 1));
+    mCache.mAmbientLight.commit();
+
+    mCache.mSunLight.setParam("intensity",
+        parameters.mWorld.mLights.mShading ? parameters.mWorld.mLights.mSunStrength : 0);
+    mCache.mSunLight.setParam("color", rkcommon::math::vec3f(1, 1, 1));
+    mCache.mSunLight.setParam(
+        "direction", rkcommon::math::vec3f{-parameters.mWorld.mLights.mSunDirection[0],
+                         -parameters.mWorld.mLights.mSunDirection[1],
+                         -parameters.mWorld.mLights.mSunDirection[2]});
+    mCache.mSunLight.setParam("angularDiameter", .53f);
+    mCache.mSunLight.commit();
+  }
+
+  mCache.mWorld.commit();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -312,11 +464,11 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
   osprayCamera.setParam("imageEnd", camImageEndOsp);
   osprayCamera.commit();
 
-  glm::mat4 view =
-      glm::translate(glm::mat4(1.f), -glm::vec3(camXLen, camYLen, -camZLen) / volumeHeight);
+  glm::mat4 model = glm::scale(glm::mat4(1), glm::vec3(volumeHeight));
+  glm::mat4 view  = glm::translate(glm::mat4(1.f), -glm::vec3(camXLen, camYLen, -camZLen));
 
-  float nearClip = -camZLen / volumeHeight - 1;
-  float farClip  = -camZLen / volumeHeight + 1;
+  float nearClip = -camZLen - volumeHeight;
+  float farClip  = -camZLen + volumeHeight;
   if (nearClip < 0) {
     nearClip = 0.00001f;
   }
@@ -334,129 +486,148 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
   projection[3][2] = -2 * farClip * nearClip / (farClip - nearClip);
 
   Camera camera;
-  camera.mOsprayCamera         = osprayCamera;
-  camera.mPositionRotated      = glm::vec3(camXLen, camYLen, -camZLen) / volumeHeight;
-  camera.mTransformationMatrix = projection * view;
+  camera.mOsprayCamera = osprayCamera;
+  camera.mModelView    = view * model;
+  camera.mProjection   = projection;
   return camera;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ospray::cpp::FrameBuffer OSPRayRenderer::renderFrame(
-    ospray::cpp::World& world, ospray::cpp::Camera& camera, const Parameters& parameters) {
+void OSPRayRenderer::renderFrame(ospray::cpp::World const& world, ospray::cpp::Camera const& camera,
+    Parameters const& parameters, bool resetAccumulation) {
   ospray::cpp::Renderer renderer("volume_depth");
   renderer.setParam("aoSamples", 0);
   renderer.setParam("shadows", false);
   renderer.setParam("volumeSamplingRate", parameters.mSamplingRate);
-  renderer.setParam("depthMode", (int)parameters.mDepthMode);
+  renderer.setParam("depthMode", (int)parameters.mWorld.mDepthMode);
+  const void* filtersPtr = parameters.mScalarFilters.data();
+  renderer.setParam("scalarFilters", OSP_VOID_PTR, &filtersPtr);
+  renderer.setParam("numScalarFilters", (int)parameters.mScalarFilters.size());
   renderer.commit();
 
-  int channels = OSP_FB_COLOR;
-  if (parameters.mDepthMode != DepthMode::eNone) {
-    channels |= OSP_FB_DEPTH;
-  }
+  if (resetAccumulation) {
+    int channels = OSP_FB_COLOR | OSP_FB_DEPTH | OSP_FB_ACCUM;
 
-  ospray::cpp::FrameBuffer framebuffer(
-      parameters.mResolution, parameters.mResolution, OSP_FB_RGBA32F, channels);
-  framebuffer.clear();
-  framebuffer.commit();
+    mCache.mFrameBuffer = ospray::cpp::FrameBuffer(
+        parameters.mResolution, parameters.mResolution, OSP_FB_RGBA32F, channels);
+    mCache.mFrameBuffer.clear();
+    mCache.mFrameBuffer.commit();
+    mFrameBufferAccumulationPasses = 0;
+  }
 
   {
     std::scoped_lock lock(mRenderFutureMutex);
-    mRenderFuture = framebuffer.renderFrame(renderer, camera, world);
+    mRenderFuture = mCache.mFrameBuffer.renderFrame(renderer, camera, world);
+    mFrameBufferAccumulationPasses++;
   }
   mRenderFuture->wait();
   {
     std::scoped_lock lock(mRenderFutureMutex);
     mRenderFuture.reset();
   }
-  return framebuffer;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Renderer::RenderedImage OSPRayRenderer::extractImageData(ospray::cpp::FrameBuffer& frame,
-    const Camera& camera, float volumeHeight, const Parameters& parameters) {
-  float*             colorFrame = (float*)frame.map(OSP_FB_COLOR);
-  std::vector<float> colorData(
-      colorFrame, colorFrame + 4 * parameters.mResolution * parameters.mResolution);
-  frame.unmap(colorFrame);
-  std::vector<float> depthData(parameters.mResolution * parameters.mResolution, INFINITY);
+OSPRayRenderer::Cache::Cache()
+    : mPathlines("curve")
+    , mPathlinesModel(mPathlines)
+    , mVolume("structuredRegular")
+    , mVolumeModel(mVolume)
+    , mCore("sphere")
+    , mCoreModel(mCore)
+    , mCoreTexture("volume")
+    , mCoreMaterial("scivis", "obj")
+    , mCoreTransferFunction("piecewiseLinear")
+    , mInstance(mGroup)
+    , mAmbientLight("ambient")
+    , mSunLight("distant") {
+  mCore.setParam("sphere.position", ospray::cpp::Data(rkcommon::math::vec3f(0, 0, 0)));
+  mCore.commit();
 
-  if (parameters.mDepthMode != DepthMode::eNone) {
-    float* depthFrame = (float*)frame.map(OSP_FB_DEPTH);
-    depthData         = std::vector<float>(depthFrame, depthFrame + depthData.size());
-    frame.unmap(depthFrame);
-  }
+  std::vector<rkcommon::math::vec3f> color = {
+      rkcommon::math::vec3f(0.f, 0.f, 0.f), rkcommon::math::vec3f(1.f, 1.f, 1.f)};
+  std::vector<float> opacity = {1.f, 1.f};
 
-  depthData = normalizeDepthData(depthData, camera, volumeHeight, parameters);
+  mCoreTransferFunction.setParam("color", ospray::cpp::Data(color));
+  mCoreTransferFunction.setParam("opacity", ospray::cpp::Data(opacity));
+  mCoreTransferFunction.commit();
 
-  std::future<std::vector<float>> futureColor;
-  std::future<std::vector<float>> futureDepth;
-  if (parameters.mDenoiseColor) {
-    futureColor = std::async(std::launch::deferred, [parameters, &colorData]() {
-      std::vector<float> data = OSPRayUtility::denoiseImage(colorData, 4, parameters.mResolution);
-      return data;
-    });
-  }
-  if (parameters.mDepthMode != DepthMode::eNone && parameters.mDenoiseDepth) {
-    futureDepth = std::async(std::launch::deferred, [parameters, &depthData]() {
-      std::vector<float> depthGrayscale = OSPRayUtility::depthToGrayscale(depthData);
-      std::vector<float> denoised =
-          OSPRayUtility::denoiseImage(depthGrayscale, 3, parameters.mResolution);
-      std::vector<float> data = OSPRayUtility::grayscaleToDepth(denoised);
-      return data;
-    });
-  }
+  // Commits have to be done after volume is set
+  mCoreTexture.setParam("transferFunction", mCoreTransferFunction);
 
-  if (parameters.mDenoiseColor) {
-    colorData = futureColor.get();
-  }
-  if (parameters.mDepthMode != DepthMode::eNone && parameters.mDenoiseDepth) {
-    depthData = futureDepth.get();
-  }
+  mCoreModel.setParam("material", mCoreMaterial);
+  mCoreModel.commit();
 
-  std::vector<uint8_t> colorDataInt(4 * parameters.mResolution * parameters.mResolution);
-  for (size_t i = 0; i < colorDataInt.size(); i++) {
-    colorDataInt[i] = (uint8_t)(colorData[i] * 255);
-  }
+  mGroup.setParam("volume", ospray::cpp::Data(mVolumeModel));
 
-  Renderer::RenderedImage renderedImage;
-  renderedImage.mColorData = colorDataInt;
-  renderedImage.mDepthData = depthData;
-  renderedImage.mMVP       = camera.mTransformationMatrix;
-  renderedImage.mValid     = true;
-  return renderedImage;
+  std::vector<ospray::cpp::Light> lights{mAmbientLight, mSunLight};
+  mWorld.setParam("instance", ospray::cpp::Data(mInstance));
+  mWorld.setParam("light", ospray::cpp::Data(lights));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::vector<float> OSPRayRenderer::normalizeDepthData(std::vector<float> data, const Camera& camera,
-    float volumeHeight, const Parameters& parameters) {
-  std::vector<float> depthData(parameters.mResolution * parameters.mResolution);
+OSPRayRenderer::RenderedImage::RenderedImage(ospray::cpp::FrameBuffer frame, Camera const& camera,
+    float volumeHeight, Parameters const& parameters, glm::mat4 const& cameraTransform)
+    : Renderer::RenderedImage(
+          true, parameters.mResolution, cameraTransform, camera.mModelView, camera.mProjection)
+    , mFrame(std::move(frame)) {
+  mColorData = (float*)mFrame.map(OSP_FB_COLOR);
+  mDepthData = (float*)mFrame.map(OSP_FB_DEPTH);
 
-  for (size_t i = 0; i < depthData.size(); i++) {
-    float val = data[i];
-    if (val == INFINITY) {
-      depthData[i] = -camera.mTransformationMatrix[3][2] / camera.mTransformationMatrix[2][2];
-    } else {
-      val /= volumeHeight;
-      int       x          = i % parameters.mResolution;
-      float     ndcX       = ((float)x / parameters.mResolution - 0.5f) * 2;
-      int       y          = (int)(i / parameters.mResolution);
-      float     ndcY       = ((float)y / parameters.mResolution - 0.5f) * 2;
-      glm::vec4 posPixClip = glm::vec4(ndcX, ndcY, 0, 1);
-      glm::vec4 posPix     = glm::inverse(camera.mTransformationMatrix) * posPixClip;
-      glm::vec3 posPixNorm = glm::vec3(posPix) * (1 / posPix.w);
-      glm::vec3 pos =
-          val * glm::normalize(posPixNorm - camera.mPositionRotated) + camera.mPositionRotated;
-      glm::vec4 posClip     = camera.mTransformationMatrix * glm::vec4(pos, 1);
-      glm::vec3 posClipNorm = glm::vec3(posClip) * (1 / posClip.w);
-      depthData[i]          = posClipNorm.z;
-    }
+  std::thread colorDenoising;
+  std::thread depthDenoising;
+  if (parameters.mDenoiseColor) {
+    colorDenoising = std::thread([this, parameters]() {
+      OSPRayUtility::denoiseImage(mColorData, 4, parameters.mResolution);
+    });
+  }
+  if (parameters.mWorld.mDepthMode != DepthMode::eNone && parameters.mDenoiseDepth) {
+    depthDenoising = std::thread([this, parameters]() {
+      std::vector<float> depthGrayscale = OSPRayUtility::depthToGrayscale(mDepthData, mResolution);
+      OSPRayUtility::denoiseImage(depthGrayscale.data(), 3, parameters.mResolution);
+      OSPRayUtility::grayscaleToDepth(depthGrayscale, mDepthData);
+    });
   }
 
-  return depthData;
+  if (parameters.mDenoiseColor) {
+    colorDenoising.join();
+  }
+  if (parameters.mWorld.mDepthMode != DepthMode::eNone && parameters.mDenoiseDepth) {
+    depthDenoising.join();
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+OSPRayRenderer::RenderedImage::~RenderedImage() {
+  if (mFrame.handle() != nullptr) {
+    mFrame.unmap(mColorData);
+    mFrame.unmap(mDepthData);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+OSPRayRenderer::RenderedImage::RenderedImage(RenderedImage&& other)
+    : Renderer::RenderedImage(std::move(other)) {
+  std::swap(other.mFrame, mFrame);
+  std::swap(other.mColorData, mColorData);
+  std::swap(other.mDepthData, mDepthData);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+float* OSPRayRenderer::RenderedImage::getColorData() {
+  return mColorData;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+float* OSPRayRenderer::RenderedImage::getDepthData() {
+  return mDepthData;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

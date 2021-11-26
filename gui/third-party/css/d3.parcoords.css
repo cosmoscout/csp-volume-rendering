@@ -1,0 +1,32 @@
+.parcoords > canvas {
+  font: 14px sans-serif;
+  position: absolute;
+}
+.parcoords > canvas {
+  pointer-events: none;
+}
+.parcoords text.label {
+  cursor: default;
+  fill: black;
+  transform: rotate(-5deg);
+  text-anchor: start;
+}
+.parcoords canvas {
+  opacity: 1;
+  transition: opacity 0.3s;
+  -moz-transition: opacity 0.3s;
+  -webkit-transition: opacity 0.3s;
+  -o-transition: opacity 0.3s;
+}
+.parcoords canvas.faded {
+  opacity: 0.25;
+}
+.parcoords {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  -khtml-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  background-color: white;
+}

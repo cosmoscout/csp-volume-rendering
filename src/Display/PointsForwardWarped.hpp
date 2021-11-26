@@ -33,7 +33,9 @@ class PointsForwardWarped : public DisplayNode {
   bool Do() override;
 
  private:
-  void createBuffers(std::vector<float> depthValues);
+  void createBuffers();
+
+  int mDepthResolution;
 
   VistaVertexArrayObject mVAO;
   VistaBufferObject      mVBO;

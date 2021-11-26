@@ -4,11 +4,10 @@
 //                        Copyright: (c) 2019 German Aerospace Center (DLR)                       //
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "VtkDataManager.hpp"
+#include "VtkFileLoader.hpp"
 
 #include "../logger.hpp"
 
-#include <vtkCellDataToPointData.h>
 #include <vtkDataSetReader.h>
 #include <vtkXMLFileReadTester.h>
 #include <vtkXMLGenericDataObjectReader.h>
@@ -17,29 +16,22 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-VtkDataManager::VtkDataManager(std::string path, std::string filenamePattern)
-    : DataManager(path, filenamePattern) {
-  initState();
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-vtkSmartPointer<vtkDataSet> VtkDataManager::loadDataImpl(int timestep) {
+vtkSmartPointer<vtkDataSet> VtkFileLoader::loadDataImpl(std::string const& file) {
   vtkSmartPointer<vtkDataSet> data;
 
   auto fileTester = vtkSmartPointer<vtkXMLFileReadTester>::New();
-  fileTester->SetFileName(mTimestepFiles[timestep].c_str());
+  fileTester->SetFileName(file.c_str());
 
   if (fileTester->TestReadFile() > 0) {
     // Is an XML File in new vtk data format
     auto reader = vtkSmartPointer<vtkXMLGenericDataObjectReader>::New();
-    reader->SetFileName(mTimestepFiles[timestep].c_str());
+    reader->SetFileName(file.c_str());
     reader->Update();
 
     data = reader->GetOutputAsDataSet();
   } else {
     auto reader = vtkSmartPointer<vtkDataSetReader>::New();
-    reader->SetFileName(mTimestepFiles[timestep].c_str());
+    reader->SetFileName(file.c_str());
     reader->ReadAllScalarsOn();
     reader->Update();
 

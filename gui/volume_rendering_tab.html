@@ -18,7 +18,7 @@
         </div>
       </div>
 
-      <div class="row">
+      <div id="volumeRendering.timestepContainer" class="row">
         <div class="col-5">
           Timestep
         </div>
@@ -28,7 +28,7 @@
         </div>
       </div>
 
-      <div class="row">
+      <div id="volumeRendering.animationSpeedContainer" class="row">
         <div class="col-5">
           Animation speed
         </div>
@@ -105,10 +105,10 @@
 
       <div class="row">
         <div class="col-5">
-          Sun strength
+          Max render passes
         </div>
         <div class="col-7">
-          <div data-callback="volumeRendering.setSunStrength">
+          <div data-callback="volumeRendering.setMaxRenderPasses">
           </div>
         </div>
       </div>
@@ -126,6 +126,48 @@
   </div>
 
   <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-lighting"
+         data-toggle="collapse" data-target="#collapseVolume-lighting" aria-expanded="false"
+         aria-controls="collapseVolume-lighting" type="button">
+      <i class="material-icons">lightbulb</i>
+      <span>Lighting</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-lighting"
+         aria-labelledby="headingVolume-lighting" data-parent="#volumeRenderingTab-accordion">
+      <div class="row">
+        <div class="col-7 offset-5">
+          <label class="checklabel">
+            <input type="checkbox" data-callback="volumeRendering.setEnableLighting" />
+            <i class="material-icons"></i>
+            <span>Enable lighting</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Sun strength
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setSunStrength">
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Ambient strength
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setAmbientStrength">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section">
     <div class="section-header collapsed font-alegreya" id="headingVolume-transferFunction"
          data-toggle="collapse" data-target="#collapseVolume-transferFunction" aria-expanded="false"
          aria-controls="collapseVolume-transferFunction" type="button">
@@ -136,6 +178,20 @@
     <div class="section-body collapse container-fluid" id="collapseVolume-transferFunction"
          aria-labelledby="headingVolume-transferFunction" data-parent="#volumeRenderingTab-accordion">
       <div id="volumeRendering.tfEditor"></div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-parcoords"
+         data-toggle="collapse" data-target="#collapseVolume-parcoords" aria-expanded="false"
+         aria-controls="collapseVolume-parcoords" type="button">
+      <i class="material-icons">waves</i>
+      <span>Parallel Coordinates</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-parcoords"
+         aria-labelledby="headingVolume-parcoords" data-parent="#volumeRenderingTab-accordion">
+      <div id="volumeRendering-parcoordsVolume"></div>
     </div>
   </div>
 
@@ -294,4 +350,114 @@
       </div>
     </div>
   </div>
+
+  <div class="settings-section" hidden>
+    <div class="section-header collapsed font-alegreya" id="headingVolume-pathlines"
+         data-toggle="collapse" data-target="#collapseVolume-pathlines" aria-expanded="false"
+         aria-controls="collapseVolume-pathlines" type="button">
+      <i class="material-icons">texture</i>
+      <span>Pathlines</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-pathlines"
+         aria-labelledby="headingVolume-pathlines" data-parent="#volumeRenderingTab-accordion">
+      <div class="row">
+        <div class="col-7 offset-5">
+          <label class="checklabel">
+            <input type="checkbox" data-callback="volumeRendering.setEnablePathlines" />
+            <i class="material-icons"></i>
+            <span>Render pathlines</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Line size
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setPathlineSize">
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-7 offset-5">
+          <label class="checklabel">
+            <input type="checkbox" data-callback="volumeRendering.setEnablePathlinesParcoords" />
+            <i class="material-icons"></i>
+            <span>Separate parallel coordinates</span>
+          </label>
+        </div>
+      </div>
+
+      <div id="volumeRendering-parcoordsPathlines" hidden></div>
+    </div>
+  </div>
 </div>
+
+<template id="volumeRendering-parcoords-template">
+  <div class="parcoordsContainer">
+    <a class="btn glass block px-3 parcoordsUndockButton">
+      <i class="material-icons">launch</i>
+    </a>
+    <div class="parcoordsWidget">
+      <div class="parcoordsScroller">
+        <div class="parcoords" style="height:200px"></div>
+      </div>
+      <div class="parcoordsControls">
+        <div class="row">
+          <div class="col-5">Active axis:</div>
+          <div class="col-7 parcoordsActiveBrushLabel">None</div>
+        </div>
+        <div class="row">
+          <div class="col-5">
+            <input type="number" placeholder="Min" class="parcoordsBrushMin text-input" disabled>
+          </div>
+          <div class="col-2 text-center">
+            -
+          </div>
+          <div class="col-5">
+            <input type="number" placeholder="Max" class="parcoordsBrushMax text-input" disabled>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-5">
+            <button class="parcoordsExport waves-effect waves-light block btn glass text">Export</button>
+          </div>
+          <div class="col-7">
+            <input type="text" placeholder="Filename" class="parcoordsExportLocation text-input text">
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-5">
+            <button class="parcoordsImport waves-effect waves-light block btn glass text">Import</button>
+          </div>
+          <div class="parcoordsImportSelectParent col-7">
+            <select class="parcoordsImportSelect">
+              <option value="-1">none</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="volumeRendering-parcoordsPopout-template">
+  <div class="draggable-window resizable-window">
+    <div class="window-wrapper">
+      <div class="window-header">
+        <span class="window-title">
+          <i class="material-icons">waves</i>
+          <span>Parallel Coordinates - %NAME%</span>
+        </span>
+        <a class="btn light-glass" data-action="close" data-toggle="tooltip" title="Close">
+          <i class="material-icons">close</i>
+        </a>
+      </div>
+      <div class="window-content container-fluid parcoordsContainer">
+      </div>
+    </div>
+  </div>
+</template>

@@ -27,6 +27,10 @@
 #include <future>
 #include <thread>
 
+namespace {
+oidn::DeviceRef oidnDevice;
+}
+
 namespace csp::volumerendering::OSPRayUtility {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -56,8 +60,7 @@ void initOSPRay() {
   }
 
   OSPDevice dev = ospGetCurrentDevice();
-  ospDeviceSetErrorCallback(
-      dev,
+  ospDeviceSetErrorCallback(dev,
       [](void* userData, OSPError e, const char* errorDetails) {
         osprayLogger().error(errorDetails);
       },
@@ -67,41 +70,65 @@ void initOSPRay() {
   ospDeviceRelease(dev);
 
   ospLoadModule("volume_depth");
+
+  oidnDevice = oidn::newDevice();
+  oidnDevice.setErrorFunction([](void* userPtr, oidn::Error e, const char* errorDetails) {
+    oidnLogger().error(errorDetails);
+  });
+  oidnDevice.commit();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ospray::cpp::Volume createOSPRayVolumeUnstructured(vtkSmartPointer<vtkUnstructuredGrid> vtkVolume) {
+ospray::cpp::Volume createOSPRayVolume(
+    vtkSmartPointer<vtkUnstructuredGrid> vtkVolume, ScalarType scalarType) {
   std::vector<rkcommon::math::vec3f> vertexPositions(
       (rkcommon::math::vec3f*)vtkVolume->GetPoints()->GetVoidPointer(0),
       (rkcommon::math::vec3f*)vtkVolume->GetPoints()->GetVoidPointer(0) +
           vtkVolume->GetNumberOfPoints());
 
-  std::vector<double> vertexDataD(vtkVolume->GetNumberOfPoints());
-  vtkVolume->GetPointData()->GetScalars()->ExportToVoidPointer(vertexDataD.data());
-  std::vector<float> vertexData;
-  vertexData.reserve(vertexDataD.size());
-  std::transform(vertexDataD.begin(), vertexDataD.end(), std::back_inserter(vertexData),
-      [](double d) { return (float)d; });
+  std::vector<float> data;
+  switch (scalarType) {
+  case ScalarType::ePointData: {
+    std::vector<double> vertexDataD(vtkVolume->GetNumberOfPoints());
+    vtkVolume->GetPointData()->GetScalars()->ExportToVoidPointer(vertexDataD.data());
+    data.reserve(vertexDataD.size());
+    std::transform(vertexDataD.begin(), vertexDataD.end(), std::back_inserter(data),
+        [](double d) { return (float)d; });
+    break;
+  }
+  case ScalarType::eCellData: {
+    std::vector<double> cellDataD(vtkVolume->GetNumberOfCells());
+    vtkVolume->GetCellData()->GetScalars()->ExportToVoidPointer(cellDataD.data());
+    data.reserve(cellDataD.size());
+    std::transform(cellDataD.begin(), cellDataD.end(), std::back_inserter(data),
+        [](double d) { return (float)d; });
+    break;
+  }
+  }
 
-  std::vector<uint64_t> vertexIndices(vtkVolume->GetCells()->GetNumberOfConnectivityEntries());
-  vtkVolume->GetCells()->GetConnectivityArray64()->ExportToVoidPointer(vertexIndices.data());
+  std::vector<uint64_t> vertexIndices(vtkVolume->GetCells()->GetConnectivityArray64()->Begin(),
+      vtkVolume->GetCells()->GetConnectivityArray64()->End());
 
-  std::vector<uint64_t> cellIndices(vtkVolume->GetNumberOfCells());
-  int                   index = -4;
-  std::generate(cellIndices.begin(), cellIndices.end(), [&index] {
-    index += 5;
-    return index;
-  });
+  // This VTK array includes an additional offset for where the next cell would be placed
+  // It has to be removed for using the array with OSPRay
+  std::vector<uint64_t> cellIndices(vtkVolume->GetCells()->GetOffsetsArray64()->Begin(),
+      vtkVolume->GetCells()->GetOffsetsArray64()->End() - 1);
 
   std::vector<uint8_t> cellTypes(
       vtkVolume->GetCellTypesArray()->Begin(), vtkVolume->GetCellTypesArray()->End());
 
   ospray::cpp::Volume volume("unstructured");
+  switch (scalarType) {
+  case ScalarType::ePointData:
+    volume.setParam("vertex.data", ospray::cpp::Data(data));
+    break;
+  case ScalarType::eCellData:
+    volume.setParam("cell.data", ospray::cpp::Data(data));
+    break;
+  }
   volume.setParam("vertex.position", ospray::cpp::Data(vertexPositions));
-  volume.setParam("vertex.data", ospray::cpp::Data(vertexData));
   volume.setParam("index", ospray::cpp::Data(vertexIndices));
-  volume.setParam("indexPrefixed", false);
   volume.setParam("cell.index", ospray::cpp::Data(cellIndices));
   volume.setParam("cell.type", ospray::cpp::Data(cellTypes));
   volume.commit();
@@ -111,7 +138,8 @@ ospray::cpp::Volume createOSPRayVolumeUnstructured(vtkSmartPointer<vtkUnstructur
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-ospray::cpp::Volume createOSPRayVolumeStructured(vtkSmartPointer<vtkStructuredPoints> vtkVolume) {
+ospray::cpp::Volume createOSPRayVolume(
+    vtkSmartPointer<vtkStructuredPoints> vtkVolume, std::vector<Scalar> const& scalars) {
   double spacing[3];
   vtkVolume->GetSpacing(spacing);
   int dimensions[3];
@@ -121,25 +149,130 @@ ospray::cpp::Volume createOSPRayVolumeStructured(vtkSmartPointer<vtkStructuredPo
     origin[i] = -(vtkVolume->GetBounds()[i * 2 + 1] - vtkVolume->GetBounds()[i * 2]) / 2;
   }
 
+  std::vector<ospray::cpp::CopiedData> ospData;
+  vtkSmartPointer<vtkDataArray>        vtkData;
+
+  for (size_t i = 0; i < scalars.size(); i++) {
+    if (scalars[i].mType != scalars[0].mType) {
+      continue;
+    }
+    switch (scalars[i].mType) {
+    case ScalarType::ePointData:
+      vtkData = vtkVolume->GetPointData()->GetScalars(scalars[i].mName.c_str());
+      break;
+    case ScalarType::eCellData:
+      vtkData = vtkVolume->GetCellData()->GetScalars(scalars[i].mName.c_str());
+      break;
+    }
+
+    switch (vtkData->GetDataType()) {
+    case VTK_FLOAT:
+      ospData.emplace_back((float*)vtkData->GetVoidPointer(0), OSP_FLOAT,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_DOUBLE:
+      ospData.emplace_back((double*)vtkData->GetVoidPointer(0), OSP_DOUBLE,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_UNSIGNED_CHAR:
+      ospData.emplace_back((uint8_t*)vtkData->GetVoidPointer(0), OSP_UCHAR,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_CHAR:
+      ospData.emplace_back((int8_t*)vtkData->GetVoidPointer(0), OSP_UCHAR,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_SHORT:
+      ospData.emplace_back((int16_t*)vtkData->GetVoidPointer(0), OSP_SHORT,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_UNSIGNED_SHORT:
+      ospData.emplace_back((uint16_t*)vtkData->GetVoidPointer(0), OSP_USHORT,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    }
+  }
+
   ospray::cpp::Volume volume("structuredRegular");
   volume.setParam(
       "gridOrigin", rkcommon::math::vec3f{(float)origin[0], (float)origin[1], (float)origin[2]});
   volume.setParam("gridSpacing",
       rkcommon::math::vec3f{(float)spacing[0], (float)spacing[1], (float)spacing[2]});
+  volume.setParam("data", ospray::cpp::Data(ospData.data(), OSP_DATA, ospData.size()));
+  volume.setParam("dimensions", rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+  volume.commit();
 
-  if (vtkVolume->GetScalarSize() == 4) {
-    std::vector<float> data((float*)vtkVolume->GetScalarPointer(),
-        (float*)vtkVolume->GetScalarPointer() + vtkVolume->GetNumberOfPoints());
-    volume.setParam(
-        "data", ospray::cpp::CopiedData(data.data(),
-                    rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]}));
-  } else if (vtkVolume->GetScalarSize() == 8) {
-    std::vector<double> data((double*)vtkVolume->GetScalarPointer(),
-        (double*)vtkVolume->GetScalarPointer() + vtkVolume->GetNumberOfPoints());
-    volume.setParam(
-        "data", ospray::cpp::CopiedData(data.data(),
-                    rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]}));
+  return volume;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+ospray::cpp::Volume createOSPRayVolume(
+    vtkSmartPointer<vtkStructuredGrid> vtkVolume, std::vector<Scalar> const& scalars) {
+  std::array<int, 6> extent;
+  vtkVolume->GetExtent(extent.data());
+  std::array<double, 6> bounds;
+  vtkVolume->GetBounds(bounds.data());
+  std::array<int, 3> dimensions;
+  vtkVolume->GetDimensions(dimensions.data());
+  std::array<double, 3> origin;
+  vtkVolume->GetPoint(0, 0, 0, origin.data());
+
+  std::vector<ospray::cpp::CopiedData> ospData;
+  vtkSmartPointer<vtkDataArray>        vtkData;
+  rkcommon::math::vec3i                dim;
+
+  for (size_t i = 0; i < scalars.size(); i++) {
+    if (scalars[i].mType != scalars[0].mType) {
+      continue;
+    }
+    switch (scalars[i].mType) {
+    case ScalarType::ePointData:
+      dim     = {dimensions[1], dimensions[2], dimensions[0]};
+      vtkData = vtkVolume->GetPointData()->GetScalars(scalars[i].mName.c_str());
+      break;
+    case ScalarType::eCellData:
+      dim     = {dimensions[1] - 1, dimensions[2] - 1, dimensions[0] - 1};
+      vtkData = vtkVolume->GetCellData()->GetScalars(scalars[i].mName.c_str());
+      break;
+    }
+
+    int                   dataSize = vtkData->GetDataTypeSize();
+    rkcommon::math::vec3i stride{dataSize * dim[2], dataSize * dim[2] * dim[0], dataSize};
+    switch (vtkData->GetDataType()) {
+    case VTK_FLOAT:
+      ospData.emplace_back((float*)vtkData->GetVoidPointer(0), OSP_FLOAT, dim, stride);
+      break;
+    case VTK_DOUBLE:
+      ospData.emplace_back((double*)vtkData->GetVoidPointer(0), OSP_DOUBLE, dim, stride);
+      break;
+    case VTK_UNSIGNED_CHAR:
+      ospData.emplace_back((uint8_t*)vtkData->GetVoidPointer(0), OSP_UCHAR, dim, stride);
+      break;
+    case VTK_CHAR:
+      ospData.emplace_back((int8_t*)vtkData->GetVoidPointer(0), OSP_UCHAR, dim, stride);
+      break;
+    case VTK_SHORT:
+      ospData.emplace_back((int16_t*)vtkData->GetVoidPointer(0), OSP_SHORT,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_UNSIGNED_SHORT:
+      ospData.emplace_back((uint16_t*)vtkData->GetVoidPointer(0), OSP_USHORT,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    }
   }
+
+  rkcommon::math::vec3f spacing = {((float)(bounds[3] - bounds[2]) / 2 - (float)origin[2]) / dim[0],
+      180.f / dim[1], 360.f / dim[2]};
+  rkcommon::math::vec3f gridOrigin =
+      rkcommon::math::vec3f{(float)origin[2], spacing[1] / 2, spacing[2] / 2};
+
+  ospray::cpp::Volume volume("structuredSpherical");
+  volume.setParam("gridSpacing", spacing);
+  volume.setParam("gridOrigin", gridOrigin);
+  volume.setParam("data", ospray::cpp::Data(ospData.data(), OSP_DATA, ospData.size()));
+  volume.setParam("dimensions", dim);
   volume.commit();
 
   return volume;
@@ -165,13 +298,13 @@ ospray::cpp::TransferFunction createOSPRayTransferFunction() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ospray::cpp::TransferFunction createOSPRayTransferFunction(
-    float min, float max, std::vector<glm::vec4> colors) {
+    float min, float max, std::vector<glm::vec4> const& colors) {
   std::vector<rkcommon::math::vec3f> color;
   std::vector<float>                 opacity;
 
   for (glm::vec4 c : colors) {
-    color.push_back(rkcommon::math::vec3f(c[0], c[1], c[2]));
-    opacity.push_back(c[3]);
+    color.emplace_back(c[0], c[1], c[2]);
+    opacity.push_back(std::pow(c[3], 10));
   }
 
   rkcommon::math::vec2f valueRange = {min, max};
@@ -186,11 +319,12 @@ ospray::cpp::TransferFunction createOSPRayTransferFunction(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::vector<float> depthToGrayscale(const std::vector<float>& depth) {
+std::vector<float> depthToGrayscale(float* depth, int resolution) {
   std::vector<float> grayscale;
-  grayscale.reserve(depth.size() * 3);
+  grayscale.reserve(resolution * resolution * 3);
 
-  for (const float& val : depth) {
+  for (int i = 0; i < resolution * resolution; i++) {
+    float val = depth[i];
     for (int i = 0; i < 3; i++) {
       grayscale.push_back((val + 1) / 2);
     }
@@ -201,36 +335,23 @@ std::vector<float> depthToGrayscale(const std::vector<float>& depth) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::vector<float> grayscaleToDepth(const std::vector<float>& grayscale) {
-  std::vector<float> depth;
-  depth.reserve(grayscale.size() / 3);
-
+void grayscaleToDepth(std::vector<float> const& grayscale, float* output) {
   for (size_t i = 0; i < grayscale.size() / 3; i++) {
-    depth.push_back(grayscale[i * 3] * 2 - 1);
+    output[i] = grayscale[i * 3] * 2 - 1;
   }
-
-  return depth;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::vector<float> denoiseImage(std::vector<float>& image, int channelCount, int resolution) {
-  oidn::DeviceRef device = oidn::newDevice();
-  device.setErrorFunction([](void* userPtr, oidn::Error e, const char* errorDetails) {
-    oidnLogger().error(errorDetails);
-  });
-  device.commit();
-
-  oidn::FilterRef filter = device.newFilter("RT");
-  filter.setImage("color", image.data(), oidn::Format::Float3, resolution, resolution, 0,
+void denoiseImage(float* image, int channelCount, int resolution) {
+  oidn::FilterRef filter = oidnDevice.newFilter("RT");
+  filter.setImage("color", image, oidn::Format::Float3, resolution, resolution, 0,
       sizeof(float) * channelCount, sizeof(float) * channelCount * resolution);
-  filter.setImage("output", image.data(), oidn::Format::Float3, resolution, resolution, 0,
+  filter.setImage("output", image, oidn::Format::Float3, resolution, resolution, 0,
       sizeof(float) * channelCount, sizeof(float) * channelCount * resolution);
   filter.commit();
 
   filter.execute();
-
-  return image;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

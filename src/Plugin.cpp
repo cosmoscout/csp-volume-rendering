@@ -6,7 +6,8 @@
 
 #include "Plugin.hpp"
 
-#include "Data/VtkDataManager.hpp"
+#include "Data/NetCdfFileLoader.hpp"
+#include "Data/VtkFileLoader.hpp"
 #include "Display/Billboard.hpp"
 #include "Display/PointsForwardWarped.hpp"
 #include "Render/OSPRayRenderer.hpp"
@@ -18,6 +19,7 @@
 #include "../../../src/cs-core/SolarSystem.hpp"
 #include "../../../src/cs-core/TimeControl.hpp"
 #include "../../../src/cs-graphics/ColorMap.hpp"
+#include "../../../src/cs-utils/convert.hpp"
 #include "../../../src/cs-utils/filesystem.hpp"
 
 #include <VistaKernel/GraphicsManager/VistaGroupNode.h>
@@ -55,13 +57,16 @@ namespace csp::volumerendering {
 NLOHMANN_JSON_SERIALIZE_ENUM(VolumeFileType, {
                                                  {VolumeFileType::eInvalid, nullptr},
                                                  {VolumeFileType::eVtk, "vtk"},
+                                                 {VolumeFileType::eNetCdf, "netcdf"},
                                              })
 
-NLOHMANN_JSON_SERIALIZE_ENUM(VolumeStructure, {
-                                                  {VolumeStructure::eInvalid, nullptr},
-                                                  {VolumeStructure::eStructured, "structured"},
-                                                  {VolumeStructure::eUnstructured, "unstructured"},
-                                              })
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    VolumeStructure, {
+                         {VolumeStructure::eInvalid, nullptr},
+                         {VolumeStructure::eStructured, "structured"},
+                         {VolumeStructure::eStructuredSpherical, "structuredSpherical"},
+                         {VolumeStructure::eUnstructured, "unstructured"},
+                     })
 
 NLOHMANN_JSON_SERIALIZE_ENUM(VolumeShape, {
                                               {VolumeShape::eInvalid, nullptr},
@@ -83,80 +88,138 @@ NLOHMANN_JSON_SERIALIZE_ENUM(DepthMode, {
                                             {DepthMode::eMultiThreshold, "multiThreshold"},
                                         })
 
-void from_json(nlohmann::json const& j, Plugin::Settings& o) {
-  // Data settings
-  cs::core::Settings::deserialize(j, "volumeDataPath", o.mVolumeDataPath);
-  cs::core::Settings::deserialize(j, "volumeDataPattern", o.mVolumeDataPattern);
-  cs::core::Settings::deserialize(j, "volumeDataType", o.mVolumeDataType);
-  cs::core::Settings::deserialize(j, "volumeStructure", o.mVolumeStructure);
-  cs::core::Settings::deserialize(j, "volumeShape", o.mVolumeShape);
+void from_json(nlohmann::json const& j, Plugin::Settings::Data& o) {
+  cs::core::Settings::deserialize(j, "path", o.mPath);
+  cs::core::Settings::deserialize(j, "namePattern", o.mNamePattern);
+  cs::core::Settings::deserialize(j, "type", o.mType);
+  cs::core::Settings::deserialize(j, "structure", o.mStructure);
+  cs::core::Settings::deserialize(j, "shape", o.mShape);
+  cs::core::Settings::deserialize(j, "activeScalar", o.mActiveScalar);
+};
 
-  // Rendering settings
+void to_json(nlohmann::json& j, Plugin::Settings::Data const& o) {
+  cs::core::Settings::serialize(j, "path", o.mPath);
+  cs::core::Settings::serialize(j, "namePattern", o.mNamePattern);
+  cs::core::Settings::serialize(j, "type", o.mType);
+  cs::core::Settings::serialize(j, "structure", o.mStructure);
+  cs::core::Settings::serialize(j, "shape", o.mShape);
+  cs::core::Settings::serialize(j, "activeScalar", o.mActiveScalar);
+};
+
+void from_json(nlohmann::json const& j, Plugin::Settings::Rendering& o) {
   cs::core::Settings::deserialize(j, "requestImages", o.mRequestImages);
   cs::core::Settings::deserialize(j, "resolution", o.mResolution);
   cs::core::Settings::deserialize(j, "samplingRate", o.mSamplingRate);
-  cs::core::Settings::deserialize(j, "sunStrength", o.mSunStrength);
+  cs::core::Settings::deserialize(j, "maxPasses", o.mMaxPasses);
   cs::core::Settings::deserialize(j, "densityScale", o.mDensityScale);
   cs::core::Settings::deserialize(j, "denoiseColor", o.mDenoiseColor);
   cs::core::Settings::deserialize(j, "denoiseDepth", o.mDenoiseDepth);
   cs::core::Settings::deserialize(j, "depthMode", o.mDepthMode);
   cs::core::Settings::deserialize(j, "transferFunction", o.mTransferFunction);
+};
 
-  // Display settings
-  cs::core::Settings::deserialize(j, "predictiveRendering", o.mPredictiveRendering);
-  cs::core::Settings::deserialize(j, "reuseImages", o.mReuseImages);
-  cs::core::Settings::deserialize(j, "useDepth", o.mDepthData);
-  cs::core::Settings::deserialize(j, "drawDepth", o.mDrawDepth);
-  cs::core::Settings::deserialize(j, "displayMode", o.mDisplayMode);
-
-  // Transform settings
-  cs::core::Settings::deserialize(j, "anchor", o.mAnchor);
-  cs::core::Settings::deserialize(j, "position", o.mPosition);
-  cs::core::Settings::deserialize(j, "scale", o.mScale);
-  cs::core::Settings::deserialize(j, "rotation", o.mRotation);
-}
-
-void to_json(nlohmann::json& j, Plugin::Settings const& o) {
-  // Data settings
-  cs::core::Settings::serialize(j, "volumeDataPath", o.mVolumeDataPath);
-  cs::core::Settings::serialize(j, "volumeDataPattern", o.mVolumeDataPattern);
-  cs::core::Settings::serialize(j, "volumeDataType", o.mVolumeDataType);
-  cs::core::Settings::serialize(j, "volumeStructure", o.mVolumeStructure);
-  cs::core::Settings::serialize(j, "volumeShape", o.mVolumeShape);
-
-  // Rendering settings
+void to_json(nlohmann::json& j, Plugin::Settings::Rendering const& o) {
   cs::core::Settings::serialize(j, "requestImages", o.mRequestImages);
   cs::core::Settings::serialize(j, "resolution", o.mResolution);
   cs::core::Settings::serialize(j, "samplingRate", o.mSamplingRate);
-  cs::core::Settings::serialize(j, "sunStrength", o.mSunStrength);
+  cs::core::Settings::serialize(j, "maxPasses", o.mMaxPasses);
   cs::core::Settings::serialize(j, "densityScale", o.mDensityScale);
   cs::core::Settings::serialize(j, "denoiseColor", o.mDenoiseColor);
   cs::core::Settings::serialize(j, "denoiseDepth", o.mDenoiseDepth);
   cs::core::Settings::serialize(j, "depthMode", o.mDepthMode);
   cs::core::Settings::serialize(j, "transferFunction", o.mTransferFunction);
+};
 
-  // Display settings
+void from_json(nlohmann::json const& j, Plugin::Settings::Lighting& o) {
+  cs::core::Settings::deserialize(j, "enabled", o.mEnabled);
+  cs::core::Settings::deserialize(j, "sunStrength", o.mSunStrength);
+  cs::core::Settings::deserialize(j, "ambientStrength", o.mSunStrength);
+}
+
+void to_json(nlohmann::json& j, Plugin::Settings::Lighting const& o) {
+  cs::core::Settings::serialize(j, "enabled", o.mEnabled);
+  cs::core::Settings::serialize(j, "sunStrength", o.mSunStrength);
+  cs::core::Settings::serialize(j, "ambientStrength", o.mSunStrength);
+}
+
+void from_json(nlohmann::json const& j, Plugin::Settings::Display& o) {
+  cs::core::Settings::deserialize(j, "predictiveRendering", o.mPredictiveRendering);
+  cs::core::Settings::deserialize(j, "reuseImages", o.mReuseImages);
+  cs::core::Settings::deserialize(j, "useDepth", o.mDepthData);
+  cs::core::Settings::deserialize(j, "drawDepth", o.mDrawDepth);
+  cs::core::Settings::deserialize(j, "displayMode", o.mDisplayMode);
+};
+
+void to_json(nlohmann::json& j, Plugin::Settings::Display const& o) {
   cs::core::Settings::serialize(j, "predictiveRendering", o.mPredictiveRendering);
   cs::core::Settings::serialize(j, "reuseImages", o.mReuseImages);
   cs::core::Settings::serialize(j, "useDepth", o.mDepthData);
   cs::core::Settings::serialize(j, "drawDepth", o.mDrawDepth);
   cs::core::Settings::serialize(j, "displayMode", o.mDisplayMode);
+};
 
-  // Transform settings
+void from_json(nlohmann::json const& j, Plugin::Settings::Transform& o) {
+  cs::core::Settings::deserialize(j, "anchor", o.mAnchor);
+  cs::core::Settings::deserialize(j, "position", o.mPosition);
+  cs::core::Settings::deserialize(j, "scale", o.mScale);
+  cs::core::Settings::deserialize(j, "rotation", o.mRotation);
+};
+
+void to_json(nlohmann::json& j, Plugin::Settings::Transform const& o) {
   cs::core::Settings::serialize(j, "anchor", o.mAnchor);
   cs::core::Settings::serialize(j, "position", o.mPosition);
   cs::core::Settings::serialize(j, "scale", o.mScale);
   cs::core::Settings::serialize(j, "rotation", o.mRotation);
+};
+
+void from_json(nlohmann::json const& j, Plugin::Settings::Core& o) {
+  cs::core::Settings::deserialize(j, "enabled", o.mEnabled);
+  cs::core::Settings::deserialize(j, "scalar", o.mScalar);
+  cs::core::Settings::deserialize(j, "radius", o.mRadius);
 }
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
+void to_json(nlohmann::json& j, Plugin::Settings::Core const& o) {
+  cs::core::Settings::serialize(j, "enabled", o.mEnabled);
+  cs::core::Settings::serialize(j, "scalar", o.mScalar);
+  cs::core::Settings::serialize(j, "radius", o.mRadius);
+}
 
-bool Plugin::Frame::operator==(const Frame& other) {
-  return mResolution == other.mResolution &&
-         glm::all(glm::epsilonEqual(mCameraTransform[0], other.mCameraTransform[0], 0.0001f)) &&
-         glm::all(glm::epsilonEqual(mCameraTransform[1], other.mCameraTransform[1], 0.0001f)) &&
-         glm::all(glm::epsilonEqual(mCameraTransform[2], other.mCameraTransform[2], 0.0001f)) &&
-         glm::all(glm::epsilonEqual(mCameraTransform[3], other.mCameraTransform[3], 0.0001f));
+void from_json(nlohmann::json const& j, Plugin::Settings::Pathlines& o) {
+  cs::core::Settings::deserialize(j, "path", o.mPath);
+  cs::core::Settings::deserialize(j, "enabled", o.mEnabled);
+  cs::core::Settings::deserialize(j, "size", o.mLineSize);
+}
+
+void to_json(nlohmann::json& j, Plugin::Settings::Pathlines const& o) {
+  cs::core::Settings::serialize(j, "path", o.mPath);
+  cs::core::Settings::serialize(j, "enabled", o.mEnabled);
+  cs::core::Settings::serialize(j, "size", o.mLineSize);
+}
+
+void from_json(nlohmann::json const& j, Plugin::Settings& o) {
+  cs::core::Settings::deserialize(j, "data", o.mData);
+  if (j.contains("rendering")) {
+    cs::core::Settings::deserialize(j, "rendering", o.mRendering);
+  }
+  if (j.contains("lighting")) {
+    cs::core::Settings::deserialize(j, "lighting", o.mLighting);
+  }
+  if (j.contains("display")) {
+    cs::core::Settings::deserialize(j, "display", o.mDisplay);
+  }
+  cs::core::Settings::deserialize(j, "transform", o.mTransform);
+  cs::core::Settings::deserialize(j, "core", o.mCore);
+  cs::core::Settings::deserialize(j, "pathlines", o.mPathlines);
+}
+
+void to_json(nlohmann::json& j, Plugin::Settings const& o) {
+  cs::core::Settings::serialize(j, "data", o.mData);
+  cs::core::Settings::serialize(j, "rendering", o.mRendering);
+  cs::core::Settings::serialize(j, "lighting", o.mLighting);
+  cs::core::Settings::serialize(j, "display", o.mDisplay);
+  cs::core::Settings::serialize(j, "transform", o.mTransform);
+  cs::core::Settings::serialize(j, "core", o.mCore);
+  cs::core::Settings::serialize(j, "pathlines", o.mPathlines);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -180,9 +243,9 @@ void Plugin::init() {
       [this]() { mAllSettings->mPlugins["csp-volume-rendering"] = mPluginSettings; });
 
   onLoad();
-  registerUICallbacks();
+  registerAllUICallbacks();
   initUI();
-  connectSettings();
+  connectAllSettings();
 
   // Init buffers for predictive rendering
   mFrameIntervals.resize(mFrameIntervalsLength);
@@ -202,8 +265,6 @@ void Plugin::deInit() {
 
   mAllSettings->onLoad().disconnect(mOnLoadConnection);
   mAllSettings->onSave().disconnect(mOnSaveConnection);
-  mAllSettings->mGraphics.pEnableLighting.disconnect(mLightingConnection);
-  mAllSettings->mGraphics.pAmbientBrightness.disconnect(mAmbientConnection);
 
   logger().info("Unloading done.");
 }
@@ -213,19 +274,45 @@ void Plugin::deInit() {
 void Plugin::update() {
   mNextFrame.mCameraTransform = getCurrentCameraTransform();
 
+  if (mDataManager->isReady() && mSampleCount < 20 && !mAnimating) {
+    if (mDataSample.valid() &&
+        mDataSample.wait_for(std::chrono::milliseconds(0)) == std::future_status::ready) {
+      std::vector<float> sample = mDataSample.get();
+      if (sample.size() > 0) {
+        nlohmann::json sampleJson = sample;
+        if (mSampleCount == 0) {
+          nlohmann::json extents =
+              mDataManager->getScalarRange(mDataManager->getState().mScalar.getId());
+          mGuiManager->getGui()->callJavascript(
+              "CosmoScout.volumeRendering.transferFunctionEditor.setData", sampleJson,
+              mResetTfHandles, extents);
+        } else {
+          mGuiManager->getGui()->callJavascript(
+              "CosmoScout.volumeRendering.transferFunctionEditor.addData", sampleJson, false);
+        }
+        mSampleCount++;
+      }
+    } else {
+      mDataSample =
+          mDataManager->getSample(mDataManager->getState(), std::chrono::milliseconds(10));
+    }
+  }
+
   switch (mRenderState) {
   case RenderState::eWaitForData:
     if (mDataManager->isReady()) {
       mRenderState = RenderState::eIdle;
+      // Make sure that the correct scalar is selected in the DataManager
+      mPluginSettings.mData.mActiveScalar.touch();
     }
     break;
   case RenderState::ePaused:
-    if (mPluginSettings.mRequestImages.get()) {
+    if (mPluginSettings.mRendering.mRequestImages.get()) {
       mRenderState = RenderState::eIdle;
     }
     break;
   case RenderState::eIdle:
-    if (!mPluginSettings.mRequestImages.get()) {
+    if (!mPluginSettings.mRendering.mRequestImages.get()) {
       mRenderState = RenderState::ePaused;
     } else if (tryRequestFrame()) {
       mRenderState = RenderState::eRenderingImage;
@@ -233,7 +320,7 @@ void Plugin::update() {
     break;
   case RenderState::eRenderingImage:
     showRenderProgress();
-    if (!mPluginSettings.mRequestImages.get()) {
+    if (!mPluginSettings.mRendering.mRequestImages.get()) {
       mRenderer->cancelRendering();
       mRenderState = RenderState::ePaused;
     } else if (mFutureFrameData.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
@@ -245,7 +332,7 @@ void Plugin::update() {
     break;
   }
 
-  if (mPluginSettings.mReuseImages.get() && mRenderedFrames.size() > 0) {
+  if (mPluginSettings.mDisplay.mReuseImages.get() && mRenderedImages.size() > 0) {
     tryReuseFrame(mNextFrame.mCameraTransform);
   }
 
@@ -261,10 +348,18 @@ void Plugin::onLoad() {
   // Init data manager and volume renderer
   mRenderState = RenderState::eWaitForData;
 
-  switch (mPluginSettings.mVolumeDataType.get()) {
+  switch (mPluginSettings.mData.mType.get()) {
   case VolumeFileType::eVtk:
-    mDataManager = std::make_shared<VtkDataManager>(
-        mPluginSettings.mVolumeDataPath.get(), mPluginSettings.mVolumeDataPattern.get());
+    mDataManager = std::make_shared<DataManager>(mPluginSettings.mData.mPath.get(),
+        mPluginSettings.mData.mNamePattern.get(), std::make_unique<VtkFileLoader>(),
+        mPluginSettings.mPathlines ? std::optional(mPluginSettings.mPathlines->mPath.get())
+                                   : std::nullopt);
+    break;
+  case VolumeFileType::eNetCdf:
+    mDataManager = std::make_shared<DataManager>(mPluginSettings.mData.mPath.get(),
+        mPluginSettings.mData.mNamePattern.get(), std::make_unique<NetCdfFileLoader>(),
+        mPluginSettings.mPathlines ? std::optional(mPluginSettings.mPathlines->mPath.get())
+                                   : std::nullopt);
     break;
   default:
     logger().error("Invalid volume data type given in settings! Should be 'vtk'.");
@@ -273,7 +368,7 @@ void Plugin::onLoad() {
   }
 
   mRenderer = std::make_unique<OSPRayRenderer>(
-      mDataManager, mPluginSettings.mVolumeStructure.get(), mPluginSettings.mVolumeShape.get());
+      mDataManager, mPluginSettings.mData.mStructure.get(), mPluginSettings.mData.mShape.get());
 
   // If the volume representations already exist, remove them from the solar system
   for (auto const& node : mDisplayNodes) {
@@ -283,22 +378,23 @@ void Plugin::onLoad() {
   mActiveDisplay.reset();
 
   // Init volume representation
-  auto anchor = mAllSettings->mAnchors.find(mPluginSettings.mAnchor.get());
+  auto anchor = mAllSettings->mAnchors.find(mPluginSettings.mTransform.mAnchor.get());
   if (anchor == mAllSettings->mAnchors.end()) {
-    logger().error("No anchor with name '{}' found!", mPluginSettings.mAnchor.get());
+    logger().error("No anchor with name '{}' found!", mPluginSettings.mTransform.mAnchor.get());
     throw std::runtime_error("Failed to initialize CelestialObjects.");
   }
 
   auto existence                    = anchor->second.mExistence;
   mDisplayNodes[DisplayMode::eMesh] = std::make_shared<Billboard>(
-      mPluginSettings.mVolumeShape.get(), mAllSettings, mPluginSettings.mAnchor.get());
+      mPluginSettings.mData.mShape.get(), mAllSettings, mPluginSettings.mTransform.mAnchor.get());
   mDisplayNodes[DisplayMode::ePoints] = std::make_shared<PointsForwardWarped>(
-      mPluginSettings.mVolumeShape.get(), mAllSettings, mPluginSettings.mAnchor.get());
+      mPluginSettings.mData.mShape.get(), mAllSettings, mPluginSettings.mTransform.mAnchor.get());
 
   for (auto const& node : mDisplayNodes) {
-    node.second->setAnchorPosition(mPluginSettings.mPosition.get());
-    node.second->setAnchorScale(mPluginSettings.mScale.get());
-    node.second->setAnchorRotation(mPluginSettings.mRotation.get());
+    node.second->setAnchorPosition(mPluginSettings.mTransform.mPosition.get());
+    node.second->setAnchorScale(mPluginSettings.mTransform.mScale.get());
+    node.second->setAnchorRotation(
+        cs::utils::convert::toRadians(mPluginSettings.mTransform.mRotation.get()));
 
     mSolarSystem->registerAnchor(node.second);
   }
@@ -306,97 +402,26 @@ void Plugin::onLoad() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Plugin::registerUICallbacks() {
-  // Rendering settings
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableRequestImages",
-      "If disabled no new images will be rendered.",
-      std::function([this](bool enable) { mPluginSettings.mRequestImages = enable; }));
+void Plugin::registerAllUICallbacks() {
+  registerUICallbacks<bool>();
+  registerUICallbacks<int>();
+  registerUICallbacks<float>();
+  registerUICallbacks<std::string>();
+  registerUICallbacks<DisplayMode>();
+  registerUICallbacks<DepthMode>();
 
+  // Rendering settings
   mGuiManager->getGui()->registerCallback("volumeRendering.cancel",
       "If an image is currently rendered, cancel it.",
       std::function([this]() { mRenderer->cancelRendering(); }));
 
-  mGuiManager->getGui()->registerCallback("volumeRendering.setResolution",
-      "Sets the resolution of the rendered volume images.", std::function([this](double value) {
-        mPluginSettings.mResolution = (int)std::lround(value);
-      }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setSamplingRate",
-      "Sets the sampling rate for volume rendering.",
-      std::function([this](double value) { mPluginSettings.mSamplingRate = (float)value; }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setSunStrength",
-      "Sets the strength of the sun when shading is enabled.",
-      std::function([this](double value) { mPluginSettings.mSunStrength = (float)value; }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDensityScale",
-      "Sets the density scale of the volume.",
-      std::function([this](double value) { mPluginSettings.mDensityScale = (float)value; }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDenoiseColor",
-      "Enables use of OIDN for displaying color data.",
-      std::function([this](bool enable) { mPluginSettings.mDenoiseColor = enable; }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDenoiseDepth",
-      "Enables use of OIDN for displaying depth data.",
-      std::function([this](bool enable) { mPluginSettings.mDenoiseDepth = enable; }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode0",
-      "Don't calculate a depth value.",
-      std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eNone; }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode1",
-      "Calculate depth of isosurface.",
-      std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eIsosurface; }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode2",
-      "Uses first hit as depth value.",
-      std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eFirstHit; }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode3",
-      "Uses last hit as depth value.",
-      std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eLastHit; }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode4",
-      "Uses depth, at which an opacity threshold was reached.",
-      std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eThreshold; }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDepthMode5",
-      "Uses depth, at which the last of multiple opacity thresholds was reached.",
-      std::function([this]() { mPluginSettings.mDepthMode = DepthMode::eMultiThreshold; }));
-
-  // Display settings
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnablePredictiveRendering",
-      "Enables predicting the next camera position for rendering.",
-      std::function([this](bool enable) { mPluginSettings.mPredictiveRendering = enable; }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableReuseImages",
-      "Enables reuse of previously rendered images.",
-      std::function([this](bool enable) { mPluginSettings.mReuseImages = enable; }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDepthData",
-      "Enables use of depth data for displaying data.",
-      std::function([this](bool enable) { mPluginSettings.mDepthData = enable; }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setEnableDrawDepth",
-      "Enables displaying the depth buffer instead of the color buffer.",
-      std::function([this](bool enable) { mPluginSettings.mDrawDepth = enable; }));
-
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDisplayMode0",
-      "Displays the rendered images on a continuous mesh.",
-      std::function([this]() { mPluginSettings.mDisplayMode = DisplayMode::eMesh; }));
-  mGuiManager->getGui()->registerCallback("volumeRendering.setDisplayMode1",
-      "Displays the rendered images on a continuous mesh.",
-      std::function([this]() { mPluginSettings.mDisplayMode = DisplayMode::ePoints; }));
-
   // Data settings
-  mGuiManager->getGui()->registerCallback("volumeRendering.setScalar",
-      "Set the scalar to be rendered.", std::function([this](std::string scalar) {
-        mRenderedFrames.clear();
-        mDataManager->setActiveScalar(scalar);
-        mParametersDirty = true;
-      }));
-
   mGuiManager->getGui()->registerCallback("volumeRendering.setTimestep",
       "Sets the timestep of the rendered volume images.", std::function([this](double value) {
-        mRenderedFrames.clear();
+        invalidateCache();
         mDataManager->setTimestep((int)std::lround(value));
-        mParametersDirty = true;
+        mSampleCount    = 0;
+        mResetTfHandles = false;
       }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.preloadTimestep",
@@ -406,34 +431,125 @@ void Plugin::registerUICallbacks() {
         mRenderer->preloadData(state);
       }));
 
-  mGuiManager->getGui()->registerCallback("volumeRendering.setAnimationSpeed",
-      "Time units per second when animating.", std::function([](double value) {
-        // Callback is only registered to suppress warnings
-      }));
-
   // Transferfunction
   mGuiManager->getGui()->registerCallback("volumeRendering.setTransferFunction",
       "Sets the transfer function for rendering the volume.",
       std::function([this](std::string json) {
-        mRenderedFrames.clear();
+        invalidateCache();
         cs::graphics::ColorMap colorMap(json);
         mRenderer->setTransferFunction(colorMap.getRawData());
-        mParametersDirty = true;
+      }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setVolumeScalarFilters",
+      "Sets filters for selecting which parts of the volume should be rendered.",
+      std::function([this](std::string jsonString) {
+        std::vector<Scalar>       scalars = mDataManager->pScalars.get();
+        std::vector<ScalarFilter> filters = parseScalarFilters(jsonString, scalars);
+        invalidateCache();
+        mRenderer->setScalarFilters(filters);
+      }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setTimestepAnimating",
+      "Specifies, whether timesteps are currently animated (increasing automatically).",
+      std::function([this](bool value) {
+        invalidateCache();
+        mAnimating = value;
+        if (value) {
+          mRenderer->setMaxLod(mDataManager->getMinLod(mDataManager->getState()));
+        } else {
+          mRenderer->clearMaxLod();
+        }
+      }));
+
+  // Pathline settings
+  if (mPluginSettings.mPathlines.has_value()) {
+    mGuiManager->getGui()->registerCallback("volumeRendering.setPathlinesScalarFilters",
+        "Sets filters for selecting which parts of the pathlines should be rendered.",
+        std::function([this](std::string jsonString) {
+          std::vector<ScalarFilter> filters =
+              parseScalarFilters(jsonString, mDataManager->getPathlines().getScalars());
+          invalidateCache();
+          mRenderer->setPathlineScalarFilters(filters);
+        }));
+  }
+
+  // Parcoords
+  mGuiManager->getGui()->registerCallback("parcoords.importBrushState",
+      "Import a saved parcoords brush state.",
+      std::function([this](std::string name, std::string editorId) {
+        std::stringstream json;
+        std::ifstream     i("../share/resources/parcoords/" + name);
+        json << i.rdbuf();
+
+        mGuiManager->getGui()->callJavascript(
+            "CosmoScout.parcoords.loadBrushState", json.str(), editorId);
+      }));
+
+  mGuiManager->getGui()->registerCallback("parcoords.exportBrushState",
+      "Export the current parcoords brush state to a file.",
+      std::function([this](std::string name, std::string json) {
+        std::ofstream o("../share/resources/parcoords/" + name);
+        o << json;
+
+        mGuiManager->getGui()->callJavascript("CosmoScout.parcoords.addAvailableBrushState", name);
+      }));
+
+  mGuiManager->getGui()->registerCallback("parcoords.getAvailableBrushStates",
+      "Requests the list of currently available parcoords brush state files.",
+      std::function([this]() {
+        nlohmann::json j = nlohmann::json::array();
+        std::string    parcoordsPath("../share/resources/parcoords/");
+        if (!boost::filesystem::exists(parcoordsPath)) {
+          cs::utils::filesystem::createDirectoryRecursively(
+              parcoordsPath, boost::filesystem::perms::all_all);
+        }
+        for (const auto& file : cs::utils::filesystem::listFiles(parcoordsPath)) {
+          std::string filename = file;
+          filename.erase(0, 29);
+          j.push_back(filename);
+        }
+
+        mGuiManager->getGui()->callJavascript(
+            "CosmoScout.parcoords.setAvailableBrushStates", j.dump());
       }));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Plugin::connectSettings() {
+void Plugin::connectAllSettings() {
+  connectSettings<bool>();
+  connectSettings<int>();
+  connectSettings<float>();
+  connectSettings<std::string>();
+  connectSettings<DisplayMode>();
+  connectSettings<DepthMode>();
+
+  // Connect to plugin settings
+  // Rendering settings
+  mPluginSettings.mRendering.mTransferFunction.connectAndTouch([this](std::string name) {
+    std::string code = "CosmoScout.volumeRendering.loadTransferFunction('" + name + "');";
+    mGuiManager->addScriptToGui(code);
+  });
+
   // Connect to data manager properties
-  mDataManager->pScalars.connectAndTouch([this](std::vector<std::string> scalars) {
-    for (std::string scalar : scalars) {
-      mGuiManager->getGui()->callJavascript(
-          "CosmoScout.gui.addDropdownValue", "volumeRendering.setScalar", scalar, scalar, false);
+  mDataManager->pScalars.connectAndTouch([this](std::vector<Scalar> scalars) {
+    mGuiManager->getGui()->callJavascript(
+        "CosmoScout.gui.clearDropdown", "volumeRendering.setScalar");
+    for (Scalar scalar : scalars) {
+      mGuiManager->getGui()->callJavascript("CosmoScout.gui.addDropdownValue",
+          "volumeRendering.setScalar", scalar.getId(), scalar.mName, false);
     }
     if (scalars.size() > 0) {
+      auto activeScalar = std::find_if(scalars.begin(), scalars.end(),
+          [this](Scalar s) { return s.getId() == mPluginSettings.mData.mActiveScalar.get(); });
+      if (activeScalar == scalars.end()) {
+        activeScalar = scalars.begin();
+      }
+      mPluginSettings.mData.mActiveScalar.set(activeScalar->getId());
+      mSampleCount    = 0;
+      mResetTfHandles = true;
       mGuiManager->getGui()->callJavascript(
-          "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", scalars[0]);
+          "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", activeScalar->getId());
     }
   });
   mDataManager->pTimesteps.connectAndTouch([this](std::vector<int> timesteps) {
@@ -441,124 +557,149 @@ void Plugin::connectSettings() {
     mGuiManager->getGui()->callJavascript(
         "CosmoScout.volumeRendering.setTimesteps", timestepsJson.dump());
   });
+  mDataManager->onScalarRangeUpdated().connect([this](Scalar const& scalar) {
+    if (mDataManager->isReady() && scalar.getId() == mPluginSettings.mData.mActiveScalar.get()) {
+      mSampleCount    = 0;
+      mResetTfHandles = false;
+    }
+  });
+}
 
-  // Connect to global CosmoScout graphics settings
-  mLightingConnection =
-      mAllSettings->mGraphics.pEnableLighting.connectAndTouch([this](bool enable) {
-        mRenderedFrames.clear();
-        mRenderer->setShading(enable);
-        mParametersDirty = true;
-      });
-  mAmbientConnection =
-      mAllSettings->mGraphics.pAmbientBrightness.connectAndTouch([this](float value) {
-        mRenderedFrames.clear();
-        mRenderer->setAmbientLight(value);
-        mParametersDirty = true;
-      });
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
-  // Connect to plugin settings
-  // Rendering settings
-  mPluginSettings.mRequestImages.connectAndTouch([this](bool enable) {
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableRequestImages", enable);
-  });
-  mPluginSettings.mResolution.connectAndTouch([this](int value) {
-    mRenderedFrames.clear();
-    mNextFrame.mResolution = value;
-    mRenderer->setResolution(value);
-    mParametersDirty = true;
-    mGuiManager->setSliderValue("volumeRendering.setResolution", value);
-  });
-  mPluginSettings.mSamplingRate.connectAndTouch([this](float value) {
-    mRenderedFrames.clear();
-    mRenderer->setSamplingRate(value);
-    mParametersDirty = true;
-    mGuiManager->setSliderValue("volumeRendering.setSamplingRate", value);
-  });
-  mPluginSettings.mSunStrength.connectAndTouch([this](float value) {
-    mRenderedFrames.clear();
-    mRenderer->setSunStrength(value);
-    mParametersDirty = true;
-    mGuiManager->setSliderValue("volumeRendering.setSunStrength", value);
-  });
-  mPluginSettings.mDensityScale.connectAndTouch([this](float value) {
-    mRenderedFrames.clear();
-    mRenderer->setDensityScale(value);
-    mParametersDirty = true;
-    mGuiManager->setSliderValue("volumeRendering.setDensityScale", value);
-  });
-  mPluginSettings.mDenoiseColor.connectAndTouch([this](bool enable) {
-    mRenderedFrames.clear();
-    mRenderer->setDenoiseColor(enable);
-    mParametersDirty = true;
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseColor", enable);
-  });
-  mPluginSettings.mDenoiseDepth.connectAndTouch([this](bool enable) {
-    mRenderedFrames.clear();
-    mRenderer->setDenoiseDepth(enable);
-    mParametersDirty = true;
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableDenoiseDepth", enable);
-  });
-  mPluginSettings.mDepthMode.connectAndTouch([this](DepthMode drawMode) {
-    mRenderedFrames.clear();
-    mRenderer->setDepthMode(drawMode);
-    mParametersDirty = true;
-    if (drawMode == DepthMode::eNone) {
-      mGuiManager->setRadioChecked("volumeRendering.setDepthMode0");
-    } else if (drawMode == DepthMode::eIsosurface) {
-      mGuiManager->setRadioChecked("volumeRendering.setDepthMode1");
-    } else if (drawMode == DepthMode::eFirstHit) {
-      mGuiManager->setRadioChecked("volumeRendering.setDepthMode2");
-    } else if (drawMode == DepthMode::eLastHit) {
-      mGuiManager->setRadioChecked("volumeRendering.setDepthMode3");
-    } else if (drawMode == DepthMode::eThreshold) {
-      mGuiManager->setRadioChecked("volumeRendering.setDepthMode4");
-    } else if (drawMode == DepthMode::eMultiThreshold) {
-      mGuiManager->setRadioChecked("volumeRendering.setDepthMode5");
-    }
-  });
-  mPluginSettings.mTransferFunction.connectAndTouch([this](std::string name) {
-    std::string code = "CosmoScout.volumeRendering.loadTransferFunction('" + name + "');";
-    mGuiManager->addScriptToGui(code);
-  });
+template <>
+constexpr std::array<Plugin::Setting<bool>, SETTINGS_COUNT<bool>>
+Plugin::Setting<bool>::getSettings(Settings& pluginSettings) {
+  std::array<Setting<bool>, SETTINGS_COUNT<bool>> settings{
+      // Rendering settings
+      Setting<bool>{"setEnableRequestImages", "If disabled no new images will be rendered.",
+          pluginSettings.mRendering.mRequestImages},
+      Setting<bool>{"setEnableDenoiseColor", "Enables use of OIDN for displaying color data.",
+          pluginSettings.mRendering.mDenoiseColor, &Renderer::setDenoiseColor},
+      Setting<bool>{"setEnableDenoiseDepth", "Enables use of OIDN for displaying depth data.",
+          pluginSettings.mRendering.mDenoiseDepth, &Renderer::setDenoiseDepth},
+      // Display settings
+      Setting<bool>{"setEnableDepthData", "Enables use of depth data for displaying data.",
+          pluginSettings.mDisplay.mDepthData, {}, &Plugin::setDepthData},
+      Setting<bool>{"setEnableDrawDepth",
+          "Enables displaying the depth buffer instead of the color buffer.",
+          pluginSettings.mDisplay.mDrawDepth, {}, &Plugin::setDrawDepth},
+      Setting<bool>{"setEnablePredictiveRendering",
+          "Enables predicting the next camera position for rendering.",
+          pluginSettings.mDisplay.mPredictiveRendering},
+      Setting<bool>{"setEnableReuseImages", "Enables reuse of previously rendered images.",
+          pluginSettings.mDisplay.mReuseImages},
+      // Lighting settings
+      Setting<bool>{"setEnableLighting", "Enables/Disables shading.",
+          pluginSettings.mLighting.mEnabled, &Renderer::setShading},
+      // Core settings
+      pluginSettings.mCore.has_value()
+          ? Setting<bool>{"setEnableCore", "Enable/disable rendering of core",
+                pluginSettings.mCore->mEnabled, &Renderer::setCoreEnabled}
+          : Setting<bool>{},
+      // Pathline settings
+      pluginSettings.mPathlines.has_value()
+          ? Setting<bool>{"setEnablePathlines", "Enable/disable rendering of pathlines.",
+                pluginSettings.mPathlines->mEnabled, &Renderer::setPathlinesEnabled}
+          : Setting<bool>{},
+      Setting<bool>{
+          "setEnablePathlinesParcoords",
+          "Use a separate parallel coordinate diagram for the pathlines.",
+      },
+  };
+  return std::move(settings);
+}
 
-  // Display settings
-  mPluginSettings.mPredictiveRendering.connectAndTouch([this](bool enable) {
-    mGuiManager->setCheckboxValue("volumeRendering.setEnablePredictiveRendering", enable);
-  });
-  mPluginSettings.mReuseImages.connectAndTouch([this](bool enable) {
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableReuseImages", enable);
-  });
-  mPluginSettings.mDepthData.connectAndTouch([this](bool enable) {
-    for (auto const& node : mDisplayNodes) {
-      node.second->setUseDepth(enable);
-    }
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableDepthData", enable);
-  });
-  mPluginSettings.mDrawDepth.connectAndTouch([this](bool enable) {
-    for (auto const& node : mDisplayNodes) {
-      node.second->setDrawDepth(enable);
-    }
-    mGuiManager->setCheckboxValue("volumeRendering.setEnableDrawDepth", enable);
-  });
-  mPluginSettings.mDisplayMode.connectAndTouch([this](DisplayMode displayMode) {
-    for (auto const& node : mDisplayNodes) {
-      if (node.first == displayMode) {
-        node.second->setEnabled(true);
-      } else {
-        node.second->setEnabled(false);
-      }
-    }
-    mActiveDisplay = mDisplayNodes.find(displayMode)->second;
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    if (displayMode == DisplayMode::eMesh) {
-      mGuiManager->setRadioChecked("volumeRendering.setDisplayMode0");
-    } else if (displayMode == DisplayMode::ePoints) {
-      mGuiManager->setRadioChecked("volumeRendering.setDisplayMode1");
-    }
-    if (mDisplayedFrame.has_value()) {
-      displayFrame(*mDisplayedFrame, displayMode);
-    }
-  });
+template <>
+constexpr std::array<Plugin::Setting<int>, SETTINGS_COUNT<int>> Plugin::Setting<int>::getSettings(
+    Settings& pluginSettings) {
+  std::array<Setting<int>, SETTINGS_COUNT<int>> settings{
+      // Rendering settings
+      Setting<int>{"setMaxRenderPasses",
+          "Sets the maximum number of render passes for constant rendering parameters.",
+          pluginSettings.mRendering.mMaxPasses, &Renderer::setMaxRenderPasses},
+      Setting<int>{"setResolution", "Sets the resolution of the rendered volume images.",
+          pluginSettings.mRendering.mResolution, &Renderer::setResolution, &Plugin::setResolution},
+  };
+  return std::move(settings);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template <>
+constexpr std::array<Plugin::Setting<float>, SETTINGS_COUNT<float>>
+Plugin::Setting<float>::getSettings(Settings& pluginSettings) {
+  std::array<Setting<float>, SETTINGS_COUNT<float>> settings{
+      // Animation settings
+      Setting<float>{"setAnimationSpeed", "Time units per second when animating."},
+      // Rendering settings
+      Setting<float>{"setSamplingRate", "Sets the sampling rate for volume rendering.",
+          pluginSettings.mRendering.mSamplingRate, &Renderer::setSamplingRate},
+      Setting<float>{"setDensityScale", "Sets the density scale of the volume.",
+          pluginSettings.mRendering.mDensityScale, &Renderer::setDensityScale},
+      // Lighting settings
+      Setting<float>{"setSunStrength", "Sets the strength of the sun when shading is enabled.",
+          pluginSettings.mLighting.mSunStrength, &Renderer::setSunStrength},
+      Setting<float>{"setAmbientStrength",
+          "Sets the strength of the ambient light when shading is enabled.",
+          pluginSettings.mLighting.mAmbientStrength, &Renderer::setAmbientLight},
+      // Core settings
+      pluginSettings.mCore.has_value()
+          ? Setting<float>{"setCoreRadius", "Sets the radius of the rendered core.",
+                pluginSettings.mCore->mRadius, &Renderer::setCoreRadius}
+          : Setting<float>{},
+      // Pathline settings
+      pluginSettings.mPathlines.has_value()
+          ? Setting<float>{"setPathlineSize", "Sets the size of the rendered pathlines.",
+                pluginSettings.mPathlines->mLineSize, &Renderer::setPathlineSize}
+          : Setting<float>{},
+  };
+  return std::move(settings);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template <>
+constexpr std::array<Plugin::Setting<std::string>, SETTINGS_COUNT<std::string>>
+Plugin::Setting<std::string>::getSettings(Settings& pluginSettings) {
+  std::array<Setting<std::string>, SETTINGS_COUNT<std::string>> settings{
+      // Data settings
+      Setting<std::string>{"setScalar", "Set the scalar to be rendered.",
+          pluginSettings.mData.mActiveScalar, {}, &Plugin::setScalar},
+      // Core settings
+      pluginSettings.mCore.has_value()
+          ? Setting<std::string>{"setCoreScalar", "Sets the scalar used for coloring the core.",
+                pluginSettings.mCore->mScalar, &Renderer::setCoreScalar}
+          : Setting<std::string>{},
+  };
+  return std::move(settings);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template <>
+constexpr std::array<Plugin::Setting<DisplayMode>, SETTINGS_COUNT<DisplayMode>>
+Plugin::Setting<DisplayMode>::getSettings(Settings& pluginSettings) {
+  std::array<Setting<DisplayMode>, SETTINGS_COUNT<DisplayMode>> settings{
+      Setting<DisplayMode>{"setDisplayMode", "Sets the mode for displaying the rendered images.",
+          pluginSettings.mDisplay.mDisplayMode, {}, &Plugin::setDisplayMode},
+  };
+  return std::move(settings);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+template <>
+constexpr std::array<Plugin::Setting<DepthMode>, SETTINGS_COUNT<DepthMode>>
+Plugin::Setting<DepthMode>::getSettings(Settings& pluginSettings) {
+  std::array<Setting<DepthMode>, SETTINGS_COUNT<DepthMode>> settings{
+      Setting<DepthMode>{"setDepthMode",
+          "Sets the mode for determining the per pixel depth values of the volume.",
+          pluginSettings.mRendering.mDepthMode, &Renderer::setDepthMode},
+  };
+  return std::move(settings);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -566,16 +707,80 @@ void Plugin::connectSettings() {
 void Plugin::initUI() {
   // Add the volume rendering user interface components to the CosmoScout user interface.
   mGuiManager->addCssToGui("css/csp-volume-rendering.css");
+  mGuiManager->addCssToGui("third-party/css/d3.parcoords.css");
   mGuiManager->addPluginTabToSideBarFromHTML(
       "Volume Rendering", "blur_circular", "../share/resources/gui/volume_rendering_tab.html");
+  mGuiManager->addScriptToGuiFromJS(
+      "../share/resources/gui/third-party/js/parcoords.standalone.js");
+  mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/parcoords.js");
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
+  mGuiManager->addScriptToGui(
+      "CosmoScout.volumeRendering.initParcoords(`" + mDataManager->getCsvData() + "`, `" +
+      (mPluginSettings.mPathlines ? mDataManager->getPathlines().getCsvData() : "") + "`);");
+
+  if (mPluginSettings.mPathlines.has_value()) {
+    mGuiManager->getGui()->callJavascript(
+        "CosmoScout.volumeRendering.enableSettingsSection", "pathlines");
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void csp::volumerendering::Plugin::setResolution(int value) {
+  mNextFrame.mResolution = value;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void csp::volumerendering::Plugin::setDepthData(bool value) {
+  for (auto const& node : mDisplayNodes) {
+    node.second->setUseDepth(value);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void csp::volumerendering::Plugin::setDrawDepth(bool value) {
+  for (auto const& node : mDisplayNodes) {
+    node.second->setDrawDepth(value);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void csp::volumerendering::Plugin::setScalar(std::string const& value) {
+  invalidateCache();
+  if (mDataManager->isReady()) {
+    mDataManager->setActiveScalar(value);
+    mSampleCount    = 0;
+    mResetTfHandles = true;
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void csp::volumerendering::Plugin::setDisplayMode(DisplayMode value) {
+  for (auto const& node : mDisplayNodes) {
+    if (node.first == value) {
+      node.second->setEnabled(true);
+    } else {
+      node.second->setEnabled(false);
+    }
+  }
+  mActiveDisplay = mDisplayNodes.find(value)->second;
+
+  if (mDisplayedImage) {
+    displayFrame(std::move(mDisplayedImage), value);
+  } else {
+    // TODO What to do here?
+    mParametersDirty = true;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool Plugin::tryRequestFrame() {
-  if ((!(mNextFrame == mRenderingFrame) || mParametersDirty || mFrameInvalid) &&
-      mActiveDisplay->pVisible.get()) {
+  if (mActiveDisplay->pVisible.get()) {
     cs::utils::FrameTimings::ScopedTimer timer("Request frame");
 
     mRenderingFrame = mNextFrame;
@@ -609,7 +814,7 @@ glm::mat4 Plugin::getCurrentCameraTransform() {
     mCameraTransformsIndex = 0;
   }
 
-  if (mPluginSettings.mPredictiveRendering.get()) {
+  if (mPluginSettings.mDisplay.mPredictiveRendering.get()) {
     currentCameraTransform = predictCameraTransform(currentCameraTransform);
   }
   return currentCameraTransform;
@@ -653,18 +858,13 @@ void Plugin::receiveFrame() {
     mFrameIntervalsIndex = 0;
   }
 
-  Renderer::RenderedImage renderedImage = mFutureFrameData.get();
-  if (!renderedImage.mValid) {
+  std::unique_ptr<Renderer::RenderedImage> renderedImage = mFutureFrameData.get();
+  if (!renderedImage || !renderedImage->isValid()) {
     mFrameInvalid = true;
     return;
   }
 
-  mRenderingFrame.mColorImage          = renderedImage.mColorData;
-  mRenderingFrame.mDepthImage          = renderedImage.mDepthData;
-  mRenderingFrame.mModelViewProjection = renderedImage.mMVP;
-  mRenderedFrames.push_back(mRenderingFrame);
-
-  displayFrame(mRenderingFrame);
+  displayFrame(std::move(renderedImage));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -680,38 +880,83 @@ float diffTranslations(glm::mat4 transformA, glm::mat4 transformB) {
 void Plugin::tryReuseFrame(glm::mat4 cameraTransform) {
   cs::utils::FrameTimings::ScopedTimer timer("Try reuse frame");
 
-  Frame bestFrame = mRenderedFrames.back();
-  float minDiff   = diffTranslations(cameraTransform, bestFrame.mCameraTransform);
-  for (const Frame& f : mRenderedFrames) {
-    float diff = diffTranslations(cameraTransform, f.mCameraTransform);
+  auto  bestFrame = mRenderedImages.begin();
+  float minDiff;
+  float currentDiff = INFINITY;
+  if (mDisplayedImage) {
+    minDiff     = diffTranslations(cameraTransform, mDisplayedImage->getCameraTransform());
+    currentDiff = minDiff;
+  } else {
+    minDiff = diffTranslations(cameraTransform, (*bestFrame)->getCameraTransform());
+  }
+  for (auto img = bestFrame; img != mRenderedImages.end(); img++) {
+    float diff = diffTranslations(cameraTransform, (*img)->getCameraTransform());
     if (diff < minDiff) {
       minDiff   = diff;
-      bestFrame = f;
+      bestFrame = img;
     }
   }
-  if (mDisplayedFrame.has_value() && !(bestFrame == *mDisplayedFrame) && minDiff > 0) {
-    displayFrame(bestFrame);
+  if (minDiff < currentDiff) {
+    std::unique_ptr<Renderer::RenderedImage> image =
+        std::move(mRenderedImages.extract(bestFrame).value());
+    displayFrame(std::move(image));
   }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Plugin::displayFrame(Frame& frame) {
-  displayFrame(frame, mPluginSettings.mDisplayMode.get());
+void csp::volumerendering::Plugin::invalidateCache() {
+  mRenderedImages.clear();
+  mDisplayedImage.reset();
+  mParametersDirty = true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void Plugin::displayFrame(Frame& frame, DisplayMode displayMode) {
+std::vector<ScalarFilter> csp::volumerendering::Plugin::parseScalarFilters(
+    std::string const& json, std::vector<Scalar> const& scalars) {
+  auto                      j = nlohmann::json::parse(json);
+  std::vector<ScalarFilter> filters;
+  for (auto const& [axis, value] : j.items()) {
+    auto const& scalar = std::find_if(scalars.begin(), scalars.end(),
+        [& axis = axis](Scalar const& s) { return s.mName == axis; });
+    if (scalar != scalars.end()) {
+      ScalarFilter filter;
+      filter.mAttrIndex = (int)std::distance(scalars.begin(), scalar);
+      filter.mMin       = value["selection"]["scaled"][1];
+      filter.mMax       = value["selection"]["scaled"][0];
+      filters.push_back(filter);
+    }
+  }
+  return filters;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Plugin::displayFrame(std::unique_ptr<Renderer::RenderedImage> frame) {
+  displayFrame(std::move(frame), mPluginSettings.mDisplay.mDisplayMode.get());
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Plugin::displayFrame(std::unique_ptr<Renderer::RenderedImage> frame, DisplayMode displayMode) {
   cs::utils::FrameTimings::ScopedTimer timer("Display volume frame");
 
   std::shared_ptr<DisplayNode> displayNode = mDisplayNodes.find(displayMode)->second;
-  displayNode->setTexture(frame.mColorImage, frame.mResolution, frame.mResolution);
-  displayNode->setDepthTexture(frame.mDepthImage, frame.mResolution, frame.mResolution);
-  displayNode->setTransform(glm::toMat4(glm::toQuat(frame.mCameraTransform)));
-  displayNode->setMVPMatrix(frame.mModelViewProjection);
+  displayNode->setTexture(frame->getColorData(), frame->getResolution(), frame->getResolution());
+  displayNode->setDepthTexture(
+      frame->getDepthData(), frame->getResolution(), frame->getResolution());
+  displayNode->setTransform(glm::toMat4(glm::toQuat(frame->getCameraTransform())));
+  displayNode->setRendererMatrices(frame->getModelView(), frame->getProjection());
 
-  mDisplayedFrame = frame;
+  if (mDisplayedImage) {
+    mRenderedImages.insert(std::move(mDisplayedImage));
+  }
+  if (mPluginSettings.mDisplay.mReuseImages.get()) {
+    mDisplayedImage = std::make_unique<Renderer::CopiedImage>(*frame);
+  } else {
+    mDisplayedImage.reset();
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
