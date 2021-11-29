@@ -7,7 +7,7 @@
 #include "DataManager.hpp"
 
 #include "../logger.hpp"
-#include "NetCDFFileLoader.hpp"
+#include "NetCdfFileLoader.hpp"
 #include "VtkFileLoader.hpp"
 
 #include "../../../../src/cs-utils/convert.hpp"
@@ -384,6 +384,9 @@ DataManager::Metadata DataManager::calculateMetadata() {
     meta.mStructuredSpherical = metadata;
     break;
   }
+  default:
+    // TODO implement
+    break;
   }
   return meta;
 }

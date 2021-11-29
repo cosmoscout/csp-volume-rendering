@@ -13,6 +13,7 @@
 #include "Render/Renderer.hpp"
 #include "Settings.hpp"
 
+#include "../../../src/cs-core/GuiManager.hpp"
 #include "../../../src/cs-core/PluginBase.hpp"
 #include "../../../src/cs-utils/DefaultProperty.hpp"
 
@@ -27,6 +28,10 @@
 #include <unordered_set>
 
 namespace csp::volumerendering {
+
+/// Template variable for static_asserts in constexpr if statements
+template <typename T>
+constexpr std::false_type always_false_v{};
 
 /// Type transformation to get the corresponding type passed in UI callbacks.
 template <typename T>
@@ -80,8 +85,25 @@ class Plugin : public cs::core::PluginBase {
   template <typename T>
   struct Setting {
    public:
+    /// Wrapper for a reference to a cs::utils::Property.
+    /// With C++ 20 std::reference_wrapper could be used instead,
+    /// but currently on gcc std::reference_wrapper is not a literal type
+    /// and thus can't be used in constexpr functions.
+    struct PropertyRefWrapper {
+     public:
+      constexpr PropertyRefWrapper(cs::utils::Property<T>& ref)
+          : mRef(ref){};
+
+      constexpr cs::utils::Property<T>& get() const {
+        return mRef;
+      }
+
+     private:
+      cs::utils::Property<T>& mRef;
+    };
+
     using Setter = void (Renderer::*)(T);
-    using Target = std::reference_wrapper<cs::utils::Property<T>>;
+    using Target = PropertyRefWrapper;
     using Action = std::conditional_t<std::is_arithmetic_v<T> || std::is_enum_v<T>,
         void (Plugin::*)(T), void (Plugin::*)(T const&)>;
 
@@ -152,7 +174,7 @@ class Plugin : public cs::core::PluginBase {
     } else if constexpr (std::is_same_v<T, float>) {
       return std::function([target](get_ui_type_t<T> value) { target.get() = (float)value; });
     } else {
-      static_assert(false, "Unhandled type for getCallbackHandler");
+      static_assert(always_false_v<T>, "Unhandled type for getCallbackHandler");
     }
   };
 
@@ -165,7 +187,7 @@ class Plugin : public cs::core::PluginBase {
       return;
     }
     if (setting.mTarget.has_value()) {
-      Setting<T>::Target target(setting.mTarget.value());
+      typename Setting<T>::Target target(setting.mTarget.value());
       if constexpr (std::is_enum_v<T>) {
         for (int i = static_cast<int>(T::First); i <= static_cast<int>(T::Last); i++) {
           mGuiManager->getGui()->registerCallback(
@@ -204,7 +226,7 @@ class Plugin : public cs::core::PluginBase {
       mGuiManager->setRadioChecked(
           "volumeRendering." + name + std::to_string(static_cast<int>(value)));
     } else {
-      static_assert(false, "Unhandled type for setValueInUI");
+      static_assert(always_false_v<T>, "Unhandled type for setValueInUI");
     }
   };
 
@@ -216,9 +238,9 @@ class Plugin : public cs::core::PluginBase {
     if (std::string(setting.mName) == "" || !setting.mTarget.has_value()) {
       return;
     }
-    std::string                       name(setting.mName);
-    std::optional<Setting<T>::Setter> setter(setting.mSetter);
-    std::optional<Setting<T>::Action> action(setting.mAction);
+    std::string                                name(setting.mName);
+    std::optional<typename Setting<T>::Setter> setter(setting.mSetter);
+    std::optional<typename Setting<T>::Action> action(setting.mAction);
     setting.mTarget.value().get().connectAndTouch([this, name, setter, action](T value) {
       setValueInUI<T>("volumeRendering." + name, value);
       if (setter.has_value()) {

@@ -71,6 +71,9 @@ void from_json(nlohmann::json const& j, Settings::Data& o) {
       cs::core::Settings::deserialize(j, "metadata", metadata);
       o.mMetadata = {metadata};
       break;
+    default:
+      // No metadata expected
+      break;
     }
   }
 };
@@ -87,6 +90,9 @@ void to_json(nlohmann::json& j, Settings::Data const& o) {
     switch (o.mStructure.get()) {
     case VolumeStructure::eStructuredSpherical:
       cs::core::Settings::serialize(j, "metadata", o.mMetadata->mStructuredSpherical);
+      break;
+    default:
+      // No metadata to write
       break;
     }
   }
