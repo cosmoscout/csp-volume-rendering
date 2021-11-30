@@ -7,12 +7,19 @@
 #include "DataManager.hpp"
 
 #include "../logger.hpp"
+#include "NetCdfFileLoader.hpp"
+#include "VtkFileLoader.hpp"
 
+#include "../../../../src/cs-utils/convert.hpp"
 #include "../../../../src/cs-utils/filesystem.hpp"
 #include "../../../../src/cs-utils/utils.hpp"
 
 #include <vtkCellData.h>
 #include <vtkPointData.h>
+#include <vtkStructuredGrid.h>
+
+#include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/norm.hpp>
 
 #include <algorithm>
 #include <future>
@@ -29,21 +36,29 @@ const char* DataManagerException::what() const noexcept {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-DataManager::DataManager(std::string const& path, std::string const& filenamePattern,
-    std::unique_ptr<FileLoader> fileLoader, std::optional<std::string> const& pathlinesPath)
-    : mFileLoader(std::move(fileLoader)) {
-  // Initialize pathlines if path is given
-  if (pathlinesPath.has_value()) {
-    mPathlines = std::make_unique<Pathlines>(pathlinesPath.value());
+DataManager::DataManager(Settings::Data const& dataSettings)
+    : mDataSettings(dataSettings) {
+  // Create appropriate file loader
+  switch (mDataSettings.mType.get()) {
+  case VolumeFileType::eVtk:
+    mFileLoader = std::make_unique<VtkFileLoader>();
+    break;
+  case VolumeFileType::eNetCdf:
+    mFileLoader = std::make_unique<VtkFileLoader>();
+    break;
+  default:
+    logger().error("Invalid volume data type given in settings! Should be 'vtk' or 'netcdf'.");
+    throw DataManagerException();
+    break;
   }
 
   // Parse regex
   std::regex patternRegex;
   try {
-    patternRegex = std::regex(".*" + filenamePattern);
+    patternRegex = std::regex(".*" + mDataSettings.mNamePattern.get());
   } catch (const std::regex_error& e) {
-    logger().error(
-        "Filename pattern '{}' is not a valid regular expression: {}", filenamePattern, e.what());
+    logger().error("Filename pattern '{}' is not a valid regular expression: {}",
+        mDataSettings.mNamePattern.get(), e.what());
     throw DataManagerException();
   }
 
@@ -55,32 +70,32 @@ DataManager::DataManager(std::string const& path, std::string const& filenamePat
     logger().error(
         "Filename pattern '{}' has the wrong amount of capture groups: {}! The pattern should "
         "contain only one capture group capturing the timestep component of the filename.",
-        filenamePattern, patternRegex.mark_count());
+        mDataSettings.mNamePattern.get(), patternRegex.mark_count());
     throw DataManagerException();
   }
 
   // Get all files matching the regex
   std::set<std::string> files;
   try {
-    files = cs::utils::filesystem::listFiles(path, patternRegex);
+    files = cs::utils::filesystem::listFiles(mDataSettings.mPath.get(), patternRegex);
   } catch (const boost::filesystem::filesystem_error& e) {
-    logger().error("Loading volume data from '{}' failed: {}", path, e.what());
+    logger().error("Loading volume data from '{}' failed: {}", mDataSettings.mPath.get(), e.what());
     throw DataManagerException();
   }
 
   // Try to get csv data
-  std::string csvPattern = filenamePattern;
+  std::string csvPattern = mDataSettings.mNamePattern.get();
   cs::utils::replaceString(csvPattern, boost::filesystem::extension(csvPattern), ".csv");
   try {
     std::set<std::string> files =
-        cs::utils::filesystem::listFiles(path, std::regex(".*" + csvPattern));
+        cs::utils::filesystem::listFiles(mDataSettings.mPath.get(), std::regex(".*" + csvPattern));
     if (files.size() == 0) {
-      logger().error("No csv data found in '{}'!", path);
+      logger().error("No csv data found in '{}'!", mDataSettings.mPath.get());
       throw DataManagerException();
     }
     mCsvData = cs::utils::filesystem::loadToString(*files.begin());
   } catch (const boost::filesystem::filesystem_error& e) {
-    logger().error("Loading csv data from '{}' failed: {}", path, e.what());
+    logger().error("Loading csv data from '{}' failed: {}", mDataSettings.mPath.get(), e.what());
     throw DataManagerException();
   }
 
@@ -96,17 +111,21 @@ DataManager::DataManager(std::string const& path, std::string const& filenamePat
     try {
       timestep = std::stoi(match[haveLodFiles ? 2 : 1].str());
     } catch (const std::invalid_argument&) {
-      logger().error("Capture group in filename pattern '{}' does not match an integer for file "
-                     "'{}': Match of group is '{}'! A suitable capture group could be '([0-9])+'.",
-          filenamePattern, file, match[haveLodFiles ? 2 : 1].str());
+      logger().error("Capture group in filename pattern '{}' does "
+                     "not match an integer for file "
+                     "'{}': Match of group is '{}'! A suitable "
+                     "capture group could be '([0-9])+'.",
+          mDataSettings.mNamePattern.get(), file, match[haveLodFiles ? 2 : 1].str());
       throw DataManagerException();
     }
     try {
       lod = haveLodFiles ? std::stoi(match[1].str()) : 0;
     } catch (const std::invalid_argument&) {
-      logger().error("Capture group in filename pattern '{}' does not match an integer for file "
-                     "'{}': Match of group is '{}'! A suitable capture group could be '([0-9])+'.",
-          filenamePattern, file, match[1].str());
+      logger().error("Capture group in filename pattern '{}' does "
+                     "not match an integer for file "
+                     "'{}': Match of group is '{}'! A suitable "
+                     "capture group could be '([0-9])+'.",
+          mDataSettings.mNamePattern.get(), file, match[1].str());
       throw DataManagerException();
     }
 
@@ -114,7 +133,8 @@ DataManager::DataManager(std::string const& path, std::string const& filenamePat
     mFiles[timestep][lod] = file;
   }
   if (timesteps.size() == 0) {
-    logger().error("No files matching '{}' found in '{}'!", filenamePattern, path);
+    logger().error("No files matching '{}' found in '{}'!", mDataSettings.mNamePattern.get(),
+        mDataSettings.mPath.get());
     throw DataManagerException();
   }
   pTimesteps.set(timesteps);
@@ -127,6 +147,12 @@ DataManager::DataManager(std::string const& path, std::string const& filenamePat
   }
   setTimestep(timestep);
   mInitScalarsThread = std::thread(&DataManager::initScalars, this);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void DataManager::addPathlines(Settings::Pathlines const& pathlinesSettings) {
+  mPathlines = std::make_unique<Pathlines>(pathlinesSettings.mPath.get());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -173,7 +199,8 @@ void DataManager::setTimestep(int timestep) {
         pTimesteps.get().end()) {
       mCurrentTimestep = timestep;
     } else {
-      logger().warn("'{}' is not a timestep in the current dataset. '{}' will be used instead.",
+      logger().warn("'{}' is not a timestep in the current "
+                    "dataset. '{}' will be used instead.",
           timestep, mCurrentTimestep);
       timestep = mCurrentTimestep;
     }
@@ -187,8 +214,9 @@ void DataManager::setTimestep(int timestep) {
 void DataManager::cacheTimestep(int timestep) {
   if (std::find(pTimesteps.get().begin(), pTimesteps.get().end(), timestep) ==
       pTimesteps.get().end()) {
-    logger().warn(
-        "'{}' is not a timestep in the current dataset. No timestep will be cached.", timestep);
+    logger().warn("'{}' is not a timestep in the current dataset. "
+                  "No timestep will be cached.",
+        timestep);
     return;
   }
   getFromCache(timestep);
@@ -203,7 +231,8 @@ void DataManager::setActiveScalar(std::string const& scalarId) {
   if (scalar != pScalars.get().end()) {
     mActiveScalar = *scalar;
   } else {
-    logger().warn("'{}' is not a scalar in the current dataset. '{}' will be used instead.",
+    logger().warn("'{}' is not a scalar in the current dataset. "
+                  "'{}' will be used instead.",
         scalarId, mActiveScalar.getId());
   }
 }
@@ -212,6 +241,162 @@ void DataManager::setActiveScalar(std::string const& scalarId) {
 
 std::string const& DataManager::getCsvData() {
   return mCsvData;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+DataManager::Metadata DataManager::calculateMetadata() {
+  Metadata meta;
+  switch (mDataSettings.mStructure.get()) {
+  case VolumeStructure::eStructuredSpherical: {
+    Metadata::StructuredSpherical      metadata;
+    vtkSmartPointer<vtkStructuredGrid> volume = vtkStructuredGrid::SafeDownCast(getData());
+
+    glm::dvec3            origin;
+    std::array<double, 6> bounds;
+    std::array<int, 3>    dimensions;
+    volume->GetPoint(0, 0, 0, glm::value_ptr(origin));
+    volume->GetBounds(bounds.data());
+    volume->GetDimensions(dimensions.data());
+
+    std::array<glm::dvec3, 3> increments;
+    volume->GetPoint(1, 0, 0, glm::value_ptr(increments[0]));
+    volume->GetPoint(0, 1, 0, glm::value_ptr(increments[1]));
+    volume->GetPoint(0, 0, 1, glm::value_ptr(increments[2]));
+    std::array<glm::dvec3, 3> maxPoints;
+    volume->GetPoint(dimensions[0] - 1, 0, 0, glm::value_ptr(maxPoints[0]));
+    volume->GetPoint(0, dimensions[1] - 1, 0, glm::value_ptr(maxPoints[1]));
+    volume->GetPoint(0, 0, dimensions[2] - 1, glm::value_ptr(maxPoints[2]));
+
+    // Get the radial axis in the VTK data.
+    // This should be the axis, where each step results in the biggest movement relative to
+    // the center of the carthesian coordinates.
+    double maxDist = 0.;
+    for (int i = 0; i < 3; i++) {
+      double dist    = glm::length(increments[i]) - glm::length(origin);
+      double distAbs = std::abs(dist);
+      if (distAbs > maxDist) {
+        maxDist             = distAbs;
+        metadata.mAxes.mRad = i;
+      }
+    }
+    metadata.mRanges.mRad = {glm::length(origin), glm::length(maxPoints[metadata.mAxes.mRad])};
+
+    // Check the other two axes to see which is the latitudinal and which is the longitudinal axis.
+    for (int axisOffset = 1; axisOffset < 3; axisOffset++) {
+      // Grid axis, that is checked in this iteration
+      int axis = (metadata.mAxes.mRad + axisOffset) % 3;
+      // Grid axis, that is neither the radial, nor the currently checked grid axis
+      int otherAxis = (metadata.mAxes.mRad + 3 - axisOffset) % 3;
+
+      std::array<double, 3>                angles = {0., 0., 0.};
+      std::array<std::array<double, 3>, 2> maxDiffs;
+
+      // Do the check for two times with different positions along the other axis.
+      for (int i = 0; i < 2; i++) {
+        maxDiffs[i] = {0, 0, 0};
+        glm::dvec3         point;
+        glm::dvec3         pointPrev;
+        std::array<int, 3> pos = {0, 0, 0};
+        pos[otherAxis]         = i;
+
+        // Iterate over all points of the checked axis, with constant values for the other two axes.
+        // Keep track of the total angle of rotation along each of the carthesian axes, as well as
+        // the maximal translation along each of the carthesian axes between two neighboured points.
+        volume->GetPoint(pos[0], pos[1], pos[2], glm::value_ptr(point));
+        for (int j = 1; j < dimensions[axis]; j++) {
+          pointPrev = point;
+          switch (axis) {
+          case 0:
+            volume->GetPoint(j, pos[1], pos[2], glm::value_ptr(point));
+            break;
+          case 1:
+            volume->GetPoint(pos[0], j, pos[2], glm::value_ptr(point));
+            break;
+          case 2:
+            volume->GetPoint(pos[0], pos[1], j, glm::value_ptr(point));
+            break;
+          }
+          for (int k = 0; k < 3; k++) {
+            maxDiffs[i][k] = std::max(maxDiffs[i][k], std::abs(pointPrev[k] - point[k]));
+          }
+          if (i == 0) {
+            angles[0] += glm::acos(glm::dot(glm::normalize(point * glm::dvec3(0, 1, 1)),
+                glm::normalize(pointPrev * glm::dvec3(0, 1, 1))));
+            angles[1] += glm::acos(glm::dot(glm::normalize(point * glm::dvec3(1, 0, 1)),
+                glm::normalize(pointPrev * glm::dvec3(1, 0, 1))));
+            angles[2] += glm::acos(glm::dot(glm::normalize(point * glm::dvec3(1, 1, 0)),
+                glm::normalize(pointPrev * glm::dvec3(1, 1, 0))));
+          }
+        }
+      }
+
+      // Check, for which carthesian axis there was no translation when iterating over all points.
+      // If there was no translation, the points on the currently checked grid axis rotate around
+      // the carthesian axis. This carthesian axis is a candidate for the up axis.
+      std::array<int, 2> zeroAxes = {-1, -1};
+      for (int i = 0; i < 2; i++) {
+        for (int k = 0; k < 3; k++) {
+          if (maxDiffs[i][k] == 0) {
+            zeroAxes[i] = k;
+          }
+        }
+      }
+
+      // If the points rotate around the same carthesian axis for both iterations, the currently
+      // checked grid axis probably is the longitudinal axis.
+      if (zeroAxes[0] == zeroAxes[1] && zeroAxes[0] != -1) {
+        metadata.mAxes.mLon = axis;
+        metadata.mAxes.mLat = otherAxis;
+
+        int    upAxis   = -1;
+        double maxAngle = 0.;
+        for (int i = 0; i < 3; i++) {
+          if (angles[i] > maxAngle) {
+            maxAngle = angles[i];
+            upAxis   = i;
+          }
+        }
+        maxAngle = cs::utils::convert::toDegrees(maxAngle);
+
+        glm::dvec3 up{0., 0., 0.};
+        up[upAxis] = 1.;
+
+        // Check the direction of rotation around the up axis.
+        bool flipped = glm::dot(glm::cross(origin, increments[metadata.mAxes.mLon]), up) < 0.;
+        if (flipped) {
+          metadata.mRanges.mLon = {maxAngle, 0.};
+        } else {
+          metadata.mRanges.mLon = {0., maxAngle};
+        }
+
+        // The minimum and maximum latitude is determined by calculating the angle between the down
+        // vector and the first and last point on the latitudinal grid axis.
+        metadata.mRanges.mLat = {
+            cs::utils::convert::toDegrees(glm::acos(glm::dot(glm::normalize(origin), -up))),
+            cs::utils::convert::toDegrees(
+                glm::acos(glm::dot(glm::normalize(maxPoints[metadata.mAxes.mLat]), -up)))};
+
+        break;
+      }
+    }
+
+    meta.mStructuredSpherical = metadata;
+    break;
+  }
+  default:
+    // TODO implement
+    break;
+  }
+  return meta;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+DataManager::Metadata::StructuredSpherical const& DataManager::getMetadata() {
+  assert(("getMetadata must not be called when metadata is not set in the plugin settings.",
+      mDataSettings.mMetadata.has_value()));
+  return mDataSettings.mMetadata->mStructuredSpherical;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -254,7 +439,8 @@ vtkSmartPointer<vtkDataSet> DataManager::getData(
       getFromCache(state.mTimestep, optLod);
   vtkSmartPointer<vtkDataSet> dataset = futureData.get();
   if (!dataset) {
-    logger().error("Loaded data is null! Is the data type correctly set in the settings?");
+    logger().error("Loaded data is null! Is the data type "
+                   "correctly set in the settings?");
     throw std::runtime_error("Loaded data is null.");
   }
   if (state.mScalar.mName != "") {
@@ -320,7 +506,9 @@ int DataManager::getMinLod(State state) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Pathlines const& DataManager::getPathlines() const {
-  assert(("getPathlines must not be called when pathlines are deactivated.", mPathlines));
+  assert(("getPathlines must not be called when pathlines are "
+          "deactivated.",
+      mPathlines));
   return *mPathlines;
 }
 
@@ -336,7 +524,8 @@ void DataManager::initScalars() {
   try {
     data = getData();
   } catch (const std::exception&) {
-    logger().error("Could not load initial data for determining available scalars! "
+    logger().error("Could not load initial data for determining "
+                   "available scalars! "
                    "Requested data may have no active scalar.");
     return;
   }
@@ -367,7 +556,8 @@ void DataManager::initScalars() {
       }
     }
     if (scalars.size() == 0) {
-      logger().error("No scalars found in volume data! Requested data may have no active scalar.");
+      logger().error("No scalars found in volume data! Requested "
+                     "data may have no active scalar.");
       return;
     }
     mActiveScalar = scalars[0];
@@ -417,7 +607,8 @@ std::shared_future<vtkSmartPointer<vtkDataSet>> DataManager::getFromCache(
 
 void DataManager::loadData(Timestep timestep, Lod lod) {
   logger().info("Loading data for timestep {}, level of detail {}...", timestep, lod);
-  auto data             = std::async(std::launch::async,
+  auto data = std::async(
+      std::launch::async,
       [this](Timestep timestep, Lod lod) {
         std::chrono::high_resolution_clock::time_point timer;
         vtkSmartPointer<vtkDataSet>                    data;
@@ -465,7 +656,8 @@ void DataManager::loadData(Timestep timestep, Lod lod) {
           mOnScalarRangeUpdated.emit(scalar.first);
         }
 
-        logger().info("Finished loading data for timestep {}, level of detail {}. Took {}s.",
+        logger().info("Finished loading data for timestep {}, "
+                      "level of detail {}. Took {}s.",
             timestep, lod,
             (float)(std::chrono::high_resolution_clock::now() - timer).count() / 1000000000);
 

@@ -88,6 +88,34 @@ There are the following categories:
 | **volumeStructure** | `"structured"` / `"structuredSpherical"` / `"unstructured"` | - | Structure of the volumetric data. Currently supports structured regular grids, structured spherical grids and unstructured grids. |
 | **volumeShape** | `"cubic"` / `"spherical"` | - | Shape of the volume. By default, spherical volumes are rendered with the same size as the planet they are bound to. Cubic volumes are rendered, so that their corners touch the planets surface. |
 | *activeScalar* | string | `""` | Name of the scalar, that should be used for coloring the volume. Has to be prefixed with `"cell_"` or `"point_"`, depending on whether it is a per cell or point scalar. |
+| *metadata* | object | `null` | Metadata for the given dataset. See [Metadata](#metadata). |
+
+### Metadata
+
+Some datasets may require metadata to be rendered correctly.
+The metadata object includes different parameters depending on the structure of the volume.
+
+#### Structured spherical volume
+
+The parameters `axes` and `ranges` have to be specified for each axis in the grid (radial, latitude, longitude).
+The values can be given per axis using the following structure:
+
+```javascript
+...
+"axes": {
+    "lat": 0,
+    "lon": 1,
+    "radial": 2
+}
+...
+```
+
+If the metadata object is not present in the data settings, the plugin will try to calculate the values automatically.
+
+| Key | Type | Default | Description |
+| --- | --- | --- | --- |
+| **axes** | int *per axis* | --- | The index of the grid axis in the dataset, that corresponds to the latitudinal/longitudinal/radial axis. |
+| **ranges** | double[2] *per axis* | --- | The min and max value of the latitudinal/longitudinal/radial axis in degrees/km. If the first of the two values is smaller than the other, the radial axis will go from the center of the volume to the outside, the longitudinal axis will go from west to east and the latitudinal axis will gro from south to north. To flip the direction of an axis, swap the min and max value. |
 
 ## Rendering settings
 

@@ -11,7 +11,9 @@
 #include "Display/DisplayNode.hpp"
 #include "Enums.hpp"
 #include "Render/Renderer.hpp"
+#include "Settings.hpp"
 
+#include "../../../src/cs-core/GuiManager.hpp"
 #include "../../../src/cs-core/PluginBase.hpp"
 #include "../../../src/cs-utils/DefaultProperty.hpp"
 
@@ -26,6 +28,10 @@
 #include <unordered_set>
 
 namespace csp::volumerendering {
+
+/// Template variable for static_asserts in constexpr if statements
+template <typename T>
+constexpr std::false_type always_false_v{};
 
 /// Type transformation to get the corresponding type passed in UI callbacks.
 template <typename T>
@@ -70,64 +76,6 @@ inline constexpr int SETTINGS_COUNT<DepthMode> = 1;
 
 class Plugin : public cs::core::PluginBase {
  public:
-  struct Settings {
-    struct Data {
-      cs::utils::Property<std::string>        mPath;
-      cs::utils::Property<std::string>        mNamePattern;
-      cs::utils::Property<VolumeFileType>     mType;
-      cs::utils::Property<VolumeStructure>    mStructure;
-      cs::utils::Property<VolumeShape>        mShape;
-      cs::utils::DefaultProperty<std::string> mActiveScalar{""};
-    } mData;
-
-    struct Rendering {
-      cs::utils::DefaultProperty<bool>        mRequestImages{true};
-      cs::utils::DefaultProperty<int>         mResolution{256};
-      cs::utils::DefaultProperty<float>       mSamplingRate{0.05f};
-      cs::utils::DefaultProperty<int>         mMaxPasses{10};
-      cs::utils::DefaultProperty<float>       mDensityScale{1.f};
-      cs::utils::DefaultProperty<bool>        mDenoiseColor{true};
-      cs::utils::DefaultProperty<bool>        mDenoiseDepth{true};
-      cs::utils::DefaultProperty<DepthMode>   mDepthMode{DepthMode::eNone};
-      cs::utils::DefaultProperty<std::string> mTransferFunction{"BlackBody.json"};
-    } mRendering;
-
-    struct Lighting {
-      cs::utils::DefaultProperty<bool>  mEnabled{false};
-      cs::utils::DefaultProperty<float> mSunStrength{1.f};
-      cs::utils::DefaultProperty<float> mAmbientStrength{.5f};
-    } mLighting;
-
-    struct Display {
-      cs::utils::DefaultProperty<bool>        mPredictiveRendering{false};
-      cs::utils::DefaultProperty<bool>        mReuseImages{false};
-      cs::utils::DefaultProperty<bool>        mDepthData{true};
-      cs::utils::DefaultProperty<bool>        mDrawDepth{false};
-      cs::utils::DefaultProperty<DisplayMode> mDisplayMode{DisplayMode::eMesh};
-    } mDisplay;
-
-    struct Transform {
-      cs::utils::Property<std::string>       mAnchor;
-      cs::utils::DefaultProperty<glm::dvec3> mPosition{glm::dvec3(0, 0, 0)};
-      cs::utils::DefaultProperty<double>     mScale{1.};
-      cs::utils::DefaultProperty<glm::dvec3> mRotation{glm::dvec3(0, 0, 0)};
-    } mTransform;
-
-    struct Core {
-      cs::utils::DefaultProperty<bool>        mEnabled{true};
-      cs::utils::DefaultProperty<std::string> mScalar{""};
-      cs::utils::Property<float>              mRadius;
-    };
-    std::optional<Core> mCore;
-
-    struct Pathlines {
-      cs::utils::Property<std::string>  mPath;
-      cs::utils::DefaultProperty<bool>  mEnabled{true};
-      cs::utils::DefaultProperty<float> mLineSize{1.f};
-    };
-    std::optional<Pathlines> mPathlines;
-  };
-
   void init() override;
   void deInit() override;
   void update() override;
@@ -137,8 +85,25 @@ class Plugin : public cs::core::PluginBase {
   template <typename T>
   struct Setting {
    public:
+    /// Wrapper for a reference to a cs::utils::Property.
+    /// With C++ 20 std::reference_wrapper could be used instead,
+    /// but currently on gcc std::reference_wrapper is not a literal type
+    /// and thus can't be used in constexpr functions.
+    struct PropertyRefWrapper {
+     public:
+      constexpr PropertyRefWrapper(cs::utils::Property<T>& ref)
+          : mRef(ref){};
+
+      constexpr cs::utils::Property<T>& get() const {
+        return mRef;
+      }
+
+     private:
+      cs::utils::Property<T>& mRef;
+    };
+
     using Setter = void (Renderer::*)(T);
-    using Target = std::reference_wrapper<cs::utils::Property<T>>;
+    using Target = PropertyRefWrapper;
     using Action = std::conditional_t<std::is_arithmetic_v<T> || std::is_enum_v<T>,
         void (Plugin::*)(T), void (Plugin::*)(T const&)>;
 
@@ -163,7 +128,7 @@ class Plugin : public cs::core::PluginBase {
 
     std::string_view      mName;    /// Name of the parameter's UI callback
     std::string_view      mComment; /// Description of the parameter
-    std::optional<Target> mTarget;  /// Property in the Plugin::Settings struct
+    std::optional<Target> mTarget;  /// Property in the Settings struct
     std::optional<Setter> mSetter;  /// Setter method on the Renderer class
     std::optional<Action> mAction;  /// Setter method on the Plugin class
   };
@@ -209,7 +174,7 @@ class Plugin : public cs::core::PluginBase {
     } else if constexpr (std::is_same_v<T, float>) {
       return std::function([target](get_ui_type_t<T> value) { target.get() = (float)value; });
     } else {
-      static_assert(false, "Unhandled type for getCallbackHandler");
+      static_assert(always_false_v<T>, "Unhandled type for getCallbackHandler");
     }
   };
 
@@ -222,7 +187,7 @@ class Plugin : public cs::core::PluginBase {
       return;
     }
     if (setting.mTarget.has_value()) {
-      Setting<T>::Target target(setting.mTarget.value());
+      typename Setting<T>::Target target(setting.mTarget.value());
       if constexpr (std::is_enum_v<T>) {
         for (int i = static_cast<int>(T::First); i <= static_cast<int>(T::Last); i++) {
           mGuiManager->getGui()->registerCallback(
@@ -261,7 +226,7 @@ class Plugin : public cs::core::PluginBase {
       mGuiManager->setRadioChecked(
           "volumeRendering." + name + std::to_string(static_cast<int>(value)));
     } else {
-      static_assert(false, "Unhandled type for setValueInUI");
+      static_assert(always_false_v<T>, "Unhandled type for setValueInUI");
     }
   };
 
@@ -273,9 +238,9 @@ class Plugin : public cs::core::PluginBase {
     if (std::string(setting.mName) == "" || !setting.mTarget.has_value()) {
       return;
     }
-    std::string                       name(setting.mName);
-    std::optional<Setting<T>::Setter> setter(setting.mSetter);
-    std::optional<Setting<T>::Action> action(setting.mAction);
+    std::string                                name(setting.mName);
+    std::optional<typename Setting<T>::Setter> setter(setting.mSetter);
+    std::optional<typename Setting<T>::Action> action(setting.mAction);
     setting.mTarget.value().get().connectAndTouch([this, name, setter, action](T value) {
       setValueInUI<T>("volumeRendering." + name, value);
       if (setter.has_value()) {

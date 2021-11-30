@@ -9,7 +9,7 @@
 
 #include "../logger.hpp"
 
-#include "../Enums.hpp"
+#include "../Settings.hpp"
 #include "FileLoader.hpp"
 #include "Pathlines.hpp"
 #include "Scalar.hpp"
@@ -39,6 +39,8 @@ class DataManagerException : public std::exception {
 /// subclasses. The DataManager class can't be instantiated, use one of the subclasses instead.
 class DataManager {
  public:
+  using Metadata = Settings::Data::Metadata;
+
   struct State {
     int    mTimestep;
     Scalar mScalar;
@@ -60,9 +62,11 @@ class DataManager {
     }
   };
 
-  DataManager(std::string const& path, std::string const& filenamePattern,
-      std::unique_ptr<FileLoader> fileLoader, std::optional<std::string> const& pathlinesPath = {});
+  DataManager(Settings::Data const& dataSettings);
   ~DataManager();
+
+  /// Initialize pathlines, that can be accessed via this DataManager based on the given settings.
+  void addPathlines(Settings::Pathlines const& pathlinesSettings);
 
   /// List of timesteps for which files were found.
   cs::utils::Property<std::vector<int>> pTimesteps;
@@ -92,6 +96,14 @@ class DataManager {
   /// Returns the volume data as a csv string.
   std::string const& getCsvData();
 
+  /// Tries to automatically determine metdata for the current dataset.
+  Metadata calculateMetadata();
+  /// Returns metadata for the current dataset.
+  /// May only be called, if metadata is set in the plugin settings.
+  Metadata::StructuredSpherical const& getMetadata();
+
+  /// Asynchronously gets a random sample of scalar values for the given state.
+  /// Samples random points for the given duration.
   std::future<std::vector<float>> getSample(
       State state, std::chrono::high_resolution_clock::duration duration);
 
@@ -111,11 +123,15 @@ class DataManager {
   /// Returns the minimum level of detail, that can instantly be returned for the given state.
   int getMinLod(State state);
 
+  /// Gets the pathlines added to this DataManager.
+  /// May only be called, if addPathlines has been called before.
   Pathlines const& getPathlines() const;
 
  protected:
   using Timestep = int;
   using Lod      = int;
+
+  Settings::Data const& mDataSettings;
 
   std::unique_ptr<FileLoader> mFileLoader;
   std::unique_ptr<Pathlines>  mPathlines;

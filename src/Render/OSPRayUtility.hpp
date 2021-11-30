@@ -31,8 +31,8 @@ ospray::cpp::Volume createOSPRayVolume(
     vtkSmartPointer<vtkUnstructuredGrid> vtkVolume, ScalarType scalarType);
 ospray::cpp::Volume createOSPRayVolume(
     vtkSmartPointer<vtkStructuredPoints> vtkVolume, std::vector<Scalar> const& scalars);
-ospray::cpp::Volume createOSPRayVolume(
-    vtkSmartPointer<vtkStructuredGrid> vtkVolume, std::vector<Scalar> const& scalars);
+ospray::cpp::Volume createOSPRayVolume(vtkSmartPointer<vtkStructuredGrid> vtkVolume,
+    std::vector<Scalar> const& scalars, DataManager::Metadata::StructuredSpherical const& metadata);
 
 /// Creates a default transfer function for OSPRay.
 /// The transfer function interpolates from fully transparent blue to fully opaque red.

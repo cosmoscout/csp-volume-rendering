@@ -6,8 +6,6 @@
 
 #include "Plugin.hpp"
 
-#include "Data/NetCdfFileLoader.hpp"
-#include "Data/VtkFileLoader.hpp"
 #include "Display/Billboard.hpp"
 #include "Display/PointsForwardWarped.hpp"
 #include "Render/OSPRayRenderer.hpp"
@@ -51,176 +49,6 @@ EXPORT_FN void destroy(cs::core::PluginBase* pluginBase) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace csp::volumerendering {
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-NLOHMANN_JSON_SERIALIZE_ENUM(VolumeFileType, {
-                                                 {VolumeFileType::eInvalid, nullptr},
-                                                 {VolumeFileType::eVtk, "vtk"},
-                                                 {VolumeFileType::eNetCdf, "netcdf"},
-                                             })
-
-NLOHMANN_JSON_SERIALIZE_ENUM(
-    VolumeStructure, {
-                         {VolumeStructure::eInvalid, nullptr},
-                         {VolumeStructure::eStructured, "structured"},
-                         {VolumeStructure::eStructuredSpherical, "structuredSpherical"},
-                         {VolumeStructure::eUnstructured, "unstructured"},
-                     })
-
-NLOHMANN_JSON_SERIALIZE_ENUM(VolumeShape, {
-                                              {VolumeShape::eInvalid, nullptr},
-                                              {VolumeShape::eCubic, "cubic"},
-                                              {VolumeShape::eSpherical, "spherical"},
-                                          })
-
-NLOHMANN_JSON_SERIALIZE_ENUM(DisplayMode, {
-                                              {DisplayMode::ePoints, "points"},
-                                              {DisplayMode::eMesh, "mesh"},
-                                          })
-
-NLOHMANN_JSON_SERIALIZE_ENUM(DepthMode, {
-                                            {DepthMode::eNone, "none"},
-                                            {DepthMode::eIsosurface, "isosurface"},
-                                            {DepthMode::eFirstHit, "firstHit"},
-                                            {DepthMode::eLastHit, "lastHit"},
-                                            {DepthMode::eThreshold, "threshold"},
-                                            {DepthMode::eMultiThreshold, "multiThreshold"},
-                                        })
-
-void from_json(nlohmann::json const& j, Plugin::Settings::Data& o) {
-  cs::core::Settings::deserialize(j, "path", o.mPath);
-  cs::core::Settings::deserialize(j, "namePattern", o.mNamePattern);
-  cs::core::Settings::deserialize(j, "type", o.mType);
-  cs::core::Settings::deserialize(j, "structure", o.mStructure);
-  cs::core::Settings::deserialize(j, "shape", o.mShape);
-  cs::core::Settings::deserialize(j, "activeScalar", o.mActiveScalar);
-};
-
-void to_json(nlohmann::json& j, Plugin::Settings::Data const& o) {
-  cs::core::Settings::serialize(j, "path", o.mPath);
-  cs::core::Settings::serialize(j, "namePattern", o.mNamePattern);
-  cs::core::Settings::serialize(j, "type", o.mType);
-  cs::core::Settings::serialize(j, "structure", o.mStructure);
-  cs::core::Settings::serialize(j, "shape", o.mShape);
-  cs::core::Settings::serialize(j, "activeScalar", o.mActiveScalar);
-};
-
-void from_json(nlohmann::json const& j, Plugin::Settings::Rendering& o) {
-  cs::core::Settings::deserialize(j, "requestImages", o.mRequestImages);
-  cs::core::Settings::deserialize(j, "resolution", o.mResolution);
-  cs::core::Settings::deserialize(j, "samplingRate", o.mSamplingRate);
-  cs::core::Settings::deserialize(j, "maxPasses", o.mMaxPasses);
-  cs::core::Settings::deserialize(j, "densityScale", o.mDensityScale);
-  cs::core::Settings::deserialize(j, "denoiseColor", o.mDenoiseColor);
-  cs::core::Settings::deserialize(j, "denoiseDepth", o.mDenoiseDepth);
-  cs::core::Settings::deserialize(j, "depthMode", o.mDepthMode);
-  cs::core::Settings::deserialize(j, "transferFunction", o.mTransferFunction);
-};
-
-void to_json(nlohmann::json& j, Plugin::Settings::Rendering const& o) {
-  cs::core::Settings::serialize(j, "requestImages", o.mRequestImages);
-  cs::core::Settings::serialize(j, "resolution", o.mResolution);
-  cs::core::Settings::serialize(j, "samplingRate", o.mSamplingRate);
-  cs::core::Settings::serialize(j, "maxPasses", o.mMaxPasses);
-  cs::core::Settings::serialize(j, "densityScale", o.mDensityScale);
-  cs::core::Settings::serialize(j, "denoiseColor", o.mDenoiseColor);
-  cs::core::Settings::serialize(j, "denoiseDepth", o.mDenoiseDepth);
-  cs::core::Settings::serialize(j, "depthMode", o.mDepthMode);
-  cs::core::Settings::serialize(j, "transferFunction", o.mTransferFunction);
-};
-
-void from_json(nlohmann::json const& j, Plugin::Settings::Lighting& o) {
-  cs::core::Settings::deserialize(j, "enabled", o.mEnabled);
-  cs::core::Settings::deserialize(j, "sunStrength", o.mSunStrength);
-  cs::core::Settings::deserialize(j, "ambientStrength", o.mSunStrength);
-}
-
-void to_json(nlohmann::json& j, Plugin::Settings::Lighting const& o) {
-  cs::core::Settings::serialize(j, "enabled", o.mEnabled);
-  cs::core::Settings::serialize(j, "sunStrength", o.mSunStrength);
-  cs::core::Settings::serialize(j, "ambientStrength", o.mSunStrength);
-}
-
-void from_json(nlohmann::json const& j, Plugin::Settings::Display& o) {
-  cs::core::Settings::deserialize(j, "predictiveRendering", o.mPredictiveRendering);
-  cs::core::Settings::deserialize(j, "reuseImages", o.mReuseImages);
-  cs::core::Settings::deserialize(j, "useDepth", o.mDepthData);
-  cs::core::Settings::deserialize(j, "drawDepth", o.mDrawDepth);
-  cs::core::Settings::deserialize(j, "displayMode", o.mDisplayMode);
-};
-
-void to_json(nlohmann::json& j, Plugin::Settings::Display const& o) {
-  cs::core::Settings::serialize(j, "predictiveRendering", o.mPredictiveRendering);
-  cs::core::Settings::serialize(j, "reuseImages", o.mReuseImages);
-  cs::core::Settings::serialize(j, "useDepth", o.mDepthData);
-  cs::core::Settings::serialize(j, "drawDepth", o.mDrawDepth);
-  cs::core::Settings::serialize(j, "displayMode", o.mDisplayMode);
-};
-
-void from_json(nlohmann::json const& j, Plugin::Settings::Transform& o) {
-  cs::core::Settings::deserialize(j, "anchor", o.mAnchor);
-  cs::core::Settings::deserialize(j, "position", o.mPosition);
-  cs::core::Settings::deserialize(j, "scale", o.mScale);
-  cs::core::Settings::deserialize(j, "rotation", o.mRotation);
-};
-
-void to_json(nlohmann::json& j, Plugin::Settings::Transform const& o) {
-  cs::core::Settings::serialize(j, "anchor", o.mAnchor);
-  cs::core::Settings::serialize(j, "position", o.mPosition);
-  cs::core::Settings::serialize(j, "scale", o.mScale);
-  cs::core::Settings::serialize(j, "rotation", o.mRotation);
-};
-
-void from_json(nlohmann::json const& j, Plugin::Settings::Core& o) {
-  cs::core::Settings::deserialize(j, "enabled", o.mEnabled);
-  cs::core::Settings::deserialize(j, "scalar", o.mScalar);
-  cs::core::Settings::deserialize(j, "radius", o.mRadius);
-}
-
-void to_json(nlohmann::json& j, Plugin::Settings::Core const& o) {
-  cs::core::Settings::serialize(j, "enabled", o.mEnabled);
-  cs::core::Settings::serialize(j, "scalar", o.mScalar);
-  cs::core::Settings::serialize(j, "radius", o.mRadius);
-}
-
-void from_json(nlohmann::json const& j, Plugin::Settings::Pathlines& o) {
-  cs::core::Settings::deserialize(j, "path", o.mPath);
-  cs::core::Settings::deserialize(j, "enabled", o.mEnabled);
-  cs::core::Settings::deserialize(j, "size", o.mLineSize);
-}
-
-void to_json(nlohmann::json& j, Plugin::Settings::Pathlines const& o) {
-  cs::core::Settings::serialize(j, "path", o.mPath);
-  cs::core::Settings::serialize(j, "enabled", o.mEnabled);
-  cs::core::Settings::serialize(j, "size", o.mLineSize);
-}
-
-void from_json(nlohmann::json const& j, Plugin::Settings& o) {
-  cs::core::Settings::deserialize(j, "data", o.mData);
-  if (j.contains("rendering")) {
-    cs::core::Settings::deserialize(j, "rendering", o.mRendering);
-  }
-  if (j.contains("lighting")) {
-    cs::core::Settings::deserialize(j, "lighting", o.mLighting);
-  }
-  if (j.contains("display")) {
-    cs::core::Settings::deserialize(j, "display", o.mDisplay);
-  }
-  cs::core::Settings::deserialize(j, "transform", o.mTransform);
-  cs::core::Settings::deserialize(j, "core", o.mCore);
-  cs::core::Settings::deserialize(j, "pathlines", o.mPathlines);
-}
-
-void to_json(nlohmann::json& j, Plugin::Settings const& o) {
-  cs::core::Settings::serialize(j, "data", o.mData);
-  cs::core::Settings::serialize(j, "rendering", o.mRendering);
-  cs::core::Settings::serialize(j, "lighting", o.mLighting);
-  cs::core::Settings::serialize(j, "display", o.mDisplay);
-  cs::core::Settings::serialize(j, "transform", o.mTransform);
-  cs::core::Settings::serialize(j, "core", o.mCore);
-  cs::core::Settings::serialize(j, "pathlines", o.mPathlines);
-}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -302,6 +130,9 @@ void Plugin::update() {
   case RenderState::eWaitForData:
     if (mDataManager->isReady()) {
       mRenderState = RenderState::eIdle;
+      if (!mPluginSettings.mData.mMetadata.has_value()) {
+        mPluginSettings.mData.mMetadata = mDataManager->calculateMetadata();
+      }
       // Make sure that the correct scalar is selected in the DataManager
       mPluginSettings.mData.mActiveScalar.touch();
     }
@@ -348,23 +179,9 @@ void Plugin::onLoad() {
   // Init data manager and volume renderer
   mRenderState = RenderState::eWaitForData;
 
-  switch (mPluginSettings.mData.mType.get()) {
-  case VolumeFileType::eVtk:
-    mDataManager = std::make_shared<DataManager>(mPluginSettings.mData.mPath.get(),
-        mPluginSettings.mData.mNamePattern.get(), std::make_unique<VtkFileLoader>(),
-        mPluginSettings.mPathlines ? std::optional(mPluginSettings.mPathlines->mPath.get())
-                                   : std::nullopt);
-    break;
-  case VolumeFileType::eNetCdf:
-    mDataManager = std::make_shared<DataManager>(mPluginSettings.mData.mPath.get(),
-        mPluginSettings.mData.mNamePattern.get(), std::make_unique<NetCdfFileLoader>(),
-        mPluginSettings.mPathlines ? std::optional(mPluginSettings.mPathlines->mPath.get())
-                                   : std::nullopt);
-    break;
-  default:
-    logger().error("Invalid volume data type given in settings! Should be 'vtk'.");
-    throw std::runtime_error("Failed to initialize DataManager.");
-    break;
+  mDataManager = std::make_shared<DataManager>(mPluginSettings.mData);
+  if (mPluginSettings.mPathlines.has_value()) {
+    mDataManager->addPathlines(mPluginSettings.mPathlines.value());
   }
 
   mRenderer = std::make_unique<OSPRayRenderer>(
@@ -919,7 +736,7 @@ std::vector<ScalarFilter> csp::volumerendering::Plugin::parseScalarFilters(
   std::vector<ScalarFilter> filters;
   for (auto const& [axis, value] : j.items()) {
     auto const& scalar = std::find_if(scalars.begin(), scalars.end(),
-        [& axis = axis](Scalar const& s) { return s.mName == axis; });
+        [&axis = axis](Scalar const& s) { return s.mName == axis; });
     if (scalar != scalars.end()) {
       ScalarFilter filter;
       filter.mAttrIndex = (int)std::distance(scalars.begin(), scalar);
