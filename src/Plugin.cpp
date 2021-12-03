@@ -736,7 +736,7 @@ std::vector<ScalarFilter> csp::volumerendering::Plugin::parseScalarFilters(
   std::vector<ScalarFilter> filters;
   for (auto const& [axis, value] : j.items()) {
     auto const& scalar = std::find_if(scalars.begin(), scalars.end(),
-        [&axis = axis](Scalar const& s) { return s.mName == axis; });
+        [& axis = axis](Scalar const& s) { return s.mName == axis; });
     if (scalar != scalars.end()) {
       ScalarFilter filter;
       filter.mAttrIndex = (int)std::distance(scalars.begin(), scalar);
