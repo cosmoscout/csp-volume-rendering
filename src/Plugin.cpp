@@ -424,7 +424,7 @@ Plugin::Setting<bool>::getSettings(Settings& pluginSettings) {
           "Use a separate parallel coordinate diagram for the pathlines.",
       },
   };
-  return std::move(settings);
+  return settings;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -440,7 +440,7 @@ constexpr std::array<Plugin::Setting<int>, SETTINGS_COUNT<int>> Plugin::Setting<
       Setting<int>{"setResolution", "Sets the resolution of the rendered volume images.",
           pluginSettings.mRendering.mResolution, &Renderer::setResolution, &Plugin::setResolution},
   };
-  return std::move(settings);
+  return settings;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -473,7 +473,7 @@ Plugin::Setting<float>::getSettings(Settings& pluginSettings) {
                 pluginSettings.mPathlines->mLineSize, &Renderer::setPathlineSize}
           : Setting<float>{},
   };
-  return std::move(settings);
+  return settings;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -491,7 +491,7 @@ Plugin::Setting<std::string>::getSettings(Settings& pluginSettings) {
                 pluginSettings.mCore->mScalar, &Renderer::setCoreScalar}
           : Setting<std::string>{},
   };
-  return std::move(settings);
+  return settings;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -503,7 +503,7 @@ Plugin::Setting<DisplayMode>::getSettings(Settings& pluginSettings) {
       Setting<DisplayMode>{"setDisplayMode", "Sets the mode for displaying the rendered images.",
           pluginSettings.mDisplay.mDisplayMode, {}, &Plugin::setDisplayMode},
   };
-  return std::move(settings);
+  return settings;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -516,7 +516,7 @@ Plugin::Setting<DepthMode>::getSettings(Settings& pluginSettings) {
           "Sets the mode for determining the per pixel depth values of the volume.",
           pluginSettings.mRendering.mDepthMode, &Renderer::setDepthMode},
   };
-  return std::move(settings);
+  return settings;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -16,6 +16,8 @@ namespace csp::volumerendering {
 
 class FileLoader {
  public:
+  virtual ~FileLoader(){};
+
   virtual vtkSmartPointer<vtkDataSet> loadDataImpl(std::string const& file) = 0;
 };
 

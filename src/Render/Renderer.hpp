@@ -13,7 +13,8 @@
 #include "../../../../src/cs-utils/DefaultProperty.hpp"
 
 #include <glm/gtc/type_ptr.hpp>
-#include <glm/gtx/hash.hpp>
+
+#include <boost/functional/hash.hpp>
 
 #include <future>
 #include <string>
@@ -265,7 +266,8 @@ struct hash<csp::volumerendering::Renderer::RenderedImage> {
   std::size_t operator()(csp::volumerendering::Renderer::RenderedImage const& image) {
     size_t hash = 0u;
     hash ^= std::hash<int>{}(image.getResolution());
-    hash ^= std::hash<glm::mat4>{}(image.getCameraTransform());
+    hash ^= boost::hash_range(reinterpret_cast<const float*>(&image.getCameraTransform()),
+        reinterpret_cast<const float*>(&image.getCameraTransform()) + 16);
     return hash;
   }
 };

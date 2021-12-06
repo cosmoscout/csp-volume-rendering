@@ -80,6 +80,9 @@ struct Settings {
     cs::utils::DefaultProperty<bool>        mEnabled{true};
     cs::utils::DefaultProperty<std::string> mScalar{""};
     cs::utils::Property<float>              mRadius;
+
+    // Needed for deserialization.
+    Core(){};
   };
   std::optional<Core> mCore;
 
@@ -87,6 +90,9 @@ struct Settings {
     cs::utils::Property<std::string>  mPath;
     cs::utils::DefaultProperty<bool>  mEnabled{true};
     cs::utils::DefaultProperty<float> mLineSize{1.f};
+
+    // Needed for deserialization.
+    Pathlines(){};
   };
   std::optional<Pathlines> mPathlines;
 };
