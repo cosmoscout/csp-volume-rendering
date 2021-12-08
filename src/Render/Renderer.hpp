@@ -156,7 +156,8 @@ class Renderer {
   /// Returns 1 if no image is currently being rendered.
   virtual float getProgress() = 0;
   /// Requests the renderer to start preparing data matching the given state for rendering.
-  virtual void preloadData(DataManager::State state) = 0;
+  virtual void preloadData(
+      DataManager::State const& state, std::optional<DataManager::State> const& coreState) = 0;
   /// Requests to cancel the current rendering process.
   virtual void cancelRendering() = 0;
 

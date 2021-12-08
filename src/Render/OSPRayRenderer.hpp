@@ -41,8 +41,9 @@ class OSPRayRenderer : public Renderer {
   OSPRayRenderer& operator=(const OSPRayRenderer& other) = delete;
 
   float getProgress() override;
-  void  preloadData(DataManager::State state) override;
-  void  cancelRendering() override;
+  void  preloadData(
+       DataManager::State const& state, std::optional<DataManager::State> const& coreState) override;
+  void cancelRendering() override;
 
  private:
   OSPRayInitializer mInitializer;

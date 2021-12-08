@@ -245,7 +245,19 @@ void Plugin::registerAllUICallbacks() {
       "Prepares the renderer for rendering.", std::function([this](double value) {
         DataManager::State state = mDataManager->getState();
         state.mTimestep          = (int)std::lround(value);
-        mRenderer->preloadData(state);
+        std::optional<DataManager::State> coreState;
+        if (mPluginSettings.mCore.has_value()) {
+          coreState = state;
+          auto scalar =
+              std::find_if(mDataManager->pScalars.get().begin(), mDataManager->pScalars.get().end(),
+                  [this](Scalar s) { return s.getId() == mPluginSettings.mCore->mScalar.get(); });
+          if (scalar != mDataManager->pScalars.get().end()) {
+            coreState->mScalar = *scalar;
+          } else {
+            coreState = {};
+          }
+        }
+        mRenderer->preloadData(state, coreState);
       }));
 
   // Transferfunction
