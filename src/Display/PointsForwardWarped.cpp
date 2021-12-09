@@ -34,11 +34,7 @@ PointsForwardWarped::PointsForwardWarped(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool PointsForwardWarped::Do() {
-  if (!mEnabled || !getIsInExistence() || !pVisible.get()) {
-    return true;
-  }
-
+bool PointsForwardWarped::DoImpl() {
   cs::utils::FrameTimings::ScopedTimer timer("Volume Rendering");
 
   if (mShaderDirty) {
