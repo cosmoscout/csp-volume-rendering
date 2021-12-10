@@ -81,7 +81,8 @@ void OSPRayRenderer::cancelRendering() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::unique_ptr<Renderer::RenderedImage> OSPRayRenderer::getFrameImpl(
-    glm::mat4 const& cameraTransform, Parameters parameters, DataManager::State const& dataState) {
+    glm::mat4 const& cameraTransform, std::vector<float>&& maxDepth, Parameters parameters,
+    DataManager::State const& dataState) {
   // Shift filter attribute indices by one, because the scalar list used by the renderer is shifted
   // by one so that the active scalar can be placed at index 0.
   for (ScalarFilter& filter : parameters.mScalarFilters) {
@@ -103,7 +104,8 @@ std::unique_ptr<Renderer::RenderedImage> OSPRayRenderer::getFrameImpl(
             dataState == mCache.mState.mDataState && volume.mLod == mCache.mState.mVolumeLod)) {
       mCache.mCamera = getCamera(volume.mHeight, cameraTransform);
     }
-    renderFrame(mCache.mWorld, mCache.mCamera.mOsprayCamera, parameters, !(mCache.mState == state));
+    renderFrame(mCache.mWorld, mCache.mCamera.mOsprayCamera, std::move(maxDepth), parameters,
+        !(mCache.mState == state));
     RenderedImage renderedImage(
         mCache.mFrameBuffer, mCache.mCamera, volume.mHeight, parameters, cameraTransform);
     renderedImage.setValid(!mRenderingCancelled);
@@ -494,7 +496,14 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void OSPRayRenderer::renderFrame(ospray::cpp::World const& world, ospray::cpp::Camera const& camera,
-    Parameters const& parameters, bool resetAccumulation) {
+    std::vector<float>&& maxDepth, Parameters const& parameters, bool resetAccumulation) {
+  ospray::cpp::Texture maxDepthTex("texture2d");
+  maxDepthTex.setParam("format", OSP_TEXTURE_R32F);
+  maxDepthTex.setParam(
+      "data", ospray::cpp::SharedData(maxDepth.data(), OSP_FLOAT,
+                  rkcommon::math::vec2i(parameters.mResolution, parameters.mResolution)));
+  maxDepthTex.commit();
+
   ospray::cpp::Renderer renderer("volume_depth");
   renderer.setParam("aoSamples", 0);
   renderer.setParam("shadows", false);
@@ -503,6 +512,7 @@ void OSPRayRenderer::renderFrame(ospray::cpp::World const& world, ospray::cpp::C
   const void* filtersPtr = parameters.mScalarFilters.data();
   renderer.setParam("scalarFilters", OSP_VOID_PTR, &filtersPtr);
   renderer.setParam("numScalarFilters", (int)parameters.mScalarFilters.size());
+  renderer.setParam("map_maxDepth", maxDepthTex);
   renderer.commit();
 
   if (resetAccumulation) {

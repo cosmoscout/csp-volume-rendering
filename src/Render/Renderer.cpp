@@ -182,10 +182,10 @@ void Renderer::setPathlineScalarFilters(std::vector<ScalarFilter> const& value) 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::future<std::unique_ptr<Renderer::RenderedImage>> Renderer::getFrame(
-    glm::mat4 const& cameraTransform) {
+    glm::mat4 const& cameraTransform, std::vector<float>&& maxDepth) {
   std::scoped_lock lock(mParameterMutex);
-  return std::async(std::launch::async, &Renderer::getFrameImpl, this, cameraTransform, mParameters,
-      mDataManager->getState());
+  return std::async(std::launch::async, &Renderer::getFrameImpl, this, cameraTransform,
+      std::move(maxDepth), mParameters, mDataManager->getState());
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
