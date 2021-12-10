@@ -43,6 +43,9 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   /// Enable rendering of the display node.
   void setEnabled(bool enabled);
 
+  /// Returns last frame's depth buffer of the OpenGL render pipeline.
+  std::vector<float> getDepthBuffer(int resolution);
+
   /// Set the color image that should be displayed.
   /// The color data should be given as an array of rgba values (8 bit per channel).
   void setTexture(uint8_t* texture, int width, int height);
@@ -87,6 +90,8 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
 
   bool mShaderDirty;
 
+  int mResolution = 512;
+
   virtual bool DoImpl() = 0;
 
  private:
@@ -96,7 +101,7 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   /// Store one buffer per viewport
   std::unordered_map<VistaViewport*, VistaTexture> mDepthBufferData;
 
-  bool mDataAvailable = false;
+  std::optional<GLsync> mPBOFence;
 };
 
 } // namespace csp::volumerendering
