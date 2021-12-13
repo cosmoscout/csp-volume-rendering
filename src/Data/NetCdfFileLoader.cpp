@@ -20,7 +20,11 @@ vtkSmartPointer<vtkDataSet> NetCdfFileLoader::loadDataImpl(std::string const& fi
   auto reader = vtkSmartPointer<vtkNetCDFCFReader>::New();
   reader->SetFileName(file.c_str());
   reader->SphericalCoordinatesOn();
-  reader->SetDimensions("(lat, r, lon)");
+  //reader->SetDimensions("(depth, y, x)");
+  reader->SetVariableArrayStatus("vosaline", 1);
+  reader->SetVariableArrayStatus("vozocrtx", 1);
+  reader->SetVariableArrayStatus("votemper", 1);
+  reader->SetVariableArrayStatus("vomecrty", 1);
   reader->Update();
 
   data = vtkDataSet::SafeDownCast(reader->GetOutput());
