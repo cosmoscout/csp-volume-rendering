@@ -44,7 +44,7 @@ DataManager::DataManager(Settings::Data const& dataSettings)
     mFileLoader = std::make_unique<VtkFileLoader>();
     break;
   case VolumeFileType::eNetCdf:
-    mFileLoader = std::make_unique<VtkFileLoader>();
+    mFileLoader = std::make_unique<NetCdfFileLoader>();
     break;
   default:
     logger().error("Invalid volume data type given in settings! Should be 'vtk' or 'netcdf'.");
