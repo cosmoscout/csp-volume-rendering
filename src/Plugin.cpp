@@ -54,6 +54,7 @@ namespace csp::volumerendering {
 
 void Plugin::init() {
   logger().info("Loading plugin...");
+  vtkObject::GlobalWarningDisplayOff();
 
   std::thread keepAlive([]() {
     while (1)
@@ -64,7 +65,7 @@ void Plugin::init() {
   // Makes sure that the vtk output window is created on the main thread. If it is created on
   // another thread and that thread stops, all calls to DisplayText etc. from any other thread will
   // block indefinitely.
-  vtkOutputWindow::GetInstance()->DisplayDebugText("");
+  //vtkOutputWindow::GetInstance()->DisplayDebugText("");
 
   mOnLoadConnection = mAllSettings->onLoad().connect([this]() { onLoad(); });
   mOnSaveConnection = mAllSettings->onSave().connect(
