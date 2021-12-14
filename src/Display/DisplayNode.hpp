@@ -19,6 +19,8 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "../../../../src/cs-core/Settings.hpp"
+#include "../../../../src/cs-core/SolarSystem.hpp"
+#include "../../../../src/cs-core/TimeControl.hpp"
 #include "../../../../src/cs-scene/CelestialBody.hpp"
 #include "../../../../src/cs-utils/DefaultProperty.hpp"
 
@@ -31,7 +33,9 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   /// Create a DisplayNode positioned at the given anchor using properties found in settings.
   /// It will automatically be added to the Vista scene graph on construction and removed on
   /// destruction. The depthResolution is used as an initial mesh resolution of the created objects.
-  DisplayNode(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor);
+  DisplayNode(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor,
+      std::shared_ptr<cs::core::SolarSystem> solarSystem,
+      std::shared_ptr<cs::core::TimeControl> timeControl);
   virtual ~DisplayNode();
 
   DisplayNode(DisplayNode const& other) = delete;
@@ -71,7 +75,9 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   bool GetBoundingBox(VistaBoundingBox& bb) override;
 
  protected:
-  std::shared_ptr<VistaOpenGLNode> mVistaNode;
+  std::shared_ptr<VistaOpenGLNode>       mVistaNode;
+  std::shared_ptr<cs::core::SolarSystem> mSolarSystem;
+  std::shared_ptr<cs::core::TimeControl> mTimeControl;
 
   VolumeShape mShape;
 
@@ -102,6 +108,11 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   std::unordered_map<VistaViewport*, VistaTexture> mDepthBufferData;
 
   std::optional<GLsync> mPBOFence;
+
+  struct {
+    GLint mBottomCorner = 0;
+    GLint mTopCorner    = 0;
+  } mUniforms;
 };
 
 } // namespace csp::volumerendering

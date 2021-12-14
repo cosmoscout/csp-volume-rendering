@@ -201,11 +201,13 @@ void Plugin::onLoad() {
     throw std::runtime_error("Failed to initialize CelestialObjects.");
   }
 
-  auto existence                    = anchor->second.mExistence;
-  mDisplayNodes[DisplayMode::eMesh] = std::make_shared<Billboard>(
-      mPluginSettings.mData.mShape.get(), mAllSettings, mPluginSettings.mTransform.mAnchor.get());
-  mDisplayNodes[DisplayMode::ePoints] = std::make_shared<PointsForwardWarped>(
-      mPluginSettings.mData.mShape.get(), mAllSettings, mPluginSettings.mTransform.mAnchor.get());
+  auto existence = anchor->second.mExistence;
+  mDisplayNodes[DisplayMode::eMesh] =
+      std::make_shared<Billboard>(mPluginSettings.mData.mShape.get(), mAllSettings,
+          mPluginSettings.mTransform.mAnchor.get(), mSolarSystem, mTimeControl);
+  mDisplayNodes[DisplayMode::ePoints] =
+      std::make_shared<PointsForwardWarped>(mPluginSettings.mData.mShape.get(), mAllSettings,
+          mPluginSettings.mTransform.mAnchor.get(), mSolarSystem, mTimeControl);
 
   for (auto const& node : mDisplayNodes) {
     node.second->setAnchorPosition(mPluginSettings.mTransform.mPosition.get());
@@ -749,7 +751,7 @@ std::vector<ScalarFilter> csp::volumerendering::Plugin::parseScalarFilters(
   std::vector<ScalarFilter> filters;
   for (auto const& [axis, value] : j.items()) {
     auto const& scalar = std::find_if(scalars.begin(), scalars.end(),
-        [& axis = axis](Scalar const& s) { return s.mName == axis; });
+        [&axis = axis](Scalar const& s) { return s.mName == axis; });
     if (scalar != scalars.end()) {
       ScalarFilter filter;
       filter.mAttrIndex = (int)std::distance(scalars.begin(), scalar);

@@ -10,6 +10,7 @@
 #include "Shaders.hpp"
 
 #include "../../../../src/cs-utils/FrameTimings.hpp"
+#include "../../../../src/cs-utils/convert.hpp"
 #include "../../../../src/cs-utils/utils.hpp"
 
 #include <VistaKernel/DisplayManager/VistaDisplayManager.h>
@@ -26,9 +27,12 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-DisplayNode::DisplayNode(
-    VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor)
-    : mShape(shape)
+DisplayNode::DisplayNode(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings,
+    std::string anchor, std::shared_ptr<cs::core::SolarSystem> solarSystem,
+    std::shared_ptr<cs::core::TimeControl> timeControl)
+    : mSolarSystem(solarSystem)
+    , mTimeControl(timeControl)
+    , mShape(shape)
     , mTexture(GL_TEXTURE_2D)
     , mDepthTexture(GL_TEXTURE_2D)
     , mShaderDirty(true)
@@ -78,6 +82,9 @@ DisplayNode::DisplayNode(
 
     throw std::runtime_error(std::string("ERROR: Failed to link compute shader\n") + log);
   }
+
+  mUniforms.mTopCorner    = glGetUniformLocation(mDepthComputeShader, "uTopCorner");
+  mUniforms.mBottomCorner = glGetUniformLocation(mDepthComputeShader, "uBottomCorner");
 
   // Create textures for depth buffer of previous render pass
   for (auto const& viewport : GetVistaSystem()->GetDisplayManager()->GetViewports()) {
@@ -206,6 +213,70 @@ bool DisplayNode::Do() {
     return true;
   }
 
+  // Get field of view and aspect ratio
+  glm::mat4 glMatP;
+  glGetFloatv(GL_PROJECTION_MATRIX, reinterpret_cast<GLfloat*>(&glMatP));
+
+  float aspect  = glMatP[1][1] / glMatP[0][0];
+  float fovYRad = 2.f * atan(1.f / glMatP[1][1]);
+  float fovXRad = fovYRad * aspect;
+  fovXRad *= 0.9f;
+
+  // Create camera transform looking along negative z
+  glm::mat4 cameraTransform(1);
+  cameraTransform[2][2] = -1;
+
+  // Move camera to observer position relative to planet
+  glm::mat4 observerTransform =
+      getRelativeTransform(mTimeControl->pSimulationTime.get(), mSolarSystem->getObserver());
+  cameraTransform = observerTransform * cameraTransform;
+
+  // Get base vectors of rotated coordinate system
+  glm::vec3 camRight(cameraTransform[0]);
+  camRight = glm::normalize(camRight);
+  glm::vec3 camUp(cameraTransform[1]);
+  camUp = glm::normalize(camUp);
+  glm::vec3 camDir(cameraTransform[2]);
+  camDir = glm::normalize(camDir);
+  glm::vec3 camPos(cameraTransform[3]);
+
+  // Get position of camera in rotated coordinate system
+  float camXLen = glm::dot(camPos, camRight);
+  float camYLen = glm::dot(camPos, camUp);
+  float camZLen = glm::dot(camPos, camDir);
+
+  // Get angle between camera position and forward vector
+  float cameraAngleX = atan(camXLen / camZLen);
+  float cameraAngleY = atan(camYLen / camZLen);
+
+  // Get angle between ray towards center of volume and ray at edge of volume
+  float modelAngleX =
+      asin(static_cast<float>(getRadii()[0]) / sqrt(camXLen * camXLen + camZLen * camZLen));
+  float modelAngleY =
+      asin(static_cast<float>(getRadii()[0]) / sqrt(camYLen * camYLen + camZLen * camZLen));
+
+  // Get angle between rays at edges of volume and forward vector
+  float leftAngle, rightAngle, downAngle, upAngle;
+  if (!isnan(modelAngleX) && !isnan(modelAngleY)) {
+    leftAngle  = cameraAngleX - modelAngleX;
+    rightAngle = cameraAngleX + modelAngleX;
+    downAngle  = cameraAngleY - modelAngleY;
+    upAngle    = cameraAngleY + modelAngleY;
+  } else {
+    // If the camera is inside the volume the model angles will be NaN,
+    // so the angles are set to the edges of the field of view
+    leftAngle  = -fovXRad / 2;
+    rightAngle = fovXRad / 2;
+    downAngle  = -fovYRad / 2;
+    upAngle    = fovYRad / 2;
+  }
+
+  // Get edges of volume in image space coordinates
+  float leftPercent  = 0.5f + tan(leftAngle) / (2 * tan(fovXRad / 2));
+  float rightPercent = 0.5f + tan(rightAngle) / (2 * tan(fovXRad / 2));
+  float downPercent  = 0.5f + tan(downAngle) / (2 * tan(fovYRad / 2));
+  float upPercent    = 0.5f + tan(upAngle) / (2 * tan(fovYRad / 2));
+
   // copy depth buffer from previous rendering
   std::array<GLint, 4> iViewport{};
   glGetIntegerv(GL_VIEWPORT, iViewport.data());
@@ -222,6 +293,9 @@ bool DisplayNode::Do() {
 
   depthBuffer.Bind(GL_TEXTURE0);
   glBindImageTexture(1, mOut.GetId(), 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
+
+  glUniform2f(mUniforms.mBottomCorner, leftPercent, downPercent);
+  glUniform2f(mUniforms.mTopCorner, rightPercent, upPercent);
 
   glDispatchCompute(mResolution, mResolution, 1);
 

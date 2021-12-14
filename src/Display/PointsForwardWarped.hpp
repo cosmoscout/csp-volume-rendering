@@ -20,8 +20,9 @@ namespace csp::volumerendering {
 /// The number of used points is equal to the number of pixels in the used depth image.
 class PointsForwardWarped : public DisplayNode {
  public:
-  PointsForwardWarped(
-      VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor);
+  PointsForwardWarped(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings,
+      std::string anchor, std::shared_ptr<cs::core::SolarSystem> solarSystem,
+      std::shared_ptr<cs::core::TimeControl> timeControl);
 
   PointsForwardWarped(PointsForwardWarped const& other) = delete;
   PointsForwardWarped(PointsForwardWarped&& other)      = default;
