@@ -14,6 +14,8 @@
 #include "../../../../src/cs-utils/utils.hpp"
 
 #include <VistaKernel/DisplayManager/VistaDisplayManager.h>
+#include <VistaKernel/DisplayManager/VistaProjection.h>
+#include <VistaKernel/DisplayManager/VistaViewport.h>
 #include <VistaKernel/GraphicsManager/VistaSceneGraph.h>
 #include <VistaKernel/GraphicsManager/VistaTransformNode.h>
 #include <VistaKernel/VistaSystem.h>
@@ -85,6 +87,8 @@ DisplayNode::DisplayNode(VolumeShape shape, std::shared_ptr<cs::core::Settings> 
 
   mUniforms.mTopCorner    = glGetUniformLocation(mDepthComputeShader, "uTopCorner");
   mUniforms.mBottomCorner = glGetUniformLocation(mDepthComputeShader, "uBottomCorner");
+  mUniforms.mNearDistance = glGetUniformLocation(mDepthComputeShader, "uNear");
+  mUniforms.mFarDistance  = glGetUniformLocation(mDepthComputeShader, "uFar");
 
   // Create textures for depth buffer of previous render pass
   for (auto const& viewport : GetVistaSystem()->GetDisplayManager()->GetViewports()) {
@@ -277,6 +281,16 @@ bool DisplayNode::Do() {
   float downPercent  = 0.5f + tan(downAngle) / (2 * tan(fovYRad / 2));
   float upPercent    = 0.5f + tan(upAngle) / (2 * tan(fovYRad / 2));
 
+  // Get near and far distance
+  double                                      near, far;
+  VistaProjection::VistaProjectionProperties* projectionProperties =
+      GetVistaSystem()
+          ->GetDisplayManager()
+          ->GetCurrentRenderInfo()
+          ->m_pViewport->GetProjection()
+          ->GetProjectionProperties();
+  projectionProperties->GetClippingRange(near, far);
+
   // copy depth buffer from previous rendering
   std::array<GLint, 4> iViewport{};
   glGetIntegerv(GL_VIEWPORT, iViewport.data());
@@ -296,6 +310,12 @@ bool DisplayNode::Do() {
 
   glUniform2f(mUniforms.mBottomCorner, leftPercent, downPercent);
   glUniform2f(mUniforms.mTopCorner, rightPercent, upPercent);
+  glUniform1f(mUniforms.mNearDistance,
+      static_cast<float>(
+          near * mSolarSystem->getObserver().getAnchorScale() / 1000. * (1. / getAnchorScale())));
+  glUniform1f(mUniforms.mFarDistance,
+      static_cast<float>(
+          far * mSolarSystem->getObserver().getAnchorScale() / 1000. * (1. / getAnchorScale())));
 
   glDispatchCompute(mResolution, mResolution, 1);
 

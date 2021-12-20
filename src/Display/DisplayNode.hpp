@@ -112,6 +112,8 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   struct {
     GLint mBottomCorner = 0;
     GLint mTopCorner    = 0;
+    GLint mNearDistance = 0;
+    GLint mFarDistance  = 0;
   } mUniforms;
 };
 
