@@ -102,7 +102,7 @@ std::unique_ptr<Renderer::RenderedImage> OSPRayRenderer::getFrameImpl(
     }
     if (!(cameraTransform == mCache.mState.mCameraTransform &&
             dataState == mCache.mState.mDataState && volume.mLod == mCache.mState.mVolumeLod)) {
-      mCache.mCamera = getCamera(volume.mHeight, cameraTransform);
+      mCache.mCamera = getCamera(1, cameraTransform);
     }
     renderFrame(mCache.mWorld, mCache.mCamera.mOsprayCamera, std::move(maxDepth), parameters,
         !(mCache.mState == state));
@@ -363,6 +363,9 @@ void OSPRayRenderer::updateWorld(
 
   if (updateGroup) {
     mCache.mGroup.commit();
+
+    rkcommon::math::affine3f transform = rkcommon::math::affine3f::scale(1.f / volume.mHeight);
+    mCache.mInstance.setParam("xfm", transform);
     mCache.mInstance.commit();
   }
 

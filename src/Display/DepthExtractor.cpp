@@ -82,6 +82,7 @@ DepthExtractor::DepthExtractor(std::shared_ptr<DisplayNode> displayNode,
 
   mUniforms.mTopCorner    = glGetUniformLocation(mDepthComputeShader, "uTopCorner");
   mUniforms.mBottomCorner = glGetUniformLocation(mDepthComputeShader, "uBottomCorner");
+  mUniforms.mRadius       = glGetUniformLocation(mDepthComputeShader, "uRadius");
   mUniforms.mNearDistance = glGetUniformLocation(mDepthComputeShader, "uNear");
   mUniforms.mFarDistance  = glGetUniformLocation(mDepthComputeShader, "uFar");
 
@@ -129,7 +130,6 @@ std::vector<float> DepthExtractor::getDepthBuffer(int resolution) {
         std::vector<float> buffer(data, data + resolution * resolution);
         glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
         glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
-        logger().trace("D: {}", buffer[(resolution + 1) * resolution / 2]);
         return buffer;
       }
     }
@@ -251,12 +251,13 @@ bool DepthExtractor::Do() {
 
   glUniform2f(mUniforms.mBottomCorner, leftPercent, downPercent);
   glUniform2f(mUniforms.mTopCorner, rightPercent, upPercent);
+  glUniform1f(mUniforms.mRadius, static_cast<float>(mDisplayNode->getRadii()[0]));
   glUniform1f(mUniforms.mNearDistance,
-      static_cast<float>(near * mSolarSystem->getObserver().getAnchorScale() / 1000. /
-                         mDisplayNode->getAnchorScale()));
+      static_cast<float>(
+          near * mSolarSystem->getObserver().getAnchorScale() / mDisplayNode->getAnchorScale()));
   glUniform1f(mUniforms.mFarDistance,
-      static_cast<float>(far * mSolarSystem->getObserver().getAnchorScale() / 1000. /
-                         mDisplayNode->getAnchorScale()));
+      static_cast<float>(
+          far * mSolarSystem->getObserver().getAnchorScale() / mDisplayNode->getAnchorScale()));
 
   glDispatchCompute(mResolution, mResolution, 1);
 

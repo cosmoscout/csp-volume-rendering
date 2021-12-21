@@ -228,6 +228,7 @@ layout(r32f, binding = 1) writeonly uniform image2D uOutDepth;
 
 uniform vec2 uBottomCorner;
 uniform vec2 uTopCorner;
+uniform float uRadius;
 uniform float uNear;
 uniform float uFar;
 
@@ -237,7 +238,7 @@ void main() {
     ivec2 pix = ivec2(gl_GlobalInvocationID);
 
     vec4 val = texture(uInDepth, pos * textureSize(uInDepth));
-    val *= uFar * 0.92;
+    val *= uFar / uRadius;
 
     imageStore(uOutDepth, pix, val);
 }
