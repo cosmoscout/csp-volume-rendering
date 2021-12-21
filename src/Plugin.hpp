@@ -223,8 +223,7 @@ class Plugin : public cs::core::PluginBase {
     } else if constexpr (std::is_same_v<T, std::string>) {
       mGuiManager->getGui()->callJavascript("CosmoScout.gui.setDropdownValue", name, value);
     } else if constexpr (std::is_enum_v<T>) {
-      mGuiManager->setRadioChecked(
-          "volumeRendering." + name + std::to_string(static_cast<int>(value)));
+      mGuiManager->setRadioChecked(name + std::to_string(static_cast<int>(value)));
     } else {
       static_assert(always_false_v<T>, "Unhandled type for setValueInUI");
     }
