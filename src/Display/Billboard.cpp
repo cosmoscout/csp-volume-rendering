@@ -26,10 +26,9 @@ const uint32_t GRID_RESOLUTION = 256;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Billboard::Billboard(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings,
-    std::string anchor, std::shared_ptr<cs::core::SolarSystem> solarSystem,
-    std::shared_ptr<cs::core::TimeControl> timeControl)
-    : DisplayNode(shape, settings, anchor, solarSystem, timeControl) {
+Billboard::Billboard(
+    VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor)
+    : DisplayNode(shape, settings, anchor) {
   createBuffers();
 }
 

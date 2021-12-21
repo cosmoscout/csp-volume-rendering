@@ -33,9 +33,7 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   /// Create a DisplayNode positioned at the given anchor using properties found in settings.
   /// It will automatically be added to the Vista scene graph on construction and removed on
   /// destruction. The depthResolution is used as an initial mesh resolution of the created objects.
-  DisplayNode(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor,
-      std::shared_ptr<cs::core::SolarSystem> solarSystem,
-      std::shared_ptr<cs::core::TimeControl> timeControl);
+  DisplayNode(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor);
   virtual ~DisplayNode();
 
   DisplayNode(DisplayNode const& other) = delete;
@@ -46,9 +44,6 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
 
   /// Enable rendering of the display node.
   void setEnabled(bool enabled);
-
-  /// Returns last frame's depth buffer of the OpenGL render pipeline.
-  std::vector<float> getDepthBuffer(int resolution);
 
   /// Set the color image that should be displayed.
   /// The color data should be given as an array of rgba values (8 bit per channel).
@@ -75,9 +70,7 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   bool GetBoundingBox(VistaBoundingBox& bb) override;
 
  protected:
-  std::shared_ptr<VistaOpenGLNode>       mVistaNode;
-  std::shared_ptr<cs::core::SolarSystem> mSolarSystem;
-  std::shared_ptr<cs::core::TimeControl> mTimeControl;
+  std::shared_ptr<VistaOpenGLNode> mVistaNode;
 
   VolumeShape mShape;
 
@@ -96,25 +89,7 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
 
   bool mShaderDirty;
 
-  int mResolution = 512;
-
   virtual bool DoImpl() = 0;
-
- private:
-  GLuint       mDepthComputeShader = 0;
-  GLuint       mPBO                = 0;
-  VistaTexture mOut;
-  /// Store one buffer per viewport
-  std::unordered_map<VistaViewport*, VistaTexture> mDepthBufferData;
-
-  std::optional<GLsync> mPBOFence;
-
-  struct {
-    GLint mBottomCorner = 0;
-    GLint mTopCorner    = 0;
-    GLint mNearDistance = 0;
-    GLint mFarDistance  = 0;
-  } mUniforms;
 };
 
 } // namespace csp::volumerendering

@@ -25,11 +25,9 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-PointsForwardWarped::PointsForwardWarped(VolumeShape shape,
-    std::shared_ptr<cs::core::Settings> settings, std::string anchor,
-    std::shared_ptr<cs::core::SolarSystem> solarSystem,
-    std::shared_ptr<cs::core::TimeControl> timeControl)
-    : DisplayNode(shape, settings, anchor, solarSystem, timeControl)
+PointsForwardWarped::PointsForwardWarped(
+    VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor)
+    : DisplayNode(shape, settings, anchor)
     , mDepthResolution(256) {
   createBuffers();
 }

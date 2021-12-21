@@ -8,6 +8,7 @@
 #define CSP_VOLUME_RENDERING_PLUGIN_HPP
 
 #include "Data/DataManager.hpp"
+#include "Display/DepthExtractor.hpp"
 #include "Display/DisplayNode.hpp"
 #include "Enums.hpp"
 #include "Render/Renderer.hpp"
@@ -296,6 +297,7 @@ class Plugin : public cs::core::PluginBase {
   std::shared_ptr<DataManager>                        mDataManager;
   std::map<DisplayMode, std::shared_ptr<DisplayNode>> mDisplayNodes;
   std::shared_ptr<DisplayNode>                        mActiveDisplay;
+  std::unique_ptr<DepthExtractor>                     mDepthExtractor;
 
   RenderState mRenderState = RenderState::eWaitForData;
 

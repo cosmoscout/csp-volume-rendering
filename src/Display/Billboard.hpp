@@ -21,9 +21,7 @@ namespace csp::volumerendering {
 /// (defined in Billboard.cpp).
 class Billboard : public DisplayNode {
  public:
-  Billboard(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor,
-      std::shared_ptr<cs::core::SolarSystem> solarSystem,
-      std::shared_ptr<cs::core::TimeControl> timeControl);
+  Billboard(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor);
 
   Billboard(Billboard const& other) = delete;
   Billboard(Billboard&& other)      = default;
