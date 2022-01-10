@@ -32,7 +32,7 @@ class DepthExtractor : public IVistaOpenGLDraw {
   void setEnabled(bool enabled);
 
   /// Returns last frame's depth buffer of the OpenGL render pipeline.
-  std::vector<float> getDepthBuffer(int resolution);
+  std::optional<std::vector<float>> getDepthBuffer(int resolution);
 
   /// Interface implementation of IVistaOpenGLDraw.
   bool Do() override;

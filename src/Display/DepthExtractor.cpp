@@ -121,9 +121,10 @@ void DepthExtractor::setEnabled(bool enabled) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::vector<float> DepthExtractor::getDepthBuffer(int resolution) {
+std::optional<std::vector<float>> DepthExtractor::getDepthBuffer(int resolution) {
   if (resolution == mResolution) {
     if (mPBOFence.has_value()) {
+      // Wait for max 50ms
       int sync = glClientWaitSync(mPBOFence.value(), 0, 50 * 1000000);
       if (sync == GL_ALREADY_SIGNALED || sync == GL_CONDITION_SATISFIED) {
         glBindBuffer(GL_PIXEL_PACK_BUFFER, mPBO);
@@ -131,7 +132,7 @@ std::vector<float> DepthExtractor::getDepthBuffer(int resolution) {
         std::vector<float> buffer(data, data + resolution * resolution);
         glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
         glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
-        return buffer;
+        return std::move(buffer);
       }
     }
   } else {
@@ -148,8 +149,7 @@ std::vector<float> DepthExtractor::getDepthBuffer(int resolution) {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, mResolution, mResolution, 0, GL_RED, GL_FLOAT, nullptr);
     mOut.Unbind();
   }
-  std::vector<float> buffer(resolution * resolution, INFINITY);
-  return buffer;
+  return {};
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -615,12 +615,18 @@ bool Plugin::tryRequestFrame() {
   if (mActiveDisplay->pVisible.get()) {
     cs::utils::FrameTimings::ScopedTimer timer("Request frame");
 
+    auto depthBuffer =
+        mDepthExtractor->getDepthBuffer(mPluginSettings.mRendering.mResolution.get());
+    if (!depthBuffer.has_value()) {
+      return false;
+    }
+
     mRenderingFrame = mNextFrame;
     glm::vec4 dir = glm::vec4(mSolarSystem->getSunDirection(mActiveDisplay->getWorldPosition()), 1);
     dir           = dir * glm::inverse(mRenderingFrame.mCameraTransform);
     mRenderer->setSunDirection(dir);
-    mFutureFrameData   = mRenderer->getFrame(mRenderingFrame.mCameraTransform,
-        std::move(mDepthExtractor->getDepthBuffer(mPluginSettings.mRendering.mResolution.get())));
+    mFutureFrameData =
+        mRenderer->getFrame(mRenderingFrame.mCameraTransform, std::move(depthBuffer.value()));
     mLastFrameInterval = 0;
     mParametersDirty   = false;
     mFrameInvalid      = false;
