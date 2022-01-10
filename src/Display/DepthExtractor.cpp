@@ -6,6 +6,7 @@
 
 #include "DepthExtractor.hpp"
 
+#include "../Utility.hpp"
 #include "../logger.hpp"
 #include "Shaders.hpp"
 
@@ -167,60 +168,12 @@ bool DepthExtractor::Do() {
   float fovXRad = fovYRad * aspect;
   fovXRad *= 0.9f;
 
-  // Create camera transform looking along negative z
-  glm::mat4 cameraTransform(1);
-  cameraTransform[2][2] = -1;
-
-  // Move camera to observer position relative to planet
-  glm::mat4 observerTransform = mDisplayNode->getRelativeTransform(
-      mTimeControl->pSimulationTime.get(), mSolarSystem->getObserver());
-  cameraTransform = observerTransform * cameraTransform;
-
-  // Get base vectors of rotated coordinate system
-  glm::vec3 camRight(cameraTransform[0]);
-  camRight = glm::normalize(camRight);
-  glm::vec3 camUp(cameraTransform[1]);
-  camUp = glm::normalize(camUp);
-  glm::vec3 camDir(cameraTransform[2]);
-  camDir = glm::normalize(camDir);
-  glm::vec3 camPos(cameraTransform[3]);
-
-  // Get position of camera in rotated coordinate system
-  float camXLen = glm::dot(camPos, camRight);
-  float camYLen = glm::dot(camPos, camUp);
-  float camZLen = glm::dot(camPos, camDir);
-
-  // Get angle between camera position and forward vector
-  float cameraAngleX = atan(camXLen / camZLen);
-  float cameraAngleY = atan(camYLen / camZLen);
-
-  // Get angle between ray towards center of volume and ray at edge of volume
-  float modelAngleX = asin(static_cast<float>(mDisplayNode->getRadii()[0]) /
-                           sqrt(camXLen * camXLen + camZLen * camZLen));
-  float modelAngleY = asin(static_cast<float>(mDisplayNode->getRadii()[0]) /
-                           sqrt(camYLen * camYLen + camZLen * camZLen));
-
-  // Get angle between rays at edges of volume and forward vector
-  float leftAngle, rightAngle, downAngle, upAngle;
-  if (!isnan(modelAngleX) && !isnan(modelAngleY)) {
-    leftAngle  = cameraAngleX - modelAngleX;
-    rightAngle = cameraAngleX + modelAngleX;
-    downAngle  = cameraAngleY - modelAngleY;
-    upAngle    = cameraAngleY + modelAngleY;
-  } else {
-    // If the camera is inside the volume the model angles will be NaN,
-    // so the angles are set to the edges of the field of view
-    leftAngle  = -fovXRad / 2;
-    rightAngle = fovXRad / 2;
-    downAngle  = -fovYRad / 2;
-    upAngle    = fovYRad / 2;
-  }
-
-  // Get edges of volume in image space coordinates
-  float leftPercent  = 0.5f + tan(leftAngle) / (2 * tan(fovXRad / 2));
-  float rightPercent = 0.5f + tan(rightAngle) / (2 * tan(fovXRad / 2));
-  float downPercent  = 0.5f + tan(downAngle) / (2 * tan(fovYRad / 2));
-  float upPercent    = 0.5f + tan(upAngle) / (2 * tan(fovYRad / 2));
+  // Get edges of body as screen space coordinates
+  Utility::CameraParams crop =
+      Utility::calculateCameraParams(static_cast<float>(mDisplayNode->getRadii()[0]),
+          mDisplayNode->getRelativeTransform(
+              mTimeControl->pSimulationTime.get(), mSolarSystem->getObserver()),
+          fovYRad, fovXRad);
 
   // Get near and far distance
   double                                      near, far;
@@ -249,8 +202,8 @@ bool DepthExtractor::Do() {
   depthBuffer.Bind(GL_TEXTURE0);
   glBindImageTexture(1, mOut.GetId(), 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_R32F);
 
-  glUniform2f(mUniforms.mBottomCorner, leftPercent, downPercent);
-  glUniform2f(mUniforms.mTopCorner, rightPercent, upPercent);
+  glUniform2f(mUniforms.mBottomCorner, crop.mLeft, crop.mBottom);
+  glUniform2f(mUniforms.mTopCorner, crop.mRight, crop.mTop);
   glUniform1f(mUniforms.mRadius, static_cast<float>(mDisplayNode->getRadii()[0]));
   glUniform1f(mUniforms.mNearDistance,
       static_cast<float>(

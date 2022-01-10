@@ -6,8 +6,10 @@
 
 #include "OSPRayRenderer.hpp"
 
+#include "../Utility.hpp"
 #include "../logger.hpp"
 
+#include "../../../../src/cs-utils/convert.hpp"
 #include "../../../../src/cs-utils/utils.hpp"
 
 #include <glm/ext/matrix_clip_space.hpp>
@@ -396,103 +398,31 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
   observerTransform[3] =
       observerTransform[3] * glm::vec4(volumeHeight, volumeHeight, volumeHeight, 1);
 
-  // Define vertical field of view for ospray camera
-  float fov    = 90;
-  float fovRad = fov / 180 * (float)M_PI;
+  float                 fov = 3.141f;
+  Utility::CameraParams crop =
+      Utility::calculateCameraParams(volumeHeight, observerTransform, fov, fov);
 
-  // Create camera transform looking along negative z
-  glm::mat4 cameraTransform(1);
-  cameraTransform[2][2] = -1;
+  rkcommon::math::vec3f camPosOsp{crop.mPos.x, crop.mPos.y, crop.mPos.z};
+  rkcommon::math::vec3f camUpOsp{crop.mUp.x, crop.mUp.y, crop.mUp.z};
+  rkcommon::math::vec3f camViewOsp{crop.mForward.x, crop.mForward.y, crop.mForward.z};
 
-  // Move camera to observer position relative to planet
-  cameraTransform = observerTransform * cameraTransform;
-
-  // Get base vectors of rotated coordinate system
-  glm::vec3 camRight(cameraTransform[0]);
-  camRight = glm::normalize(camRight);
-  glm::vec3 camUp(cameraTransform[1]);
-  camUp = glm::normalize(camUp);
-  glm::vec3 camDir(cameraTransform[2]);
-  camDir = glm::normalize(camDir);
-  glm::vec3 camPos(cameraTransform[3]);
-
-  // Get position of camera in rotated coordinate system
-  float camXLen = glm::dot(camPos, camRight);
-  float camYLen = glm::dot(camPos, camUp);
-  float camZLen = glm::dot(camPos, camDir);
-
-  // Get angle between camera position and forward vector
-  float cameraAngleX = atan(camXLen / camZLen);
-  float cameraAngleY = atan(camYLen / camZLen);
-
-  // Get angle between ray towards center of volume and ray at edge of volume
-  float modelAngleX = asin(volumeHeight / sqrt(camXLen * camXLen + camZLen * camZLen));
-  float modelAngleY = asin(volumeHeight / sqrt(camYLen * camYLen + camZLen * camZLen));
-
-  // Get angle between rays at edges of volume and forward vector
-  float leftAngle, rightAngle, downAngle, upAngle;
-  if (!isnan(modelAngleX) && !isnan(modelAngleY)) {
-    leftAngle  = cameraAngleX - modelAngleX;
-    rightAngle = cameraAngleX + modelAngleX;
-    downAngle  = cameraAngleY - modelAngleY;
-    upAngle    = cameraAngleY + modelAngleY;
-  } else {
-    // If the camera is inside the volume the model angles will be NaN,
-    // so the angles are set to the edges of the field of view
-    leftAngle  = -fovRad / 2;
-    rightAngle = fovRad / 2;
-    downAngle  = -fovRad / 2;
-    upAngle    = fovRad / 2;
-  }
-
-  // Get edges of volume in image space coordinates
-  float leftPercent  = 0.5f + tan(leftAngle) / (2 * tan(fovRad / 2));
-  float rightPercent = 0.5f + tan(rightAngle) / (2 * tan(fovRad / 2));
-  float downPercent  = 0.5f + tan(downAngle) / (2 * tan(fovRad / 2));
-  float upPercent    = 0.5f + tan(upAngle) / (2 * tan(fovRad / 2));
-
-  rkcommon::math::vec3f camPosOsp{camPos.x, camPos.y, camPos.z};
-  rkcommon::math::vec3f camUpOsp{camUp.x, camUp.y, camUp.z};
-  rkcommon::math::vec3f camViewOsp{camDir.x, camDir.y, camDir.z};
-
-  rkcommon::math::vec2f camImageStartOsp{leftPercent, downPercent};
-  rkcommon::math::vec2f camImageEndOsp{rightPercent, upPercent};
+  rkcommon::math::vec2f camImageStartOsp{crop.mLeft, crop.mBottom};
+  rkcommon::math::vec2f camImageEndOsp{crop.mRight, crop.mTop};
 
   ospray::cpp::Camera osprayCamera("perspective");
   osprayCamera.setParam("aspect", 1);
   osprayCamera.setParam("position", camPosOsp);
   osprayCamera.setParam("up", camUpOsp);
   osprayCamera.setParam("direction", camViewOsp);
-  osprayCamera.setParam("fovy", fov);
+  osprayCamera.setParam("fovy", cs::utils::convert::toDegrees(fov));
   osprayCamera.setParam("imageStart", camImageStartOsp);
   osprayCamera.setParam("imageEnd", camImageEndOsp);
   osprayCamera.commit();
 
-  glm::mat4 model = glm::scale(glm::mat4(1), glm::vec3(volumeHeight));
-  glm::mat4 view  = glm::translate(glm::mat4(1.f), -glm::vec3(camXLen, camYLen, -camZLen));
-
-  float nearClip = -camZLen - volumeHeight;
-  float farClip  = -camZLen + volumeHeight;
-  if (nearClip < 0) {
-    nearClip = 0.00001f;
-  }
-  float     leftClip  = tan(leftAngle) * nearClip;
-  float     rightClip = tan(rightAngle) * nearClip;
-  float     downClip  = tan(downAngle) * nearClip;
-  float     upClip    = tan(upAngle) * nearClip;
-  glm::mat4 projection(0);
-  projection[0][0] = 2 * nearClip / (rightClip - leftClip);
-  projection[1][1] = 2 * nearClip / (upClip - downClip);
-  projection[2][0] = (rightClip + leftClip) / (rightClip - leftClip);
-  projection[2][1] = (upClip + downClip) / (upClip - downClip);
-  projection[2][2] = -(farClip + nearClip) / (farClip - nearClip);
-  projection[2][3] = -1;
-  projection[3][2] = -2 * farClip * nearClip / (farClip - nearClip);
-
   Camera camera;
   camera.mOsprayCamera = osprayCamera;
-  camera.mModelView    = view * model;
-  camera.mProjection   = projection;
+  camera.mModelView    = crop.mModelView;
+  camera.mProjection   = crop.mProjection;
   return camera;
 }
 
