@@ -7,6 +7,8 @@
 #include "Utility.hpp"
 #include "logger.hpp"
 
+#include <cmath>
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace csp::volumerendering::Utility {
@@ -46,7 +48,7 @@ CameraParams calculateCameraParams(
 
   // Get angle between rays at edges of volume and forward vector
   float leftAngle, rightAngle, downAngle, upAngle;
-  if (!isnan(modelAngleX) && !isnan(modelAngleY)) {
+  if (!std::isnan(modelAngleX) && !std::isnan(modelAngleY)) {
     leftAngle  = cameraAngleX - modelAngleX;
     rightAngle = cameraAngleX + modelAngleX;
     downAngle  = cameraAngleY - modelAngleY;
