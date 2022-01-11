@@ -159,14 +159,12 @@ bool DepthExtractor::Do() {
     return true;
   }
 
-  // Get field of view and aspect ratio
+  // Get field of view
   glm::mat4 glMatP;
   glGetFloatv(GL_PROJECTION_MATRIX, reinterpret_cast<GLfloat*>(&glMatP));
 
-  float aspect  = glMatP[1][1] / glMatP[0][0];
-  float fovYRad = 2.f * atan(1.f / glMatP[1][1]);
-  float fovXRad = fovYRad * aspect;
-  fovXRad *= 0.9f;
+  float fovYRad = 2.f * std::atan(1.f / glMatP[1][1]);
+  float fovXRad = 2.f * std::atan(1.f / glMatP[0][0]);
 
   // Get edges of body as screen space coordinates
   Utility::CameraParams crop =
