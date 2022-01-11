@@ -636,7 +636,8 @@ bool Plugin::tryRequestFrame() {
     glm::vec4 dir = glm::vec4(mSolarSystem->getSunDirection(mActiveDisplay->getWorldPosition()), 1);
     dir           = dir * glm::inverse(mRenderingFrame.mCameraTransform);
     mRenderer->setSunDirection(dir);
-    mFutureFrameData   = mRenderer->getFrame(mRenderingFrame.mCameraTransform, std::move(depthBuffer));
+    mFutureFrameData =
+        mRenderer->getFrame(mRenderingFrame.mCameraTransform, std::move(depthBuffer));
     mLastFrameInterval = 0;
     mParametersDirty   = false;
     mFrameInvalid      = false;
