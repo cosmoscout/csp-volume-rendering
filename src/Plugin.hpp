@@ -63,7 +63,7 @@ struct get_ui_type<float> {
 template <typename T>
 constexpr int SETTINGS_COUNT = 0;
 template <>
-inline constexpr int SETTINGS_COUNT<bool> = 11;
+inline constexpr int SETTINGS_COUNT<bool> = 12;
 template <>
 inline constexpr int SETTINGS_COUNT<int> = 2;
 template <>
@@ -256,6 +256,7 @@ class Plugin : public cs::core::PluginBase {
   };
 
   void setResolution(int value);
+  void setUseMaxDepth(bool value);
   void setDepthData(bool value);
   void setDrawDepth(bool value);
   void setScalar(std::string const& value);

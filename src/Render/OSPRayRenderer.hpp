@@ -126,7 +126,7 @@ class OSPRayRenderer : public Renderer {
   std::mutex                         mRenderFutureMutex;
 
   std::unique_ptr<Renderer::RenderedImage> getFrameImpl(glm::mat4 const& cameraTransform,
-      std::vector<float>&& maxDepth, Parameters parameters,
+      std::optional<std::vector<float>>&& maxDepth, Parameters parameters,
       DataManager::State const& dataState) override;
 
   const Volume& getVolume(DataManager::State const& state, std::optional<int> const& maxLod);
@@ -138,7 +138,8 @@ class OSPRayRenderer : public Renderer {
       Volume const& volume, Parameters const& parameters, DataManager::State const& dataState);
   OSPRayRenderer::Camera getCamera(float volumeHeight, glm::mat4 observerTransform);
   void renderFrame(ospray::cpp::World const& world, ospray::cpp::Camera const& camera,
-      std::vector<float>&& maxDepth, Parameters const& parameters, bool resetAccumulation);
+      std::optional<std::vector<float>>&& maxDepth, Parameters const& parameters,
+      bool resetAccumulation);
 };
 
 } // namespace csp::volumerendering

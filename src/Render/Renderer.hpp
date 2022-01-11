@@ -152,7 +152,7 @@ class Renderer {
   /// and will not be influenced by any later changes to the parameters.
   /// Returns a future that will eventually contain the rendered image.
   std::future<std::unique_ptr<Renderer::RenderedImage>> getFrame(
-      glm::mat4 const& cameraTransform, std::vector<float>&& maxDepth);
+      glm::mat4 const& cameraTransform, std::optional<std::vector<float>>&& maxDepth);
   /// Returns the current progress of the rendering processon the range [0,1].
   /// Returns 1 if no image is currently being rendered.
   virtual float getProgress() = 0;
@@ -252,7 +252,7 @@ class Renderer {
   const VolumeShape     mShape;
 
   virtual std::unique_ptr<RenderedImage> getFrameImpl(glm::mat4 const& cameraTransform,
-      std::vector<float>&& maxDepth, Parameters parameters,
+      std::optional<std::vector<float>>&& maxDepth, Parameters parameters,
       DataManager::State const& dataState) = 0;
 
  private:

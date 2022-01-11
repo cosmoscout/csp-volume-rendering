@@ -128,6 +128,7 @@ These settings can also be dynamically changed in the CosmoScout UI.
 | *samplingRate* | float | `0.05` | Sampling rate to be used while rendering. Higher values result in higher quality images with less noise. |
 | *maxPasses* | int | `10` | Maximum number of additional render passes for progressive rendering. |
 | *densityScale* | float | `1` | Sets the density of the volume. |
+| *useMaxDepth* | bool | `true` | Use the depth buffer from CosmoScout's rendering pipeline as the maximum depth when rendering the volume. |
 | *denoiseColor* | bool | `true` | Use the OIDN library to denoise the color image of the volume before displaying it in CosmoScout. |
 | *denoiseDepth* | bool | `true` | Use the OIDN library to denoise the image containing depth information of the volume before using it for image based rendering. |
 | *depthMode* | `"none"` / `"isosurface"` / `"firstHit"` / `"lastHit"` / `"threshold"` / `"multiThreshold"` | `"none"` | Heuristic for determining per pixel depth values for the rendered images. |
@@ -238,7 +239,7 @@ The animation can be started and paused using the button at the bottom of the se
 
 ### Rendering
 
-The rendering section contains sliders for setting the rendering parameters resolution, sampling rate, maximume amount of render passes and density scale, that can also be set using properties in the settings.json file.
+The rendering section contains sliders and checkboxes for setting the rendering parameters resolution, sampling rate, maximum amount of render passes, density scale and usage of max depth, that can also be set using properties in the settings.json file.
 Information on these settings can be found under [Configuration - Rendering settings](#rendering-settings).
 
 The progressive rendering enabled by setting "Max Passes" to a value greater than `1` will run additional render passes to produce better quality images, as long as no parameters (such as camera perspective or most of the settings configurable in the UI) change.

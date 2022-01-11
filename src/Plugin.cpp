@@ -406,6 +406,9 @@ Plugin::Setting<bool>::getSettings(Settings& pluginSettings) {
       // Rendering settings
       Setting<bool>{"setEnableRequestImages", "If disabled no new images will be rendered.",
           pluginSettings.mRendering.mRequestImages},
+      Setting<bool>{"setUseMaxDepth",
+          "If enabled, rendering will use CosmoScout's depth buffer as the maximum depth.",
+          pluginSettings.mRendering.mUseMaxDepth, {}, &Plugin::setUseMaxDepth},
       Setting<bool>{"setEnableDenoiseColor", "Enables use of OIDN for displaying color data.",
           pluginSettings.mRendering.mDenoiseColor, &Renderer::setDenoiseColor},
       Setting<bool>{"setEnableDenoiseDepth", "Enables use of OIDN for displaying depth data.",
@@ -564,6 +567,12 @@ void csp::volumerendering::Plugin::setResolution(int value) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void Plugin::setUseMaxDepth(bool value) {
+  mDepthExtractor->setEnabled(value);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void csp::volumerendering::Plugin::setDepthData(bool value) {
   for (auto const& node : mDisplayNodes) {
     node.second->setUseDepth(value);
@@ -615,18 +624,19 @@ bool Plugin::tryRequestFrame() {
   if (mActiveDisplay->pVisible.get()) {
     cs::utils::FrameTimings::ScopedTimer timer("Request frame");
 
-    auto depthBuffer =
-        mDepthExtractor->getDepthBuffer(mPluginSettings.mRendering.mResolution.get());
-    if (!depthBuffer.has_value()) {
-      return false;
+    std::optional<std::vector<float>> depthBuffer;
+    if (mPluginSettings.mRendering.mUseMaxDepth.get()) {
+      depthBuffer = mDepthExtractor->getDepthBuffer(mPluginSettings.mRendering.mResolution.get());
+      if (!depthBuffer.has_value()) {
+        return false;
+      }
     }
 
     mRenderingFrame = mNextFrame;
     glm::vec4 dir = glm::vec4(mSolarSystem->getSunDirection(mActiveDisplay->getWorldPosition()), 1);
     dir           = dir * glm::inverse(mRenderingFrame.mCameraTransform);
     mRenderer->setSunDirection(dir);
-    mFutureFrameData =
-        mRenderer->getFrame(mRenderingFrame.mCameraTransform, std::move(depthBuffer.value()));
+    mFutureFrameData   = mRenderer->getFrame(mRenderingFrame.mCameraTransform, std::move(depthBuffer));
     mLastFrameInterval = 0;
     mParametersDirty   = false;
     mFrameInvalid      = false;
