@@ -10,12 +10,8 @@
 #include "Shaders.hpp"
 
 #include "../../../../src/cs-utils/FrameTimings.hpp"
-#include "../../../../src/cs-utils/convert.hpp"
 #include "../../../../src/cs-utils/utils.hpp"
 
-#include <VistaKernel/DisplayManager/VistaDisplayManager.h>
-#include <VistaKernel/DisplayManager/VistaProjection.h>
-#include <VistaKernel/DisplayManager/VistaViewport.h>
 #include <VistaKernel/GraphicsManager/VistaSceneGraph.h>
 #include <VistaKernel/GraphicsManager/VistaTransformNode.h>
 #include <VistaKernel/VistaSystem.h>
