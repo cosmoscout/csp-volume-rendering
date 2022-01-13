@@ -6,8 +6,10 @@
 
 #include "OSPRayRenderer.hpp"
 
+#include "../Utility.hpp"
 #include "../logger.hpp"
 
+#include "../../../../src/cs-utils/convert.hpp"
 #include "../../../../src/cs-utils/utils.hpp"
 
 #include <glm/ext/matrix_clip_space.hpp>
@@ -81,7 +83,8 @@ void OSPRayRenderer::cancelRendering() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::unique_ptr<Renderer::RenderedImage> OSPRayRenderer::getFrameImpl(
-    glm::mat4 const& cameraTransform, Parameters parameters, DataManager::State const& dataState) {
+    glm::mat4 const& cameraTransform, std::optional<std::vector<float>>&& maxDepth,
+    Parameters parameters, DataManager::State const& dataState) {
   // Shift filter attribute indices by one, because the scalar list used by the renderer is shifted
   // by one so that the active scalar can be placed at index 0.
   for (ScalarFilter& filter : parameters.mScalarFilters) {
@@ -101,9 +104,10 @@ std::unique_ptr<Renderer::RenderedImage> OSPRayRenderer::getFrameImpl(
     }
     if (!(cameraTransform == mCache.mState.mCameraTransform &&
             dataState == mCache.mState.mDataState && volume.mLod == mCache.mState.mVolumeLod)) {
-      mCache.mCamera = getCamera(volume.mHeight, cameraTransform);
+      mCache.mCamera = getCamera(1, cameraTransform);
     }
-    renderFrame(mCache.mWorld, mCache.mCamera.mOsprayCamera, parameters, !(mCache.mState == state));
+    renderFrame(mCache.mWorld, mCache.mCamera.mOsprayCamera, std::move(maxDepth), parameters,
+        !(mCache.mState == state));
     RenderedImage renderedImage(
         mCache.mFrameBuffer, mCache.mCamera, volume.mHeight, parameters, cameraTransform);
     renderedImage.setValid(!mRenderingCancelled);
@@ -269,7 +273,7 @@ void OSPRayRenderer::updateWorld(
           parameters.mWorld.mLights.mShading ==
               mCache.mState.mParameters.mWorld.mLights.mShading)) {
     mCache.mVolumeModel.setParam("transferFunction", transferFunction);
-    mCache.mVolumeModel.setParam("densityScale", parameters.mWorld.mVolume.mDensityScale);
+    mCache.mVolumeModel.setParam("densityScale", parameters.mWorld.mVolume.mDensityScale * 10.f);
     mCache.mVolumeModel.setParam(
         "gradientShadingScale", parameters.mWorld.mLights.mShading ? 1.f : 0.f);
     mCache.mVolumeModel.commit();
@@ -361,6 +365,9 @@ void OSPRayRenderer::updateWorld(
 
   if (updateGroup) {
     mCache.mGroup.commit();
+
+    rkcommon::math::affine3f transform = rkcommon::math::affine3f::scale(1.f / volume.mHeight);
+    mCache.mInstance.setParam("xfm", transform);
     mCache.mInstance.commit();
   }
 
@@ -391,117 +398,58 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
   observerTransform[3] =
       observerTransform[3] * glm::vec4(volumeHeight, volumeHeight, volumeHeight, 1);
 
-  // Define vertical field of view for ospray camera
-  float fov    = 90;
-  float fovRad = fov / 180 * (float)M_PI;
+  float                 fov = 3.141f;
+  Utility::CameraParams crop =
+      Utility::calculateCameraParams(volumeHeight, observerTransform, fov, fov);
 
-  // Create camera transform looking along negative z
-  glm::mat4 cameraTransform(1);
-  cameraTransform[2][2] = -1;
+  rkcommon::math::vec3f camPosOsp{crop.mPos.x, crop.mPos.y, crop.mPos.z};
+  rkcommon::math::vec3f camUpOsp{crop.mUp.x, crop.mUp.y, crop.mUp.z};
+  rkcommon::math::vec3f camViewOsp{crop.mForward.x, crop.mForward.y, crop.mForward.z};
 
-  // Move camera to observer position relative to planet
-  cameraTransform = observerTransform * cameraTransform;
-
-  // Get base vectors of rotated coordinate system
-  glm::vec3 camRight(cameraTransform[0]);
-  camRight = glm::normalize(camRight);
-  glm::vec3 camUp(cameraTransform[1]);
-  camUp = glm::normalize(camUp);
-  glm::vec3 camDir(cameraTransform[2]);
-  camDir = glm::normalize(camDir);
-  glm::vec3 camPos(cameraTransform[3]);
-
-  // Get position of camera in rotated coordinate system
-  float camXLen = glm::dot(camPos, camRight);
-  float camYLen = glm::dot(camPos, camUp);
-  float camZLen = glm::dot(camPos, camDir);
-
-  // Get angle between camera position and forward vector
-  float cameraAngleX = atan(camXLen / camZLen);
-  float cameraAngleY = atan(camYLen / camZLen);
-
-  // Get angle between ray towards center of volume and ray at edge of volume
-  float modelAngleX = asin(volumeHeight / sqrt(camXLen * camXLen + camZLen * camZLen));
-  float modelAngleY = asin(volumeHeight / sqrt(camYLen * camYLen + camZLen * camZLen));
-
-  // Get angle between rays at edges of volume and forward vector
-  float leftAngle, rightAngle, downAngle, upAngle;
-  if (!isnan(modelAngleX) && !isnan(modelAngleY)) {
-    leftAngle  = cameraAngleX - modelAngleX;
-    rightAngle = cameraAngleX + modelAngleX;
-    downAngle  = cameraAngleY - modelAngleY;
-    upAngle    = cameraAngleY + modelAngleY;
-  } else {
-    // If the camera is inside the volume the model angles will be NaN,
-    // so the angles are set to the edges of the field of view
-    leftAngle  = -fovRad / 2;
-    rightAngle = fovRad / 2;
-    downAngle  = -fovRad / 2;
-    upAngle    = fovRad / 2;
-  }
-
-  // Get edges of volume in image space coordinates
-  float leftPercent  = 0.5f + tan(leftAngle) / (2 * tan(fovRad / 2));
-  float rightPercent = 0.5f + tan(rightAngle) / (2 * tan(fovRad / 2));
-  float downPercent  = 0.5f + tan(downAngle) / (2 * tan(fovRad / 2));
-  float upPercent    = 0.5f + tan(upAngle) / (2 * tan(fovRad / 2));
-
-  rkcommon::math::vec3f camPosOsp{camPos.x, camPos.y, camPos.z};
-  rkcommon::math::vec3f camUpOsp{camUp.x, camUp.y, camUp.z};
-  rkcommon::math::vec3f camViewOsp{camDir.x, camDir.y, camDir.z};
-
-  rkcommon::math::vec2f camImageStartOsp{leftPercent, downPercent};
-  rkcommon::math::vec2f camImageEndOsp{rightPercent, upPercent};
+  rkcommon::math::vec2f camImageStartOsp{crop.mLeft, crop.mBottom};
+  rkcommon::math::vec2f camImageEndOsp{crop.mRight, crop.mTop};
 
   ospray::cpp::Camera osprayCamera("perspective");
   osprayCamera.setParam("aspect", 1);
   osprayCamera.setParam("position", camPosOsp);
   osprayCamera.setParam("up", camUpOsp);
   osprayCamera.setParam("direction", camViewOsp);
-  osprayCamera.setParam("fovy", fov);
+  osprayCamera.setParam("fovy", cs::utils::convert::toDegrees(fov));
   osprayCamera.setParam("imageStart", camImageStartOsp);
   osprayCamera.setParam("imageEnd", camImageEndOsp);
   osprayCamera.commit();
 
-  glm::mat4 model = glm::scale(glm::mat4(1), glm::vec3(volumeHeight));
-  glm::mat4 view  = glm::translate(glm::mat4(1.f), -glm::vec3(camXLen, camYLen, -camZLen));
-
-  float nearClip = -camZLen - volumeHeight;
-  float farClip  = -camZLen + volumeHeight;
-  if (nearClip < 0) {
-    nearClip = 0.00001f;
-  }
-  float     leftClip  = tan(leftAngle) * nearClip;
-  float     rightClip = tan(rightAngle) * nearClip;
-  float     downClip  = tan(downAngle) * nearClip;
-  float     upClip    = tan(upAngle) * nearClip;
-  glm::mat4 projection(0);
-  projection[0][0] = 2 * nearClip / (rightClip - leftClip);
-  projection[1][1] = 2 * nearClip / (upClip - downClip);
-  projection[2][0] = (rightClip + leftClip) / (rightClip - leftClip);
-  projection[2][1] = (upClip + downClip) / (upClip - downClip);
-  projection[2][2] = -(farClip + nearClip) / (farClip - nearClip);
-  projection[2][3] = -1;
-  projection[3][2] = -2 * farClip * nearClip / (farClip - nearClip);
-
   Camera camera;
   camera.mOsprayCamera = osprayCamera;
-  camera.mModelView    = view * model;
-  camera.mProjection   = projection;
+  camera.mModelView    = crop.mModelView;
+  camera.mProjection   = crop.mProjection;
   return camera;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void OSPRayRenderer::renderFrame(ospray::cpp::World const& world, ospray::cpp::Camera const& camera,
-    Parameters const& parameters, bool resetAccumulation) {
+    std::optional<std::vector<float>>&& maxDepth, Parameters const& parameters,
+    bool resetAccumulation) {
   ospray::cpp::Renderer renderer("volume_depth");
+
+  if (maxDepth.has_value()) {
+    ospray::cpp::Texture maxDepthTex("texture2d");
+    maxDepthTex.setParam("format", OSP_TEXTURE_R32F);
+    maxDepthTex.setParam(
+        "data", ospray::cpp::SharedData(maxDepth.value().data(), OSP_FLOAT,
+                    rkcommon::math::vec2i(parameters.mResolution, parameters.mResolution)));
+    maxDepthTex.commit();
+
+    renderer.setParam("map_maxDepth", maxDepthTex);
+  }
+
+  const void* filtersPtr = parameters.mScalarFilters.data();
+  renderer.setParam("scalarFilters", OSP_VOID_PTR, &filtersPtr);
   renderer.setParam("aoSamples", 0);
   renderer.setParam("shadows", false);
   renderer.setParam("volumeSamplingRate", parameters.mSamplingRate);
   renderer.setParam("depthMode", (int)parameters.mWorld.mDepthMode);
-  const void* filtersPtr = parameters.mScalarFilters.data();
-  renderer.setParam("scalarFilters", OSP_VOID_PTR, &filtersPtr);
   renderer.setParam("numScalarFilters", (int)parameters.mScalarFilters.size());
   renderer.commit();
 

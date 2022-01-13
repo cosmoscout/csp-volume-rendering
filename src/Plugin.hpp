@@ -8,6 +8,7 @@
 #define CSP_VOLUME_RENDERING_PLUGIN_HPP
 
 #include "Data/DataManager.hpp"
+#include "Display/DepthExtractor.hpp"
 #include "Display/DisplayNode.hpp"
 #include "Enums.hpp"
 #include "Render/Renderer.hpp"
@@ -62,7 +63,7 @@ struct get_ui_type<float> {
 template <typename T>
 constexpr int SETTINGS_COUNT = 0;
 template <>
-inline constexpr int SETTINGS_COUNT<bool> = 11;
+inline constexpr int SETTINGS_COUNT<bool> = 12;
 template <>
 inline constexpr int SETTINGS_COUNT<int> = 2;
 template <>
@@ -254,6 +255,7 @@ class Plugin : public cs::core::PluginBase {
   };
 
   void setResolution(int value);
+  void setUseMaxDepth(bool value);
   void setDepthData(bool value);
   void setDrawDepth(bool value);
   void setScalar(std::string const& value);
@@ -295,6 +297,7 @@ class Plugin : public cs::core::PluginBase {
   std::shared_ptr<DataManager>                        mDataManager;
   std::map<DisplayMode, std::shared_ptr<DisplayNode>> mDisplayNodes;
   std::shared_ptr<DisplayNode>                        mActiveDisplay;
+  std::unique_ptr<DepthExtractor>                     mDepthExtractor;
 
   RenderState mRenderState = RenderState::eWaitForData;
 

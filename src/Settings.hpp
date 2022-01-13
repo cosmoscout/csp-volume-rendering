@@ -49,6 +49,7 @@ struct Settings {
     cs::utils::DefaultProperty<float>       mSamplingRate{0.05f};
     cs::utils::DefaultProperty<int>         mMaxPasses{10};
     cs::utils::DefaultProperty<float>       mDensityScale{1.f};
+    cs::utils::DefaultProperty<bool>        mUseMaxDepth{true};
     cs::utils::DefaultProperty<bool>        mDenoiseColor{true};
     cs::utils::DefaultProperty<bool>        mDenoiseDepth{true};
     cs::utils::DefaultProperty<DepthMode>   mDepthMode{DepthMode::eNone};

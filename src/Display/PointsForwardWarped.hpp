@@ -29,8 +29,9 @@ class PointsForwardWarped : public DisplayNode {
   PointsForwardWarped& operator=(PointsForwardWarped const& other) = delete;
   PointsForwardWarped& operator=(PointsForwardWarped&& other) = default;
 
+ protected:
   /// Interface implementation of IVistaOpenGLDraw.
-  bool Do() override;
+  bool DoImpl() override;
 
  private:
   void createBuffers();

@@ -29,8 +29,9 @@ class Billboard : public DisplayNode {
   Billboard& operator=(Billboard const& other) = delete;
   Billboard& operator=(Billboard&& other) = default;
 
+ protected:
   /// Interface implementation of IVistaOpenGLDraw.
-  bool Do() override;
+  bool DoImpl() override;
 
  private:
   void createBuffers();

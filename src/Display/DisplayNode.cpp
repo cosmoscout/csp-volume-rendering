@@ -72,6 +72,7 @@ void DisplayNode::setDepthTexture(float* texture, int width, int height) {
   mDepthTexture.Bind();
   glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, width, height, 0, GL_RED, GL_FLOAT, texture);
   glTexParameteri(mDepthTexture.GetTarget(), GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  mDepthTexture.Unbind();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -104,6 +105,15 @@ void DisplayNode::setDrawDepth(bool drawDepth) {
 
 glm::dvec3 DisplayNode::getRadii() const {
   return mRadii;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+bool DisplayNode::Do() {
+  if (!mEnabled || !getIsInExistence() || !pVisible.get()) {
+    return true;
+  }
+  return DoImpl();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -218,6 +218,34 @@ void main()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const std::string GET_DEPTH_COMP = R"(
+#version 430
+
+layout(local_size_x = 1, local_size_y = 1) in;
+
+layout(rgba32f, binding = 0) readonly uniform sampler2DRect uInDepth;
+layout(r32f, binding = 1) writeonly uniform image2D uOutDepth;
+
+uniform vec2 uBottomCorner;
+uniform vec2 uTopCorner;
+uniform float uRadius;
+uniform float uNear;
+uniform float uFar;
+
+void main() {
+    vec2 pos = uBottomCorner + (vec2(gl_GlobalInvocationID.xy) + vec2(0.5f)) /
+        vec2(gl_NumWorkGroups * gl_WorkGroupSize) * (uTopCorner - uBottomCorner);
+    ivec2 pix = ivec2(gl_GlobalInvocationID);
+
+    vec4 val = texture(uInDepth, pos * textureSize(uInDepth));
+    val *= uFar / uRadius;
+
+    imageStore(uOutDepth, pix, val);
+}
+)";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 } // namespace csp::volumerendering
 
 #endif // CSP_VOLUME_RENDERING_SHADERS_HPP
