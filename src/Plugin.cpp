@@ -367,9 +367,19 @@ void Plugin::connectAllSettings() {
   mDataManager->pScalars.connectAndTouch([this](std::vector<Scalar> scalars) {
     mGuiManager->getGui()->callJavascript(
         "CosmoScout.gui.clearDropdown", "volumeRendering.setScalar");
+    mGuiManager->getGui()->callJavascript(
+        "CosmoScout.gui.clearDropdown", "volumeRendering.setCoreScalar");
+    mGuiManager->getGui()->callJavascript(
+        "CosmoScout.gui.addDropdownValue", "volumeRendering.setCoreScalar", "none", "None", true);
     for (Scalar scalar : scalars) {
       mGuiManager->getGui()->callJavascript("CosmoScout.gui.addDropdownValue",
           "volumeRendering.setScalar", scalar.getId(), scalar.mName, false);
+      bool correctCoreScalar = false;
+      if (mPluginSettings.mCore.has_value()) {
+        correctCoreScalar = (scalar.getId() == mPluginSettings.mCore->mScalar.get());
+      }
+      mGuiManager->getGui()->callJavascript("CosmoScout.gui.addDropdownValue",
+          "volumeRendering.setCoreScalar", scalar.getId(), scalar.mName, correctCoreScalar);
     }
     if (scalars.size() > 0) {
       auto activeScalar = std::find_if(scalars.begin(), scalars.end(),
@@ -553,6 +563,10 @@ void Plugin::initUI() {
       "CosmoScout.volumeRendering.initParcoords(`" + mDataManager->getCsvData() + "`, `" +
       (mPluginSettings.mPathlines ? mDataManager->getPathlines().getCsvData() : "") + "`);");
 
+  if (mPluginSettings.mCore.has_value()) {
+    mGuiManager->getGui()->callJavascript(
+        "CosmoScout.volumeRendering.enableSettingsSection", "core");
+  }
   if (mPluginSettings.mPathlines.has_value()) {
     mGuiManager->getGui()->callJavascript(
         "CosmoScout.volumeRendering.enableSettingsSection", "pathlines");
