@@ -45,6 +45,27 @@
 
       this._enablePathlinesParcoordsCheckbox =
           document.querySelector(`[data-callback="volumeRendering.setEnablePathlinesParcoords"]`);
+
+      this._coreScalarDropdown =
+          document.getElementById("volumeRendering-coreScalarDropdown").querySelector("button");
+      this._coreScalarCheckbox = document.getElementById("volumeRendering-coreScalarCheckbox");
+      this._scalarDropdown     = document.querySelector(`[data-callback="volumeRendering.setScalar"]`);
+      this._coreScalarCheckbox.addEventListener("change", (e) => {
+        this._coreScalarDropdown.disabled = e.target.checked;
+        if (e.target.checked) {
+          this._coreScalarDropdown.classList.add("unresponsive");
+          console.log($(this._scalarDropdown).val());
+          CosmoScout.gui.setDropdownValue(
+              "volumeRendering.setCoreScalar", this._scalarDropdown.value, true);
+        } else {
+          this._coreScalarDropdown.classList.remove("unresponsive");
+        }
+      });
+      this._scalarDropdown.addEventListener("change", (e) => {
+        if (this._coreScalarCheckbox.checked) {
+          CosmoScout.gui.setDropdownValue("volumeRendering.setCoreScalar", e.target.value, true);
+        }
+      });
     }
 
     enableSettingsSection(section, enable = true) {

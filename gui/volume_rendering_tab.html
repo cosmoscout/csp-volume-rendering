@@ -390,10 +390,20 @@
       </div>
 
       <div class="row">
+        <div class="col-7 offset-5">
+          <label class="checklabel">
+            <input id="volumeRendering-coreScalarCheckbox" data-callback="volumeRendering.setEnableDependentCoreScalar" type="checkbox" />
+            <i class="material-icons"></i>
+            <span>Use same scalar as volume</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
         <div class="col-5">
           Scalar
         </div>
-        <div class="col-7">
+        <div id="volumeRendering-coreScalarDropdown" class="col-7">
           <select data-callback="volumeRendering.setCoreScalar" class="simple-value-dropdown"></select>
         </div>
       </div>

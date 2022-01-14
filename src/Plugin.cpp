@@ -442,6 +442,8 @@ Plugin::Setting<bool>::getSettings(Settings& pluginSettings) {
           ? Setting<bool>{"setEnableCore", "Enable/disable rendering of core",
                 pluginSettings.mCore->mEnabled, &Renderer::setCoreEnabled}
           : Setting<bool>{},
+      pluginSettings.mCore.has_value() ? Setting<bool>{"setEnableDependentCoreScalar", ""}
+                                       : Setting<bool>{},
       // Pathline settings
       pluginSettings.mPathlines.has_value()
           ? Setting<bool>{"setEnablePathlines", "Enable/disable rendering of pathlines.",

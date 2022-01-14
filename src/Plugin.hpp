@@ -63,7 +63,7 @@ struct get_ui_type<float> {
 template <typename T>
 constexpr int SETTINGS_COUNT = 0;
 template <>
-inline constexpr int SETTINGS_COUNT<bool> = 12;
+inline constexpr int SETTINGS_COUNT<bool> = 13;
 template <>
 inline constexpr int SETTINGS_COUNT<int> = 2;
 template <>
