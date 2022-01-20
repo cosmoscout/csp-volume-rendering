@@ -264,7 +264,7 @@ void OSPRayRenderer::updateWorld(
         mCache.mCoreMaterial.commit();
       }
 
-      mCache.mCore.setParam("radius", parameters.mWorld.mCore.mRadius);
+      mCache.mCore.setParam("radius", parameters.mWorld.mCore.mRadius * volume.mHeight);
       mCache.mCore.commit();
     }
   }

@@ -495,7 +495,7 @@ Plugin::Setting<float>::getSettings(Settings& pluginSettings) {
       // Core settings
       pluginSettings.mCore.has_value()
           ? Setting<float>{"setCoreRadius", "Sets the radius of the rendered core.",
-                pluginSettings.mCore->mRadius, &Renderer::setCoreRadius}
+                pluginSettings.mCore->mRadius, {}, &Plugin::setCoreRadius}
           : Setting<float>{},
       // Pathline settings
       pluginSettings.mPathlines.has_value()
@@ -565,6 +565,9 @@ void Plugin::initUI() {
       "CosmoScout.volumeRendering.initParcoords(`" + mDataManager->getCsvData() + "`, `" +
       (mPluginSettings.mPathlines ? mDataManager->getPathlines().getCsvData() : "") + "`);");
 
+  mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setMaxCoreRadius",
+      mAllSettings->getAnchorRadii(mPluginSettings.mTransform.mAnchor.get())[0] / 1000.);
+
   if (mPluginSettings.mCore.has_value()) {
     mGuiManager->getGui()->callJavascript(
         "CosmoScout.volumeRendering.enableSettingsSection", "core");
@@ -632,6 +635,15 @@ void csp::volumerendering::Plugin::setDisplayMode(DisplayMode value) {
     // TODO What to do here?
     mParametersDirty = true;
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Plugin::setCoreRadius(float value) {
+  invalidateCache();
+  // Normalize core radius for renderer
+  mRenderer->setCoreRadius(
+      value / mAllSettings->getAnchorRadii(mPluginSettings.mTransform.mAnchor.get())[0] * 1000.);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -785,7 +797,7 @@ std::vector<ScalarFilter> csp::volumerendering::Plugin::parseScalarFilters(
   std::vector<ScalarFilter> filters;
   for (auto const& [axis, value] : j.items()) {
     auto const& scalar = std::find_if(scalars.begin(), scalars.end(),
-        [& axis = axis](Scalar const& s) { return s.mName == axis; });
+        [&axis = axis](Scalar const& s) { return s.mName == axis; });
     if (scalar != scalars.end()) {
       ScalarFilter filter;
       filter.mAttrIndex = (int)std::distance(scalars.begin(), scalar);

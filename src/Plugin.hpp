@@ -260,6 +260,7 @@ class Plugin : public cs::core::PluginBase {
   void setDrawDepth(bool value);
   void setScalar(std::string const& value);
   void setDisplayMode(DisplayMode value);
+  void setCoreRadius(float value);
 
   bool tryRequestFrame();
 

@@ -22,8 +22,6 @@
       CosmoScout.gui.initSlider("volumeRendering.setMaxRenderPasses", 1, 100, 1, [10]);
       CosmoScout.gui.initSlider("volumeRendering.setDensityScale", 0, 10, 0.1, [1]);
 
-      CosmoScout.gui.initSlider("volumeRendering.setCoreRadius", 1, 20000, 1, [1]);
-
       CosmoScout.gui.initSlider("volumeRendering.setPathlineSize", 1, 20, 1, [1]);
 
       CosmoScout.gui.initSlider("volumeRendering.setSunStrength", 0, 10, 0.1, [1]);
@@ -46,15 +44,16 @@
       this._enablePathlinesParcoordsCheckbox =
           document.querySelector(`[data-callback="volumeRendering.setEnablePathlinesParcoords"]`);
 
+      this._coreRadiusSlider =
+          document.querySelector(`[data-callback="volumeRendering.setCoreRadius"]`);
       this._coreScalarDropdown =
           document.getElementById("volumeRendering-coreScalarDropdown").querySelector("button");
       this._coreScalarCheckbox = document.getElementById("volumeRendering-coreScalarCheckbox");
-      this._scalarDropdown     = document.querySelector(`[data-callback="volumeRendering.setScalar"]`);
+      this._scalarDropdown = document.querySelector(`[data-callback="volumeRendering.setScalar"]`);
       this._coreScalarCheckbox.addEventListener("change", (e) => {
         this._coreScalarDropdown.disabled = e.target.checked;
         if (e.target.checked) {
           this._coreScalarDropdown.classList.add("unresponsive");
-          console.log($(this._scalarDropdown).val());
           CosmoScout.gui.setDropdownValue(
               "volumeRendering.setCoreScalar", this._scalarDropdown.value, true);
         } else {
@@ -66,6 +65,10 @@
           CosmoScout.gui.setDropdownValue("volumeRendering.setCoreScalar", e.target.value, true);
         }
       });
+    }
+
+    setMaxCoreRadius(radius) {
+      CosmoScout.gui.initSlider("volumeRendering.setCoreRadius", 1, radius, 1, [radius / 2]);
     }
 
     enableSettingsSection(section, enable = true) {
