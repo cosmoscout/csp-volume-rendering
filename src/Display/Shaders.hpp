@@ -223,7 +223,7 @@ const std::string GET_DEPTH_COMP = R"(
 
 layout(local_size_x = 1, local_size_y = 1) in;
 
-layout(rgba32f, binding = 0) readonly uniform sampler2DRect uInDepth;
+layout(rgba32f, binding = 0) readonly uniform image2D uInDepth;
 layout(r32f, binding = 1) writeonly uniform image2D uOutDepth;
 
 uniform vec2 uBottomCorner;
@@ -237,10 +237,11 @@ void main() {
         vec2(gl_NumWorkGroups * gl_WorkGroupSize) * (uTopCorner - uBottomCorner);
     ivec2 pix = ivec2(gl_GlobalInvocationID);
 
-    vec4 val = texture(uInDepth, pos * textureSize(uInDepth));
+    //vec4 val = texture(uInDepth, pos);
+    vec4 val = imageLoad(uInDepth, ivec2(pos * imageSize(uInDepth)));
     val *= uFar / uRadius;
 
-    imageStore(uOutDepth, pix, val);
+    imageStore(uOutDepth, pix, vec4(100000000000000.0f));
 }
 )";
 

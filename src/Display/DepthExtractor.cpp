@@ -89,8 +89,7 @@ DepthExtractor::DepthExtractor(std::shared_ptr<DisplayNode> displayNode,
 
   // Create textures for depth buffer of previous render pass
   for (auto const& viewport : GetVistaSystem()->GetDisplayManager()->GetViewports()) {
-    const auto [buffer, success] =
-        mDepthBufferData.try_emplace(viewport.second, GL_TEXTURE_RECTANGLE);
+    const auto [buffer, success] = mDepthBufferData.try_emplace(viewport.second, GL_TEXTURE_2D);
     if (success) {
       buffer->second.Bind();
       buffer->second.SetWrapS(GL_CLAMP);
@@ -191,8 +190,8 @@ bool DepthExtractor::Do() {
   VistaTexture& depthBuffer = mDepthBufferData.at(viewport);
 
   depthBuffer.Bind();
-  glCopyTexImage2D(GL_TEXTURE_RECTANGLE, 0, GL_DEPTH_COMPONENT, iViewport[0], iViewport[1],
-      iViewport[2], iViewport[3], 0);
+  glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, iViewport[0], iViewport[1], iViewport[2],
+      iViewport[3], 0);
   depthBuffer.Unbind();
 
   glUseProgram(mDepthComputeShader);
