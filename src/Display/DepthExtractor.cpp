@@ -174,14 +174,14 @@ bool DepthExtractor::Do() {
           fovYRad, fovXRad);
 
   // Get near and far distance
-  double                                      near, far;
+  double                                      nearPlane, farPlane;
   VistaProjection::VistaProjectionProperties* projectionProperties =
       GetVistaSystem()
           ->GetDisplayManager()
           ->GetCurrentRenderInfo()
           ->m_pViewport->GetProjection()
           ->GetProjectionProperties();
-  projectionProperties->GetClippingRange(near, far);
+  projectionProperties->GetClippingRange(nearPlane, farPlane);
 
   // copy depth buffer from previous rendering
   std::array<GLint, 4> iViewport{};
@@ -204,11 +204,11 @@ bool DepthExtractor::Do() {
   glUniform2f(mUniforms.mTopCorner, crop.mRight, crop.mTop);
   glUniform1f(mUniforms.mRadius, static_cast<float>(mDisplayNode->getRadii()[0]));
   glUniform1f(mUniforms.mNearDistance,
-      static_cast<float>(
-          near * mSolarSystem->getObserver().getAnchorScale() / mDisplayNode->getAnchorScale()));
+      static_cast<float>(nearPlane * mSolarSystem->getObserver().getAnchorScale() /
+                         mDisplayNode->getAnchorScale()));
   glUniform1f(mUniforms.mFarDistance,
-      static_cast<float>(
-          far * mSolarSystem->getObserver().getAnchorScale() / mDisplayNode->getAnchorScale()));
+      static_cast<float>(farPlane * mSolarSystem->getObserver().getAnchorScale() /
+                         mDisplayNode->getAnchorScale()));
 
   glDispatchCompute(mResolution, mResolution, 1);
 
