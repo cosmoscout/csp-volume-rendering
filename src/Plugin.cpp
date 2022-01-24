@@ -566,7 +566,8 @@ void Plugin::initUI() {
       (mPluginSettings.mPathlines ? mDataManager->getPathlines().getCsvData() : "") + "`);");
 
   mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setMaxCoreRadius",
-      mAllSettings->getAnchorRadii(mPluginSettings.mTransform.mAnchor.get())[0] / 1000.);
+      mAllSettings->getAnchorRadii(mPluginSettings.mTransform.mAnchor.get())[0] / 1000. *
+          mPluginSettings.mTransform.mScale.get());
 
   if (mPluginSettings.mCore.has_value()) {
     mGuiManager->getGui()->callJavascript(
@@ -580,7 +581,7 @@ void Plugin::initUI() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void csp::volumerendering::Plugin::setResolution(int value) {
+void Plugin::setResolution(int value) {
   mNextFrame.mResolution = value;
 }
 
@@ -592,7 +593,7 @@ void Plugin::setUseMaxDepth(bool value) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void csp::volumerendering::Plugin::setDepthData(bool value) {
+void Plugin::setDepthData(bool value) {
   for (auto const& node : mDisplayNodes) {
     node.second->setUseDepth(value);
   }
@@ -600,7 +601,7 @@ void csp::volumerendering::Plugin::setDepthData(bool value) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void csp::volumerendering::Plugin::setDrawDepth(bool value) {
+void Plugin::setDrawDepth(bool value) {
   for (auto const& node : mDisplayNodes) {
     node.second->setDrawDepth(value);
   }
@@ -608,7 +609,7 @@ void csp::volumerendering::Plugin::setDrawDepth(bool value) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void csp::volumerendering::Plugin::setScalar(std::string const& value) {
+void Plugin::setScalar(std::string const& value) {
   invalidateCache();
   if (mDataManager->isReady()) {
     mDataManager->setActiveScalar(value);
@@ -619,7 +620,7 @@ void csp::volumerendering::Plugin::setScalar(std::string const& value) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void csp::volumerendering::Plugin::setDisplayMode(DisplayMode value) {
+void Plugin::setDisplayMode(DisplayMode value) {
   for (auto const& node : mDisplayNodes) {
     if (node.first == value) {
       node.second->setEnabled(true);
@@ -643,7 +644,9 @@ void Plugin::setCoreRadius(float value) {
   invalidateCache();
   // Normalize core radius for renderer
   mRenderer->setCoreRadius(
-      value / mAllSettings->getAnchorRadii(mPluginSettings.mTransform.mAnchor.get())[0] * 1000.);
+      value /
+      static_cast<float>(mAllSettings->getAnchorRadii(mPluginSettings.mTransform.mAnchor.get())[0] /
+                         1000. * mPluginSettings.mTransform.mScale.get()));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
