@@ -142,6 +142,7 @@ class Renderer {
   void setCoreEnabled(bool value);
   void setCoreScalar(std::string value);
   void setCoreRadius(float value);
+  void setCoreColor(glm::vec3 value);
 
   void setPathlinesEnabled(bool enable);
   void setPathlineSize(float value);
@@ -196,9 +197,11 @@ class Renderer {
         bool        mEnable = false;
         std::string mScalar;
         float       mRadius = 0.0f;
+        glm::vec3   mColor;
 
         bool operator==(const Core& other) const {
-          return mEnable == other.mEnable && mScalar == other.mScalar && mRadius == other.mRadius;
+          return mEnable == other.mEnable && mScalar == other.mScalar && mRadius == other.mRadius &&
+                 mColor == other.mColor;
         }
       } mCore;
 

@@ -293,6 +293,17 @@ void Plugin::registerAllUICallbacks() {
         }
       }));
 
+  // Core settings
+  if (mPluginSettings.mCore.has_value()) {
+    mGuiManager->getGui()->registerCallback("volumeRendering.setCoreColor",
+        "Sets color for core when no scalar is selected.",
+        std::function([this](double r, double g, double b) {
+          invalidateCache();
+          glm::vec3 color               = glm::vec3(r / 255.f, g / 255.f, b / 255.f);
+          mPluginSettings.mCore->mColor = color;
+        }));
+  }
+
   // Pathline settings
   if (mPluginSettings.mPathlines.has_value()) {
     mGuiManager->getGui()->registerCallback("volumeRendering.setPathlinesScalarFilters",
@@ -362,6 +373,15 @@ void Plugin::connectAllSettings() {
     std::string code = "CosmoScout.volumeRendering.loadTransferFunction('" + name + "');";
     mGuiManager->addScriptToGui(code);
   });
+
+  // Core settings
+  if (mPluginSettings.mCore.has_value()) {
+    mPluginSettings.mCore->mColor.connectAndTouch([this](glm::vec3 value) {
+      mRenderer->setCoreColor(value);
+      mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setCoreColor",
+          value.r * 255.f, value.g * 255.f, value.b * 255.f);
+    });
+  }
 
   // Connect to data manager properties
   mDataManager->pScalars.connectAndTouch([this](std::vector<Scalar> scalars) {
@@ -800,7 +820,7 @@ std::vector<ScalarFilter> csp::volumerendering::Plugin::parseScalarFilters(
   std::vector<ScalarFilter> filters;
   for (auto const& [axis, value] : j.items()) {
     auto const& scalar = std::find_if(scalars.begin(), scalars.end(),
-        [&axis = axis](Scalar const& s) { return s.mName == axis; });
+        [& axis = axis](Scalar const& s) { return s.mName == axis; });
     if (scalar != scalars.end()) {
       ScalarFilter filter;
       filter.mAttrIndex = (int)std::distance(scalars.begin(), scalar);
