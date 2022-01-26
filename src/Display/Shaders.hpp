@@ -223,7 +223,7 @@ const std::string GET_DEPTH_COMP = R"(
 
 layout(local_size_x = 1, local_size_y = 1) in;
 
-layout(rgba32f, binding = 0) readonly uniform image2D uInDepth;
+layout(binding = 0) uniform sampler2DRect uInDepth;
 layout(r32f, binding = 1) writeonly uniform image2D uOutDepth;
 
 uniform vec2 uBottomCorner;
