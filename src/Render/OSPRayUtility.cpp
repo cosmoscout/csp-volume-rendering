@@ -142,7 +142,7 @@ ospray::cpp::Volume createOSPRayVolume(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 ospray::cpp::Volume createOSPRayVolume(
-    vtkSmartPointer<vtkStructuredPoints> vtkVolume, std::vector<Scalar> const& scalars) {
+    vtkSmartPointer<vtkImageData> vtkVolume, std::vector<Scalar> const& scalars) {
   double spacing[3];
   vtkVolume->GetSpacing(spacing);
   int dimensions[3];
@@ -151,6 +151,89 @@ ospray::cpp::Volume createOSPRayVolume(
   for (int i = 0; i < 3; i++) {
     origin[i] = -(vtkVolume->GetBounds()[i * 2 + 1] - vtkVolume->GetBounds()[i * 2]) / 2;
   }
+
+  std::vector<ospray::cpp::CopiedData> ospData;
+  vtkSmartPointer<vtkDataArray>        vtkData;
+
+  for (size_t i = 0; i < scalars.size(); i++) {
+    if (scalars[i].mType != scalars[0].mType) {
+      continue;
+    }
+    switch (scalars[i].mType) {
+    case ScalarType::ePointData:
+      vtkData = vtkVolume->GetPointData()->GetScalars(scalars[i].mName.c_str());
+      break;
+    case ScalarType::eCellData:
+      vtkData = vtkVolume->GetCellData()->GetScalars(scalars[i].mName.c_str());
+      break;
+    }
+
+    switch (vtkData->GetDataType()) {
+    case VTK_FLOAT:
+      ospData.emplace_back((float*)vtkData->GetVoidPointer(0), OSP_FLOAT,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_DOUBLE:
+      ospData.emplace_back((double*)vtkData->GetVoidPointer(0), OSP_DOUBLE,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_UNSIGNED_CHAR:
+      ospData.emplace_back((uint8_t*)vtkData->GetVoidPointer(0), OSP_UCHAR,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_CHAR:
+      ospData.emplace_back((int8_t*)vtkData->GetVoidPointer(0), OSP_UCHAR,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_SHORT:
+      ospData.emplace_back((int16_t*)vtkData->GetVoidPointer(0), OSP_SHORT,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_UNSIGNED_SHORT:
+      ospData.emplace_back((uint16_t*)vtkData->GetVoidPointer(0), OSP_USHORT,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    }
+  }
+
+  ospray::cpp::Volume volume("structuredRegular");
+  volume.setParam(
+      "gridOrigin", rkcommon::math::vec3f{(float)origin[0], (float)origin[1], (float)origin[2]});
+  volume.setParam("gridSpacing",
+      rkcommon::math::vec3f{(float)spacing[0], (float)spacing[1], (float)spacing[2]});
+  volume.setParam("data", ospray::cpp::Data(ospData.data(), OSP_DATA, ospData.size()));
+  volume.setParam("dimensions", rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+  volume.commit();
+
+  return volume;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+ospray::cpp::Volume createOSPRayVolume(
+    vtkSmartPointer<vtkRectilinearGrid> vtkVolume, std::vector<Scalar> const& scalars) {
+  double spacing[3];
+  //vtkVolume->GetSpacing(spacing);
+
+  double bb[6];
+  vtkVolume->GetBounds(bb);
+
+  double l[3]; 
+  l[0] = abs(bb[0] - bb[1]);
+  l[1] = abs(bb[2] - bb[3]);
+  l[2] = abs(bb[4] - bb[5]);
+
+  int dimensions[3];
+  vtkVolume->GetDimensions(dimensions);
+  double origin[3];
+  for (int i = 0; i < 3; i++) {
+    origin[i] = -(vtkVolume->GetBounds()[i * 2 + 1] - vtkVolume->GetBounds()[i * 2]) / 2;
+  }
+
+  spacing[0] = l[0] / dimensions[0];
+  spacing[1] = l[1] / dimensions[1];
+  spacing[2] = l[2] / dimensions[2];
+
 
   std::vector<ospray::cpp::CopiedData> ospData;
   vtkSmartPointer<vtkDataArray>        vtkData;
@@ -373,6 +456,267 @@ ospray::cpp::Volume createOSPRayVolume(vtkSmartPointer<vtkStructuredGrid> vtkVol
   volume.setParam("gridOrigin", gridOrigin);
   volume.setParam("data", ospray::cpp::Data(ospData.data(), OSP_DATA, ospData.size()));
   volume.setParam("dimensions", dim);
+  volume.commit();
+
+  return volume;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+ospray::cpp::Volume createOSPRayVolume(vtkSmartPointer<vtkRectilinearGrid> vtkVolume,
+    std::vector<Scalar> const&                                            scalars,
+    DataManager::Metadata::StructuredSpherical const&                     metadata) {
+  std::array<int, 3> dimensions;
+  vtkVolume->GetDimensions(dimensions.data());
+
+  constexpr int OSP_RAD_AXIS = 0;
+  constexpr int OSP_LAT_AXIS = 1;
+  constexpr int OSP_LON_AXIS = 2;
+
+  rkcommon::math::vec3i dim;
+  rkcommon::math::vec3f spacing;
+  rkcommon::math::vec3f gridOrigin;
+
+  std::array<double, 2> lonRange = metadata.mRanges.mLon;
+  std::array<double, 2> latRange = metadata.mRanges.mLat;
+
+  bool   warnLon = false;
+  double minLon  = std::min(lonRange[0], lonRange[1]);
+  if (minLon < 0.) {
+    lonRange[0] += minLon;
+    lonRange[1] += minLon;
+    warnLon = true;
+  }
+  for (int i = 0; i < 2; i++) {
+    if (lonRange[i] > 360.) {
+      lonRange[i] = 360.;
+      warnLon     = true;
+    }
+  }
+  if (warnLon && !warnedLonRange) {
+    logger().warn("The longitudinal range of the dataset is [{}, {}], which is outside the maximum "
+                  "range supported by OSPRay ([0, 360]). [{}, {}] will be used as a range instead.",
+        metadata.mRanges.mLon[0], metadata.mRanges.mLon[1], lonRange[0], lonRange[1]);
+    warnedLonRange = true;
+  }
+
+  double minLat  = std::min(latRange[0], latRange[1]);
+  bool   warnLat = false;
+  if (minLat < 0.) {
+    latRange[0] += minLat;
+    latRange[1] += minLat;
+    warnLat = true;
+  }
+  for (int i = 0; i < 2; i++) {
+    if (latRange[i] > 180) {
+      latRange[i] = 180.;
+      warnLat     = true;
+    }
+  }
+  if (warnLat && !warnedLatRange) {
+    logger().warn("The latitudinal range of the dataset is [{}, {}], which is outside the maximum "
+                  "range supported by OSPRay ([0, 180]). [{}, {}] will be used as a range instead.",
+        metadata.mRanges.mLat[0], metadata.mRanges.mLat[1], latRange[0], latRange[1]);
+    warnedLatRange = true;
+  }
+
+  // The latitude is given as angles relative to the down axis, but OSPRay expects angles relative
+  // to the up axis, so we have to flip the angles.
+  latRange[0] = 180 - latRange[0];
+  latRange[1] = 180 - latRange[1];
+
+  switch (scalars[0].mType) {
+  case ScalarType::ePointData:
+    dim[OSP_RAD_AXIS] = dimensions[metadata.mAxes.mRad];
+    dim[OSP_LAT_AXIS] = dimensions[metadata.mAxes.mLat];
+    dim[OSP_LON_AXIS] = dimensions[metadata.mAxes.mLon];
+
+    spacing[OSP_RAD_AXIS] =
+        static_cast<float>((metadata.mRanges.mRad[1] - metadata.mRanges.mRad[0])) /
+        (dim[OSP_RAD_AXIS] - 1);
+    spacing[OSP_LAT_AXIS] =
+        static_cast<float>((latRange[1] - latRange[0])) / (dim[OSP_LAT_AXIS] - 1);
+    spacing[OSP_LON_AXIS] =
+        static_cast<float>((lonRange[1] - lonRange[0])) / (dim[OSP_LON_AXIS] - 1);
+
+    gridOrigin[OSP_RAD_AXIS] = static_cast<float>(metadata.mRanges.mRad[0]);
+    gridOrigin[OSP_LAT_AXIS] = static_cast<float>(latRange[0]);
+    gridOrigin[OSP_LON_AXIS] = static_cast<float>(lonRange[0]);
+    break;
+
+  case ScalarType::eCellData:
+    dim[OSP_RAD_AXIS] = dimensions[metadata.mAxes.mRad] - 1;
+    dim[OSP_LAT_AXIS] = dimensions[metadata.mAxes.mLat] - 1;
+    dim[OSP_LON_AXIS] = dimensions[metadata.mAxes.mLon] - 1;
+
+    spacing[OSP_RAD_AXIS] =
+        static_cast<float>((metadata.mRanges.mRad[1] - metadata.mRanges.mRad[0])) /
+        dim[OSP_RAD_AXIS];
+    spacing[OSP_LAT_AXIS] = static_cast<float>((latRange[1] - latRange[0])) / dim[OSP_LAT_AXIS];
+    spacing[OSP_LON_AXIS] = static_cast<float>((lonRange[1] - lonRange[0])) / dim[OSP_LON_AXIS];
+
+    gridOrigin[OSP_RAD_AXIS] =
+        static_cast<float>(metadata.mRanges.mRad[0]) + spacing[OSP_RAD_AXIS] / 2;
+    gridOrigin[OSP_LAT_AXIS] = static_cast<float>(latRange[0]) + spacing[OSP_LAT_AXIS] / 2;
+    gridOrigin[OSP_LON_AXIS] = static_cast<float>(lonRange[0]) + spacing[OSP_LON_AXIS] / 2;
+    break;
+  }
+
+  std::vector<ospray::cpp::CopiedData> ospData;
+  vtkSmartPointer<vtkDataArray>        vtkData;
+  
+
+  for (size_t i = 0; i < scalars.size(); i++) {
+    if (scalars[i].mType != scalars[0].mType) {
+      continue;
+    }
+    switch (scalars[i].mType) {
+    case ScalarType::ePointData:
+      vtkData = vtkVolume->GetPointData()->GetScalars(scalars[i].mName.c_str());
+      break;
+    case ScalarType::eCellData:
+      vtkData = vtkVolume->GetCellData()->GetScalars(scalars[i].mName.c_str());
+      break;
+    }
+
+    int                   dataSize = vtkData->GetDataTypeSize();
+    rkcommon::math::vec3i stride{dataSize, dataSize, dataSize};
+    
+    
+    if (metadata.mAxes.mRad > metadata.mAxes.mLon) {
+      stride[OSP_RAD_AXIS] *= dim[OSP_LON_AXIS];
+    }
+    if (metadata.mAxes.mRad > metadata.mAxes.mLat) {
+      stride[OSP_RAD_AXIS] *= dim[OSP_LAT_AXIS];
+    }
+    if (metadata.mAxes.mLat > metadata.mAxes.mRad) {
+      stride[OSP_LAT_AXIS] *= dim[OSP_RAD_AXIS];
+    }
+    if (metadata.mAxes.mLat > metadata.mAxes.mLon) {
+      stride[OSP_LAT_AXIS] *= dim[OSP_LON_AXIS];
+    }
+    if (metadata.mAxes.mLon > metadata.mAxes.mRad) {
+      stride[OSP_LON_AXIS] *= dim[OSP_RAD_AXIS];
+    }
+    if (metadata.mAxes.mLon > metadata.mAxes.mLat) {
+      stride[OSP_LON_AXIS] *= dim[OSP_LAT_AXIS];
+    }
+    
+    stride[0] = dim[OSP_LON_AXIS] * dataSize;
+    stride[1] = dim[OSP_LON_AXIS] * dim[OSP_LON_AXIS] * dataSize;
+    stride[2] = dataSize;
+    logger().info("stride: {} {} {} {}", vtkData->GetName(), stride[0], stride[1], stride[2]);
+
+    switch (vtkData->GetDataType()) {
+    case VTK_FLOAT:
+      ospData.emplace_back((float*)vtkData->GetVoidPointer(0), OSP_FLOAT, dim, stride);
+      break;
+    case VTK_DOUBLE:
+      ospData.emplace_back((double*)vtkData->GetVoidPointer(0), OSP_DOUBLE, dim, stride);
+      break;
+    case VTK_UNSIGNED_CHAR:
+      ospData.emplace_back((uint8_t*)vtkData->GetVoidPointer(0), OSP_UCHAR, dim, stride);
+      break;
+    case VTK_CHAR:
+      ospData.emplace_back((int8_t*)vtkData->GetVoidPointer(0), OSP_UCHAR, dim, stride);
+      break;
+    case VTK_SHORT:
+      ospData.emplace_back((int16_t*)vtkData->GetVoidPointer(0), OSP_SHORT, dim, stride);
+      break;
+    case VTK_UNSIGNED_SHORT:
+      ospData.emplace_back((uint16_t*)vtkData->GetVoidPointer(0), OSP_USHORT, dim, stride);
+      break;
+    }
+  }
+
+  logger().info("Dataset ist rectilinear grid");
+  logger().info("spacing: {} {} {}", spacing[0], spacing[1], spacing[2]);
+  logger().info("origin: {} {} {}", gridOrigin[0], gridOrigin[1], gridOrigin[2]);
+  logger().info("dimension: rad {} lat {} long {}", dim[OSP_RAD_AXIS], dim[OSP_LAT_AXIS], dim[OSP_LON_AXIS]);
+  
+
+  ospray::cpp::Volume volume("structuredSpherical");
+  volume.setParam("gridSpacing", spacing);
+  volume.setParam("gridOrigin", gridOrigin);
+  volume.setParam("data", ospray::cpp::Data(ospData.data(), OSP_DATA, ospData.size()));
+  volume.setParam("dimensions", dim);
+  volume.commit();
+
+  return volume;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+ospray::cpp::Volume createOSPRayVolume(vtkSmartPointer<vtkImageData> vtkVolume,
+    std::vector<Scalar> const&                                            scalars,
+    DataManager::Metadata::StructuredSpherical const&                     metadata) {
+
+  double spacing[3];
+  vtkVolume->GetSpacing(spacing);
+  int dimensions[3];
+  vtkVolume->GetDimensions(dimensions);
+  double origin[3] = {0,0,0};
+  //origin[0] = (vtkVolume->GetBounds()[1] - vtkVolume->GetBounds()[0]) / 2;
+  origin[0] = 80;
+  //for (int i = 0; i < 3; i++) {
+  //  origin[i] = -(vtkVolume->GetBounds()[i * 2 + 1] - vtkVolume->GetBounds()[i * 2]) / 2;
+  //}
+
+  std::vector<ospray::cpp::CopiedData> ospData;
+  vtkSmartPointer<vtkDataArray>        vtkData;
+
+  for (size_t i = 0; i < scalars.size(); i++) {
+    if (scalars[i].mType != scalars[0].mType) {
+      continue;
+    }
+    switch (scalars[i].mType) {
+    case ScalarType::ePointData:
+      vtkData = vtkVolume->GetPointData()->GetScalars(scalars[i].mName.c_str());
+      break;
+    case ScalarType::eCellData:
+      vtkData = vtkVolume->GetCellData()->GetScalars(scalars[i].mName.c_str());
+      break;
+    }
+
+    switch (vtkData->GetDataType()) {
+    case VTK_FLOAT:
+      ospData.emplace_back((float*)vtkData->GetVoidPointer(0), OSP_FLOAT,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_DOUBLE:
+      ospData.emplace_back((double*)vtkData->GetVoidPointer(0), OSP_DOUBLE,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_UNSIGNED_CHAR:
+      ospData.emplace_back((uint8_t*)vtkData->GetVoidPointer(0), OSP_UCHAR,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_CHAR:
+      ospData.emplace_back((int8_t*)vtkData->GetVoidPointer(0), OSP_UCHAR,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_SHORT:
+      ospData.emplace_back((int16_t*)vtkData->GetVoidPointer(0), OSP_SHORT,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    case VTK_UNSIGNED_SHORT:
+      ospData.emplace_back((uint16_t*)vtkData->GetVoidPointer(0), OSP_USHORT,
+          rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
+      break;
+    }
+  }
+  logger().info("Dataset is vtkImageData");
+  logger().info("spacing: {} {} {}", spacing[0], spacing[1], spacing[2]);
+  logger().info("origin: {} {} {}", origin[0], origin[1], origin[2]);
+  logger().info("dimension: rad {} lat {} long {}", dimensions[0], dimensions[1], dimensions[2]);
+
+  ospray::cpp::Volume volume("structuredSpherical");
+  volume.setParam(
+      "gridOrigin", rkcommon::math::vec3f{(float)origin[0], (float)origin[1], (float)origin[2]});
+  volume.setParam("gridSpacing",
+      rkcommon::math::vec3f{(float)spacing[0], (float)spacing[1], (float)spacing[2]});
+  volume.setParam("data", ospray::cpp::Data(ospData.data(), OSP_DATA, ospData.size()));
+  volume.setParam("dimensions", rkcommon::math::vec3i{dimensions[0], dimensions[1], dimensions[2]});
   volume.commit();
 
   return volume;

@@ -23,6 +23,9 @@ NLOHMANN_JSON_SERIALIZE_ENUM(
                          {VolumeStructure::eInvalid, nullptr},
                          {VolumeStructure::eStructured, "structured"},
                          {VolumeStructure::eStructuredSpherical, "structuredSpherical"},
+                         {VolumeStructure::eRectilinear, "rectilinear"},
+                         {VolumeStructure::eImageSpherical, "imageSpherical"},
+                         {VolumeStructure::eRectilinearSpherical, "rectilinearSpherical"},
                          {VolumeStructure::eUnstructured, "unstructured"},
                      })
 
@@ -71,6 +74,11 @@ void from_json(nlohmann::json const& j, Settings::Data& o) {
       cs::core::Settings::deserialize(j, "metadata", metadata);
       o.mMetadata = {metadata};
       break;
+    case VolumeStructure::eRectilinearSpherical:
+      Settings::Data::Metadata::StructuredSpherical metadata1;
+      cs::core::Settings::deserialize(j, "metadata", metadata1);
+      o.mMetadata = {metadata1};
+      break;
     default:
       // No metadata expected
       break;
@@ -89,6 +97,9 @@ void to_json(nlohmann::json& j, Settings::Data const& o) {
   if (o.mMetadata.has_value()) {
     switch (o.mStructure.get()) {
     case VolumeStructure::eStructuredSpherical:
+      cs::core::Settings::serialize(j, "metadata", o.mMetadata->mStructuredSpherical);
+      break;
+    case VolumeStructure::eRectilinearSpherical:
       cs::core::Settings::serialize(j, "metadata", o.mMetadata->mStructuredSpherical);
       break;
     default:

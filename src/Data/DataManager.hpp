@@ -98,6 +98,7 @@ class DataManager {
 
   /// Tries to automatically determine metdata for the current dataset.
   Metadata calculateMetadata();
+
   /// Returns metadata for the current dataset.
   /// May only be called, if metadata is set in the plugin settings.
   Metadata::StructuredSpherical const& getMetadata();

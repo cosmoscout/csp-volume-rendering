@@ -11,6 +11,7 @@
 
 #include "../../../../src/cs-utils/convert.hpp"
 #include "../../../../src/cs-utils/utils.hpp"
+#include "../../../../src/cs-gui/internal/ScopedTimer.hpp"
 
 #include <glm/ext/matrix_clip_space.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -18,6 +19,7 @@
 #include <vtkCellData.h>
 #include <vtkPointData.h>
 #include <vtkStructuredPoints.h>
+#include <vtkImageData.h>
 
 #include <rkcommon/math/vec.h>
 
@@ -156,7 +158,14 @@ OSPRayRenderer::Volume OSPRayRenderer::loadVolume(DataManager::State const& stat
     std::vector<Scalar> scalars = mDataManager->pScalars.get();
     scalars.insert(scalars.begin(), state.mScalar);
     volume.mOsprayData =
-        OSPRayUtility::createOSPRayVolume(vtkStructuredPoints::SafeDownCast(volumeData), scalars);
+        OSPRayUtility::createOSPRayVolume(vtkImageData::SafeDownCast(volumeData), scalars);
+    break;
+  }
+  case VolumeStructure::eRectilinear: {
+    std::vector<Scalar> scalars = mDataManager->pScalars.get();
+    scalars.insert(scalars.begin(), state.mScalar);
+    volume.mOsprayData =
+        OSPRayUtility::createOSPRayVolume(vtkRectilinearGrid::SafeDownCast(volumeData), scalars);
     break;
   }
   case VolumeStructure::eStructuredSpherical: {
@@ -164,6 +173,20 @@ OSPRayRenderer::Volume OSPRayRenderer::loadVolume(DataManager::State const& stat
     scalars.insert(scalars.begin(), state.mScalar);
     volume.mOsprayData = OSPRayUtility::createOSPRayVolume(
         vtkStructuredGrid::SafeDownCast(volumeData), scalars, mDataManager->getMetadata());
+    break;
+  }
+  case VolumeStructure::eRectilinearSpherical: {
+    std::vector<Scalar> scalars = mDataManager->pScalars.get();
+    scalars.insert(scalars.begin(), state.mScalar);
+    volume.mOsprayData = OSPRayUtility::createOSPRayVolume(
+        vtkRectilinearGrid::SafeDownCast(volumeData), scalars, mDataManager->getMetadata());
+    break;
+  }
+  case VolumeStructure::eImageSpherical: {
+    std::vector<Scalar> scalars = mDataManager->pScalars.get();
+    scalars.insert(scalars.begin(), state.mScalar);
+    volume.mOsprayData = OSPRayUtility::createOSPRayVolume(
+        vtkImageData::SafeDownCast(volumeData), scalars, mDataManager->getMetadata());
     break;
   }
   case VolumeStructure::eInvalid:
@@ -247,7 +270,8 @@ void OSPRayRenderer::updateWorld(
         Volume coreVolume   = getVolume(scalarState, volume.mLod);
 
         rkcommon::math::vec2f valueRange = {
-            (float)coreVolume.mScalarBounds[0], (float)coreVolume.mScalarBounds[1]};
+            //(float)coreVolume.mScalarBounds[0], (float)coreVolume.mScalarBounds[1]};
+            (float)coreVolume.mScalarBounds[1]*0.8f, (float)coreVolume.mScalarBounds[1]*0.98f};
         mCache.mCoreTransferFunction.setParam("valueRange", valueRange);
         mCache.mCoreTransferFunction.commit();
 
@@ -409,6 +433,8 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
   rkcommon::math::vec2f camImageStartOsp{crop.mLeft, crop.mBottom};
   rkcommon::math::vec2f camImageEndOsp{crop.mRight, crop.mTop};
 
+  //TODO Get ViSTA stereo mode
+  //osprayCamera.setParam("stereoMode", OSP_STEREO_NONE or OSP_STEREO_SIDE_BY_SIDE);
   ospray::cpp::Camera osprayCamera("perspective");
   osprayCamera.setParam("aspect", 1);
   osprayCamera.setParam("position", camPosOsp);
@@ -419,6 +445,7 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
   osprayCamera.setParam("imageEnd", camImageEndOsp);
   osprayCamera.commit();
 
+  //TODO store modelview and projection for left and right eye
   Camera camera;
   camera.mOsprayCamera = osprayCamera;
   camera.mModelView    = crop.mModelView;
@@ -431,6 +458,8 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
 void OSPRayRenderer::renderFrame(ospray::cpp::World const& world, ospray::cpp::Camera const& camera,
     std::optional<std::vector<float>>&& maxDepth, Parameters const& parameters,
     bool resetAccumulation) {
+
+  cs::gui::detail::ScopedTimer timer("myVolumeRendering");
   ospray::cpp::Renderer renderer("volume_depth");
 
   if (maxDepth.has_value()) {

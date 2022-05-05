@@ -16,6 +16,8 @@
 #include <vtkStructuredGrid.h>
 #include <vtkStructuredPoints.h>
 #include <vtkUnstructuredGrid.h>
+#include <vtkRectilinearGrid.h>
+#include <vtkImageData.h>
 
 #include <glm/gtc/type_ptr.hpp>
 
@@ -30,8 +32,14 @@ void initOSPRay();
 ospray::cpp::Volume createOSPRayVolume(
     vtkSmartPointer<vtkUnstructuredGrid> vtkVolume, ScalarType scalarType);
 ospray::cpp::Volume createOSPRayVolume(
-    vtkSmartPointer<vtkStructuredPoints> vtkVolume, std::vector<Scalar> const& scalars);
+    vtkSmartPointer<vtkImageData> vtkVolume, std::vector<Scalar> const& scalars);
+ospray::cpp::Volume createOSPRayVolume(
+    vtkSmartPointer<vtkRectilinearGrid> vtkVolume, std::vector<Scalar> const& scalars);
 ospray::cpp::Volume createOSPRayVolume(vtkSmartPointer<vtkStructuredGrid> vtkVolume,
+    std::vector<Scalar> const& scalars, DataManager::Metadata::StructuredSpherical const& metadata);
+ospray::cpp::Volume createOSPRayVolume(vtkSmartPointer<vtkRectilinearGrid> vtkVolume,
+    std::vector<Scalar> const& scalars, DataManager::Metadata::StructuredSpherical const& metadata);
+ospray::cpp::Volume createOSPRayVolume(vtkSmartPointer<vtkImageData> vtkVolume,
     std::vector<Scalar> const& scalars, DataManager::Metadata::StructuredSpherical const& metadata);
 
 /// Creates a default transfer function for OSPRay.
