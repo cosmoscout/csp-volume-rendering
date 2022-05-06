@@ -459,7 +459,7 @@ void OSPRayRenderer::renderFrame(ospray::cpp::World const& world, ospray::cpp::C
     std::optional<std::vector<float>>&& maxDepth, Parameters const& parameters,
     bool resetAccumulation) {
 
-  cs::gui::detail::ScopedTimer timer("myVolumeRendering");
+  //cs::gui::detail::ScopedTimer timer("myVolumeRendering");
   ospray::cpp::Renderer renderer("volume_depth");
 
   if (maxDepth.has_value()) {
