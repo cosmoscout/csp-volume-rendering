@@ -63,6 +63,11 @@ void initOSPRay() {
   }
 
   OSPDevice dev = ospGetCurrentDevice();
+
+  int numThreads = static_cast<int>(std::thread::hardware_concurrency()/2) - 1;
+  ospDeviceSetParam(dev, "numThreads", OSPDataType::OSP_INT, &numThreads);
+  ospDeviceCommit(dev);
+
   ospDeviceSetErrorCallback(dev,
       [](void* userData, OSPError e, const char* errorDetails) {
         osprayLogger().error(errorDetails);
