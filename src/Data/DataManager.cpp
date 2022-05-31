@@ -137,6 +137,11 @@ DataManager::DataManager(Settings::Data const& dataSettings)
         mDataSettings.mPath.get());
     throw DataManagerException();
   }
+
+  // Sort timesteps and remove duplicates.
+  std::sort(timesteps.begin(), timesteps.end());
+  timesteps.erase(std::unique(timesteps.begin(), timesteps.end()), timesteps.end());
+
   pTimesteps.set(timesteps);
 
   // Initialize state

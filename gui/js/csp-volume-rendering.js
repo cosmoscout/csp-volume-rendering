@@ -42,6 +42,8 @@
 
       this._enablePathlinesParcoordsCheckbox =
           document.querySelector(`[data-callback="volumeRendering.setEnablePathlinesParcoords"]`);
+
+      this.playing = false;
     }
 
     enableSettingsSection(section, enable = true) {
@@ -140,38 +142,37 @@
      * second, set using the animation speed slider.
      */
     play() {
+      this.playing = !this.playing;
+      CosmoScout.callbacks.volumeRendering.setTimestepAnimating(this.playing);
+
       const playButtonIcon = $("#volumeRendering\\.play i");
+      playButtonIcon.html(this.playing ? "play_arrow" : "pause");
+
       if (this.playing) {
-        clearInterval(this.playHandle);
-        playButtonIcon.html("play_arrow");
-        this.playing = false;
-        CosmoScout.callbacks.volumeRendering.setTimestepAnimating(false);
-      } else {
-        this.time       = parseInt(this.timestepSlider.noUiSlider.get());
-        let prevNext    = this.time;
-        this.playHandle = setInterval(() => {
-          // reverse() changes the original array, so it is called twice to return the array to the
-          // original state
-          const last = this.timesteps.reverse().find(t => t <= parseInt(this.time));
-          const next = this.timesteps.reverse().find(t => t > parseInt(this.time));
-          if (!next) {
-            this.play();
-          }
-          let preload = CosmoScout.callbacks.find("volumeRendering.preloadTimestep");
-          if (next && next != prevNext && preload !== undefined) {
-            preload(next);
-            prevNext = next;
-          }
-          CosmoScout.gui.setSliderValue("volumeRendering.setTimestep", true, last);
-          const speedSlider =
+        this.nextTimestep();
+      }
+    }
+
+    nextTimestep() {
+      const timeStep = parseInt(this.timestepSlider.noUiSlider.get());
+
+      const current = this.timesteps.findIndex(t => t == timeStep);
+      const next = (current+1) % this.timesteps.length;
+      const preload = (current+2) % this.timesteps.length;
+
+      CosmoScout.callbacks.volumeRendering.preloadTimestep(this.timesteps[preload]);
+      CosmoScout.gui.setSliderValue("volumeRendering.setTimestep", true, this.timesteps[next]);
+
+      const speedSlider =
               document.querySelector(`[data-callback="volumeRendering.setAnimationSpeed"]`)
                   .noUiSlider;
-          this.time += parseInt(speedSlider.get()) / 10;
-        }, 100);
-        playButtonIcon.html("pause");
-        this.playing = true;
-        CosmoScout.callbacks.volumeRendering.setTimestepAnimating(true);
-      }
+      const delay = 1000.0 / parseInt(speedSlider.get());
+
+      setTimeout(() => {
+        if (this.playing) {
+          this.nextTimestep();
+        }
+      }, delay);
     }
 
     /**
