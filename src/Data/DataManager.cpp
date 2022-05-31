@@ -611,7 +611,7 @@ std::shared_future<vtkSmartPointer<vtkDataSet>> DataManager::getFromCache(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void DataManager::loadData(Timestep timestep, Lod lod) {
-  logger().info("Loading data for timestep {}, level of detail {}...", timestep, lod);
+  logger().debug("Loading data for timestep {}, level of detail {}...", timestep, lod);
   auto data             = std::async(std::launch::async,
       [this](Timestep timestep, Lod lod) {
         std::chrono::high_resolution_clock::time_point timer;
@@ -660,8 +660,7 @@ void DataManager::loadData(Timestep timestep, Lod lod) {
           mOnScalarRangeUpdated.emit(scalar.first);
         }
 
-        logger().info("Finished loading data for timestep {}, "
-                      "level of detail {}. Took {}s.",
+        logger().info("Loaded timestep {} (LoD {}, {} s)",
             timestep, lod,
             (float)(std::chrono::high_resolution_clock::now() - timer).count() / 1000000000);
 

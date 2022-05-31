@@ -710,10 +710,6 @@ ospray::cpp::Volume createOSPRayVolume(vtkSmartPointer<vtkImageData> vtkVolume,
       break;
     }
   }
-  logger().info("Dataset is vtkImageData");
-  logger().info("spacing: {} {} {}", spacing[0], spacing[1], spacing[2]);
-  logger().info("origin: {} {} {}", origin[0], origin[1], origin[2]);
-  logger().info("dimension: rad {} lat {} long {}", dimensions[0], dimensions[1], dimensions[2]);
 
   ospray::cpp::Volume volume("structuredSpherical");
   volume.setParam(
