@@ -146,7 +146,7 @@
       CosmoScout.callbacks.volumeRendering.setTimestepAnimating(this.playing);
 
       const playButtonIcon = $("#volumeRendering\\.play i");
-      playButtonIcon.html(this.playing ? "play_arrow" : "pause");
+      playButtonIcon.html(this.playing ?  "pause" : "play_arrow");
 
       if (this.playing) {
         this.nextTimestep();
