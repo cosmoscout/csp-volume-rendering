@@ -44,7 +44,7 @@ class DepthExtractor : public IVistaOpenGLDraw {
   std::shared_ptr<cs::core::SolarSystem> mSolarSystem;
   std::shared_ptr<cs::core::TimeControl> mTimeControl;
 
-  bool mEnabled = true;
+  bool mEnabled = false;
 
   int mResolution = 512;
 
