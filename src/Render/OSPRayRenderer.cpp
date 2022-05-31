@@ -297,7 +297,7 @@ void OSPRayRenderer::updateWorld(
           parameters.mWorld.mLights.mShading ==
               mCache.mState.mParameters.mWorld.mLights.mShading)) {
     mCache.mVolumeModel.setParam("transferFunction", transferFunction);
-    mCache.mVolumeModel.setParam("densityScale", parameters.mWorld.mVolume.mDensityScale * 10.f);
+    mCache.mVolumeModel.setParam("densityScale", parameters.mWorld.mVolume.mDensityScale);
     mCache.mVolumeModel.setParam(
         "gradientShadingScale", parameters.mWorld.mLights.mShading ? 1.f : 0.f);
     mCache.mVolumeModel.commit();
