@@ -26,6 +26,10 @@
       CosmoScout.gui.initSlider("volumeRendering.setSunStrength", 0, 10, 0.1, [1]);
       CosmoScout.gui.initSlider("volumeRendering.setAmbientStrength", 0, 1, 0.01, [0.5]);
 
+      CosmoScout.gui.initSlider("volumeRendering.setRotationYaw", 0, 360, 1, [0]);
+      CosmoScout.gui.initSlider("volumeRendering.setRotationPitch", 0, 360, 1, [0]);
+      CosmoScout.gui.initSlider("volumeRendering.setRotationRoll", 0, 360, 1, [0]);
+
       // Trigger "setTimestep" callback on "update" event
       this.timestepSlider = document.querySelector(`[data-callback="volumeRendering.setTimestep"]`);
       this.timestepSlider.dataset.event = "update";

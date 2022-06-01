@@ -404,6 +404,52 @@
   </div>
 </div>
 
+<div class="settings-section">
+  <div class="section-header collapsed font-alegreya" id="headingVolume-transform"
+       data-toggle="collapse" data-target="#collapseVolume-transform" aria-expanded="false"
+       aria-controls="collapseVolume-transform" type="button">
+    <i class="material-icons">gamepad</i>
+    <span>Transform</span>
+    <i class="material-icons caret-icon">keyboard_arrow_left</i>
+  </div>
+  <div class="section-body collapse container-fluid" id="collapseVolume-transform"
+       aria-labelledby="headingVolume-transform" data-parent="#volumeRenderingTab-accordion">
+    <div class="strike">
+      <span>Rotation</span>
+    </div>
+
+    <div class="row">
+      <div class="col-5">
+        Yaw
+      </div>
+      <div class="col-7">
+        <div data-callback="volumeRendering.setRotationYaw">
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-5">
+        Pitch
+      </div>
+      <div class="col-7">
+        <div data-callback="volumeRendering.setRotationPitch">
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-5">
+        Roll
+      </div>
+      <div class="col-7">
+        <div data-callback="volumeRendering.setRotationRoll">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <template id="volumeRendering-parcoords-template">
   <div class="parcoordsContainer">
     <a class="btn glass block px-3 parcoordsUndockButton">

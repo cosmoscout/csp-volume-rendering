@@ -344,6 +344,25 @@ void Plugin::registerAllUICallbacks() {
         mGuiManager->getGui()->callJavascript(
             "CosmoScout.parcoords.setAvailableBrushStates", j.dump());
       }));
+
+  mGuiManager->getGui()->registerCallback("volumeRendering.setRotationYaw",
+      "Sets the display node rotation.", std::function([this](double value) {
+        glm::dvec3 rotation                  = mPluginSettings.mTransform.mRotation.get();
+        rotation.x                           = value;
+        mPluginSettings.mTransform.mRotation = rotation;
+      }));
+  mGuiManager->getGui()->registerCallback("volumeRendering.setRotationPitch",
+      "Sets the display node rotation.", std::function([this](double value) {
+        glm::dvec3 rotation                  = mPluginSettings.mTransform.mRotation.get();
+        rotation.y                           = value;
+        mPluginSettings.mTransform.mRotation = rotation;
+      }));
+  mGuiManager->getGui()->registerCallback("volumeRendering.setRotationRoll",
+      "Sets the display node rotation.", std::function([this](double value) {
+        glm::dvec3 rotation                  = mPluginSettings.mTransform.mRotation.get();
+        rotation.z                           = value;
+        mPluginSettings.mTransform.mRotation = rotation;
+      }));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -361,6 +380,15 @@ void Plugin::connectAllSettings() {
   mPluginSettings.mRendering.mTransferFunction.connectAndTouch([this](std::string name) {
     std::string code = "CosmoScout.volumeRendering.loadTransferFunction('" + name + "');";
     mGuiManager->addScriptToGui(code);
+  });
+
+  mPluginSettings.mTransform.mRotation.connectAndTouch([this](glm::dvec3 value) {
+    mGuiManager->setSliderValue("volumeRendering.setRotationYaw", value.x);
+    mGuiManager->setSliderValue("volumeRendering.setRotationPitch", value.y);
+    mGuiManager->setSliderValue("volumeRendering.setRotationRoll", value.z);
+    for (auto const& node : mDisplayNodes) {
+      node.second->setAnchorRotation(cs::utils::convert::toRadians(value));
+    }
   });
 
   // Connect to data manager properties
