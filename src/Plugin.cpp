@@ -480,6 +480,11 @@ Plugin::Setting<float>::getSettings(Settings& pluginSettings) {
       Setting<float>{"setAmbientStrength",
           "Sets the strength of the ambient light when shading is enabled.",
           pluginSettings.mLighting.mAmbientStrength, &Renderer::setAmbientLight},
+      // Core settings
+      pluginSettings.mCore.has_value()
+          ? Setting<float>{"setCoreRadius", "Sets the radius of the rendered core.",
+                pluginSettings.mCore->mRadius, &Renderer::setCoreRadius}
+          : Setting<float>{},
       // Pathline settings
       pluginSettings.mPathlines.has_value()
           ? Setting<float>{"setPathlineSize", "Sets the size of the rendered pathlines.",
