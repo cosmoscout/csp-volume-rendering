@@ -48,7 +48,7 @@ CameraParams calculateCameraParams(
 
   // Get angle between rays at edges of volume and forward vector
   float leftAngle, rightAngle, downAngle, upAngle;
-  if (!std::isnan(modelAngleX) && !std::isnan(modelAngleY) && modelAngleX < M_PI / 4 && modelAngleY < M_PI / 4) {
+  if (!std::isnan(modelAngleX) && !std::isnan(modelAngleY) && modelAngleX < 3.141f / 4 && modelAngleY < 3.141f / 4) {
     leftAngle  = cameraAngleX - modelAngleX;
     rightAngle = cameraAngleX + modelAngleX;
     downAngle  = cameraAngleY - modelAngleY;
