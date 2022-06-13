@@ -24,6 +24,7 @@ uniform mat4 uMatRendererProjectionInv;
 uniform mat4 uMatRendererMVP;
 uniform mat4 uMatRendererMVPInv;
 uniform bool uUseDepth;
+uniform bool uInside;
 
 // inputs
 layout(location = 0) in vec3 iPos;
@@ -35,7 +36,11 @@ out float vDepth;
 
 float normalizeDepth(float cameraDistance, vec4 pos) {
     if (isinf(cameraDistance)) {
-      return -uMatRendererMVP[3][2] / uMatRendererMVP[2][2];
+      if (-uMatRendererMVP[3][2] / uMatRendererMVP[2][2] < 0.7) {
+        return uInside ? 1 : 0;
+      } else {
+        return 1;
+      }
     }
     pos = uMatRendererProjectionInv * pos;
     pos /= pos.w;
@@ -129,6 +134,7 @@ uniform mat4 uMatRendererMVPInv;
 uniform bool uUseDepth;
 uniform int uBasePointSize;
 uniform float uBaseDepth;
+uniform bool uInside;
 
 // inputs
 layout(location = 0) in vec3 iPos;
@@ -140,7 +146,7 @@ out float vDepth;
 
 float normalizeDepth(float cameraDistance, vec4 pos) {
     if (isinf(cameraDistance)) {
-      return -uMatRendererMVP[3][2] / uMatRendererMVP[2][2];
+      return uInside ? 1 : 0;
     }
     pos = uMatRendererProjectionInv * pos;
     pos /= pos.w;

@@ -59,6 +59,7 @@ class OSPRayRenderer : public Renderer {
     glm::vec3           mPositionRotated;
     glm::mat4           mModelView;
     glm::mat4           mProjection;
+    bool                mInside;
   };
 
   class RenderedImage : public Renderer::RenderedImage {

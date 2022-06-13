@@ -48,6 +48,9 @@ class Renderer {
     /// Returns the projection matrix used by the renderer.
     glm::mat4 const& getProjection() const;
 
+    /// Checks whether the camera was inside the volume while rendering.
+    bool isInside() const;
+
     /// Returns the color values of the image as RGBA values.
     virtual float* getColorData() = 0;
     /// Returns the depth values of the image as float values in the range [-1,1].
@@ -59,7 +62,7 @@ class Renderer {
 
    protected:
     RenderedImage(bool valid, int resolution, glm::mat4 cameraTransform, glm::mat4 modelView,
-        glm::mat4 projection);
+        glm::mat4 projection, bool inside);
     RenderedImage(RenderedImage const& other) = default;
     RenderedImage& operator=(RenderedImage const& other) = default;
 
@@ -71,6 +74,7 @@ class Renderer {
     glm::mat4 mCameraTransform;
     glm::mat4 mModelView;
     glm::mat4 mProjection;
+    bool      mInside;
   };
 
   class CopiedImage : public RenderedImage {

@@ -192,8 +192,8 @@ OSPRayRenderer::Volume OSPRayRenderer::loadVolume(DataManager::State const& stat
   case VolumeStructure::eInvalid:
     throw std::runtime_error("Trying to load volume with unknown/invalid structure!");
   }
-  volume.mHeight       = getHeight(volumeData);
-  volume.mLod          = lod;
+  volume.mHeight = getHeight(volumeData);
+  volume.mLod    = lod;
   return volume;
 }
 
@@ -269,7 +269,7 @@ void OSPRayRenderer::updateWorld(
         scalarState.mScalar = *scalar;
         Volume coreVolume   = getVolume(scalarState, volume.mLod);
 
-        std::array<double, 2> valueRange = mDataManager->getScalarRange(scalarState.mScalar);
+        std::array<double, 2> valueRange    = mDataManager->getScalarRange(scalarState.mScalar);
         rkcommon::math::vec2f valueRangeOsp = {
             static_cast<float>(valueRange[1]) * 0.8f, static_cast<float>(valueRange[1]) * 0.98f};
         mCache.mCoreTransferFunction.setParam("valueRange", valueRangeOsp);
@@ -450,6 +450,7 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
   camera.mOsprayCamera = osprayCamera;
   camera.mModelView    = crop.mModelView;
   camera.mProjection   = crop.mProjection;
+  camera.mInside       = crop.mInside;
   return camera;
 }
 
@@ -547,8 +548,8 @@ OSPRayRenderer::Cache::Cache()
 
 OSPRayRenderer::RenderedImage::RenderedImage(ospray::cpp::FrameBuffer frame, Camera const& camera,
     float volumeHeight, Parameters const& parameters, glm::mat4 const& cameraTransform)
-    : Renderer::RenderedImage(
-          true, parameters.mResolution, cameraTransform, camera.mModelView, camera.mProjection)
+    : Renderer::RenderedImage(true, parameters.mResolution, cameraTransform, camera.mModelView,
+          camera.mProjection, camera.mInside)
     , mFrame(std::move(frame)) {
   mColorData = (float*)mFrame.map(OSP_FB_COLOR);
   mDepthData = (float*)mFrame.map(OSP_FB_DEPTH);

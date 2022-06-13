@@ -54,7 +54,8 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   /// This should correspond to the perspective, from which the image was rendered.
   void setTransform(glm::mat4 transform);
   /// Sets the model view and projection matrices used in rendering the color image.
-  void setRendererMatrices(glm::mat4 modelView, glm::mat4 projection);
+  /// Also sets, whether the camera was inside the volume while rendering.
+  void setRendererMatrices(glm::mat4 modelView, glm::mat4 projection, bool inside);
 
   /// Enables using the depth information for image based rendering.
   void setUseDepth(bool useDepth);
@@ -82,6 +83,7 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   glm::mat4 mRendererModelView;
   glm::mat4 mRendererProjection;
   glm::mat4 mRendererMVP;
+  bool      mInside;
   bool      mUseDepth  = true;
   bool      mDrawDepth = false;
 

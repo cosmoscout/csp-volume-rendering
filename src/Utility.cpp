@@ -17,6 +17,8 @@ namespace csp::volumerendering::Utility {
 
 CameraParams calculateCameraParams(
     float volumeHeight, glm::mat4 observerTransform, float fovY, float fovX) {
+  CameraParams crop;
+
   // Create camera transform looking along negative z
   glm::mat4 cameraTransform(1);
   cameraTransform[2][2] = -1;
@@ -53,6 +55,8 @@ CameraParams calculateCameraParams(
     rightAngle = cameraAngleX + modelAngleX;
     downAngle  = cameraAngleY - modelAngleY;
     upAngle    = cameraAngleY + modelAngleY;
+
+    crop.mInside = false;
   } else {
     // If the camera is inside the volume the model angles will be NaN,
     // so the angles are set to the edges of the field of view
@@ -60,6 +64,8 @@ CameraParams calculateCameraParams(
     rightAngle = fovX / 2;
     downAngle  = -fovY / 2;
     upAngle    = fovY / 2;
+
+    crop.mInside = true;
   }
 
   // Get model, view and projection matrices
@@ -85,7 +91,6 @@ CameraParams calculateCameraParams(
   projection[3][2] = -2 * farClip * nearClip / (farClip - nearClip);
 
   // Get edges of volume in image space coordinates
-  CameraParams crop;
   crop.mLeft   = 0.5f + tan(leftAngle) / (2 * tan(fovX / 2));
   crop.mRight  = 0.5f + tan(rightAngle) / (2 * tan(fovX / 2));
   crop.mBottom = 0.5f + tan(downAngle) / (2 * tan(fovY / 2));

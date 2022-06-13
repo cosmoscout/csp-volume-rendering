@@ -83,10 +83,11 @@ void DisplayNode::setTransform(glm::mat4 transform) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void DisplayNode::setRendererMatrices(glm::mat4 modelView, glm::mat4 projection) {
+void DisplayNode::setRendererMatrices(glm::mat4 modelView, glm::mat4 projection, bool inside) {
   mRendererModelView  = std::move(modelView);
   mRendererProjection = std::move(projection);
   mRendererMVP        = mRendererProjection * mRendererModelView;
+  mInside             = inside;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

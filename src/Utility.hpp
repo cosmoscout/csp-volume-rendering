@@ -23,6 +23,8 @@ struct CameraParams {
 
   glm::mat4 mModelView;
   glm::mat4 mProjection;
+
+  bool mInside;
 };
 
 CameraParams calculateCameraParams(

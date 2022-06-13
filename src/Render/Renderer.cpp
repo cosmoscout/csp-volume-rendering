@@ -201,12 +201,13 @@ bool Renderer::RenderedImage::operator==(const RenderedImage& other) const {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Renderer::RenderedImage::RenderedImage(bool valid, int resolution, glm::mat4 cameraTransform,
-    glm::mat4 modelView, glm::mat4 projection)
+    glm::mat4 modelView, glm::mat4 projection, bool inside)
     : mValid(valid)
     , mResolution(resolution)
     , mCameraTransform(cameraTransform)
     , mModelView(modelView)
-    , mProjection(projection) {
+    , mProjection(projection)
+    , mInside(inside) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -243,6 +244,12 @@ glm::mat4 const& Renderer::RenderedImage::getModelView() const {
 
 glm::mat4 const& Renderer::RenderedImage::getProjection() const {
   return mProjection;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+bool Renderer::RenderedImage::isInside() const {
+  return mInside;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

@@ -825,7 +825,7 @@ void Plugin::displayFrame(std::unique_ptr<Renderer::RenderedImage> frame, Displa
   displayNode->setDepthTexture(
       frame->getDepthData(), frame->getResolution(), frame->getResolution());
   displayNode->setTransform(glm::toMat4(glm::toQuat(frame->getCameraTransform())));
-  displayNode->setRendererMatrices(frame->getModelView(), frame->getProjection());
+  displayNode->setRendererMatrices(frame->getModelView(), frame->getProjection(), frame->isInside());
 
   if (mDisplayedImage) {
     mRenderedImages.insert(std::move(mDisplayedImage));

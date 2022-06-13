@@ -115,6 +115,7 @@ bool PointsForwardWarped::DoImpl() {
       mShader.GetUniformLocation("uFarClip"), cs::utils::getCurrentFarClipDistance());
   mShader.SetUniform(mShader.GetUniformLocation("uUseDepth"), mUseDepth);
   mShader.SetUniform(mShader.GetUniformLocation("uDrawDepth"), mDrawDepth);
+  mShader.SetUniform(mShader.GetUniformLocation("uInside"), mInside);
 
   mTexture.Bind(GL_TEXTURE0);
   mDepthTexture.Bind(GL_TEXTURE1);
