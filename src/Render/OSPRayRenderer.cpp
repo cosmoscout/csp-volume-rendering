@@ -136,7 +136,7 @@ OSPRayRenderer::Volume const& OSPRayRenderer::getVolume(
           std::async(std::launch::async, [this, state, lod]() { return loadVolume(state, lod); });
       mCache.mCurrentVolumeState = state;
     }
-    if (mCache.mCurrentVolume.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+    if (mCache.mCurrentVolume.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
       return mCache.mCurrentVolume.get();
     }
     lod = 0;
