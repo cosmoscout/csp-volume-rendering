@@ -90,6 +90,8 @@ class OSPRayRenderer : public Renderer {
 
   struct Cache {
     std::map<DataManager::State, std::map<int, std::shared_future<Volume>>> mVolumes;
+    std::shared_future<Volume>                                              mCurrentVolume;
+    DataManager::State                                                      mCurrentVolumeState;
 
     Camera                        mCamera;
     ospray::cpp::FrameBuffer      mFrameBuffer;
