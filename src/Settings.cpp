@@ -113,6 +113,7 @@ void from_json(nlohmann::json const& j, Settings::Rendering& o) {
   cs::core::Settings::deserialize(j, "requestImages", o.mRequestImages);
   cs::core::Settings::deserialize(j, "resolution", o.mResolution);
   cs::core::Settings::deserialize(j, "samplingRate", o.mSamplingRate);
+  cs::core::Settings::deserialize(j, "aoSamples", o.mAOSamples);
   cs::core::Settings::deserialize(j, "maxPasses", o.mMaxPasses);
   cs::core::Settings::deserialize(j, "densityScale", o.mDensityScale);
   cs::core::Settings::deserialize(j, "useMaxDepth", o.mUseMaxDepth);
@@ -126,6 +127,7 @@ void to_json(nlohmann::json& j, Settings::Rendering const& o) {
   cs::core::Settings::serialize(j, "requestImages", o.mRequestImages);
   cs::core::Settings::serialize(j, "resolution", o.mResolution);
   cs::core::Settings::serialize(j, "samplingRate", o.mSamplingRate);
+  cs::core::Settings::serialize(j, "aoSamples", o.mAOSamples);
   cs::core::Settings::serialize(j, "maxPasses", o.mMaxPasses);
   cs::core::Settings::serialize(j, "densityScale", o.mDensityScale);
   cs::core::Settings::serialize(j, "useMaxDepth", o.mUseMaxDepth);

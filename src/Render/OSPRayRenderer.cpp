@@ -495,7 +495,7 @@ void OSPRayRenderer::renderFrame(ospray::cpp::World const& world, ospray::cpp::C
 
   const void* filtersPtr = parameters.mScalarFilters.data();
   renderer.setParam("scalarFilters", OSP_VOID_PTR, &filtersPtr);
-  renderer.setParam("aoSamples", 4);
+  renderer.setParam("aoSamples", parameters.mAOSamples);
   renderer.setParam("shadows", false);
   renderer.setParam("volumeSamplingRate", parameters.mSamplingRate);
   renderer.setParam("depthMode", (int)parameters.mWorld.mDepthMode);

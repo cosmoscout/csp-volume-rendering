@@ -139,6 +139,13 @@ void Renderer::setSunStrength(float strength) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void Renderer::setAOSamples(int value) {
+  std::scoped_lock lock(mParameterMutex);
+  mParameters.mAOSamples = value;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void Renderer::setCoreEnabled(bool value) {
   std::scoped_lock lock(mParameterMutex);
   mParameters.mWorld.mCore.mEnable = value;

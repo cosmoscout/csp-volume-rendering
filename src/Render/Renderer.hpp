@@ -104,7 +104,7 @@ class Renderer {
   Renderer(std::shared_ptr<DataManager> dataManager, VolumeStructure structure, VolumeShape shape);
   virtual ~Renderer() = default;
 
-  //Clear cache with ospray data
+  // Clear cache with ospray data
   virtual void clearCache() = 0;
 
   /// Sets the desired resolution of the rendered images horizontally and vertically.
@@ -145,6 +145,8 @@ class Renderer {
   void setSunDirection(glm::vec3 sunDirection);
   /// Sets the strength of the light of the sun.
   void setSunStrength(float strength);
+  /// Sets the number of ambient occlusion samples to use.
+  void setAOSamples(int value);
 
   void setCoreEnabled(bool value);
   void setCoreScalar(std::string value);
@@ -239,6 +241,7 @@ class Renderer {
 
     int   mResolution;
     float mSamplingRate;
+    int   mAOSamples;
 
     bool mDenoiseColor;
     bool mDenoiseDepth;
@@ -248,8 +251,9 @@ class Renderer {
     bool operator==(const Parameters& other) const {
       return mMaxRenderPasses == other.mMaxRenderPasses && mMaxLod == other.mMaxLod &&
              mResolution == other.mResolution && mSamplingRate == other.mSamplingRate &&
-             mDenoiseColor == other.mDenoiseColor && mDenoiseDepth == other.mDenoiseDepth &&
-             mScalarFilters == other.mScalarFilters && mWorld == other.mWorld;
+             mAOSamples == other.mAOSamples && mDenoiseColor == other.mDenoiseColor &&
+             mDenoiseDepth == other.mDenoiseDepth && mScalarFilters == other.mScalarFilters &&
+             mWorld == other.mWorld;
     }
   };
 

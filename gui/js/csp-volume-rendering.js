@@ -19,6 +19,7 @@
       CosmoScout.gui.initSlider("volumeRendering.setResolution", 32, 2048, 32, [256]);
       CosmoScout.gui.initSliderRange("volumeRendering.setSamplingRate",
           {"min": 0.001, "25%": 0.01, "50%": 0.1, "75%": 1, "max": 10}, [0.005]);
+      CosmoScout.gui.initSlider("volumeRendering.setAOSamples", 0, 10, 1, [4]);
       CosmoScout.gui.initSlider("volumeRendering.setMaxRenderPasses", 1, 100, 1, [10]);
       CosmoScout.gui.initSlider("volumeRendering.setDensityScale", 1, 20, 0.1, [10]);
       CosmoScout.gui.initSlider("volumeRendering.setPathlineSize", 1, 20, 1, [1]);
