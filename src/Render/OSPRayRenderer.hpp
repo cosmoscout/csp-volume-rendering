@@ -45,6 +45,8 @@ class OSPRayRenderer : public Renderer {
        DataManager::State const& state, std::optional<DataManager::State> const& coreState) override;
   void cancelRendering() override;
 
+  void clearCache() override;
+
  private:
   OSPRayInitializer mInitializer;
 

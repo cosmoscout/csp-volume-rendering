@@ -104,6 +104,9 @@ class Renderer {
   Renderer(std::shared_ptr<DataManager> dataManager, VolumeStructure structure, VolumeShape shape);
   virtual ~Renderer() = default;
 
+  //Clear cache with ospray data
+  virtual void clearCache() = 0;
+
   /// Sets the desired resolution of the rendered images horizontally and vertically.
   void setResolution(int resolution);
   /// Sets the sampling rate used by the renderer. Higher sampling rates result in images with

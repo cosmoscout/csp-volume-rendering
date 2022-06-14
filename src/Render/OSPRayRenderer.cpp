@@ -84,6 +84,13 @@ void OSPRayRenderer::cancelRendering() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void OSPRayRenderer::clearCache()
+{
+  mCache.mVolumes.clear();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 std::unique_ptr<Renderer::RenderedImage> OSPRayRenderer::getFrameImpl(
     glm::mat4 const& cameraTransform, std::optional<std::vector<float>>&& maxDepth,
     Parameters parameters, DataManager::State const& dataState) {
@@ -124,6 +131,7 @@ OSPRayRenderer::Volume const& OSPRayRenderer::getVolume(
     DataManager::State const& state, std::optional<int> const& maxLod) {
   int         lod        = mDataManager->getMaxLod(state, maxLod);
   auto const& stateCache = mCache.mVolumes.find(state);
+
   if (stateCache == mCache.mVolumes.end()) {
     mCache.mVolumes[state][lod] =
         std::async(std::launch::deferred, [this, state, lod]() { return loadVolume(state, lod); });

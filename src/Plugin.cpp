@@ -79,6 +79,8 @@ void Plugin::init() {
   mFrameIntervals.resize(mFrameIntervalsLength);
   mCameraTransforms.resize(mCameraTransformsLength);
 
+  mResetTfHandles = true;
+
   logger().info("Loading plugin done.");
 }
 
@@ -111,6 +113,7 @@ void Plugin::update() {
         if (mSampleCount == 0) {
           nlohmann::json extents =
               mDataManager->getScalarRange(mDataManager->getState().mScalar.getId());
+
           mGuiManager->getGui()->callJavascript(
               "CosmoScout.volumeRendering.transferFunctionEditor.setData", sampleJson,
               mResetTfHandles, extents);
@@ -619,6 +622,7 @@ void csp::volumerendering::Plugin::setDrawDepth(bool value) {
 
 void csp::volumerendering::Plugin::setScalar(std::string const& value) {
   invalidateCache();
+  mRenderer->clearCache();
   if (mDataManager->isReady()) {
     mDataManager->setActiveScalar(value);
     mSampleCount    = 0;
