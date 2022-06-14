@@ -114,6 +114,7 @@ void Plugin::update() {
           nlohmann::json extents =
               mDataManager->getScalarRange(mDataManager->getState().mScalar.getId());
 
+          std::cout << "Update range slider " << mResetTfHandles << " " << extents << std::endl;
           mGuiManager->getGui()->callJavascript(
               "CosmoScout.volumeRendering.transferFunctionEditor.setData", sampleJson,
               mResetTfHandles, extents);
@@ -424,6 +425,8 @@ void Plugin::connectAllSettings() {
     if (mDataManager->isReady() && scalar.getId() == mPluginSettings.mData.mActiveScalar.get()) {
       mSampleCount    = 0;
       mResetTfHandles = false;
+    }else{
+      mResetTfHandles = true;
     }
   });
 }
