@@ -245,7 +245,7 @@ void Plugin::registerAllUICallbacks() {
         invalidateCache();
         mDataManager->setTimestep((int)std::lround(value));
         mSampleCount    = 0;
-        mResetTfHandles = false;
+        mResetTfHandles = true;
       }));
 
   mGuiManager->getGui()->registerCallback("volumeRendering.preloadTimestep",
