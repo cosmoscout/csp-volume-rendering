@@ -130,17 +130,6 @@ OSPRayRenderer::Volume const& OSPRayRenderer::getVolume(
     DataManager::State const& state, std::optional<int> const& maxLod) {
   int lod = mDataManager->getMaxLod(state, maxLod);
 
-  if (lod > 0) {
-    if (!(mCache.mCurrentVolumeState == state) || !mCache.mCurrentVolume.valid()) {
-      mCache.mCurrentVolume =
-          std::async(std::launch::async, [this, state, lod]() { return loadVolume(state, lod); });
-      mCache.mCurrentVolumeState = state;
-    }
-    if (mCache.mCurrentVolume.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-      return mCache.mCurrentVolume.get();
-    }
-    lod = 0;
-  }
 
   auto const& stateCache = mCache.mVolumes.find(state);
   if (stateCache == mCache.mVolumes.end()) {
