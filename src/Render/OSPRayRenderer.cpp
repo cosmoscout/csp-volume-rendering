@@ -130,7 +130,6 @@ OSPRayRenderer::Volume const& OSPRayRenderer::getVolume(
     DataManager::State const& state, std::optional<int> const& maxLod) {
   int lod = mDataManager->getMaxLod(state, maxLod);
 
-
   auto const& stateCache = mCache.mVolumes.find(state);
   if (stateCache == mCache.mVolumes.end()) {
     mCache.mVolumes[state][lod] =
@@ -279,7 +278,7 @@ void OSPRayRenderer::updateWorld(
 
         std::array<double, 2> valueRange    = mDataManager->getScalarRange(scalarState.mScalar);
         rkcommon::math::vec2f valueRangeOsp = {
-            static_cast<float>(valueRange[1]) * 0.8f, static_cast<float>(valueRange[1]) * 0.98f};
+            static_cast<float>(valueRange[1]) * 0.95f, static_cast<float>(valueRange[1]) * 1.0f};
         mCache.mCoreTransferFunction.setParam("valueRange", valueRangeOsp);
         mCache.mCoreTransferFunction.commit();
 
