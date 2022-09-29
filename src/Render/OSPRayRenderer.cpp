@@ -429,7 +429,7 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
   observerTransform[3] =
       observerTransform[3] * glm::vec4(volumeHeight, volumeHeight, volumeHeight, 1);
 
-  float                 fov = 3.141f / 2;
+  float                 fov = 3.141f * 120.f / 180.f;
   Utility::CameraParams crop =
       Utility::calculateCameraParams(volumeHeight, observerTransform, fov, fov);
 
