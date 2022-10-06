@@ -34,6 +34,9 @@ static void sampleVolume(VolumeDepthRenderContext& rc, VolumeContext& vc,
   float          sampleVal[10];
   uniform uint32 atts[10];
   atts[0] = 0;
+  for (int i = 0; i < 10; i++) {
+    sampleVal[i] = nan;
+  }
   for (int i = 0; i < rc.renderer->numScalarFilters; i++) {
     atts[i + 1] = rc.renderer->scalarFilters[i].attrIndex;
   }
@@ -125,8 +128,8 @@ static float sampleAllVolumes(VolumeDepthRenderContext& rc, const VolumeInterval
     varying VolumeContext* uniform volumeContexts, Ray& ray, const uniform float samplingRate,
     vec4f& sampledColor, const uniform bool shade) {
   // Look for the closest sample across all volumes
-  float                minDist      = inf;
-  int                  usedSampleId = -1;
+  float minDist      = inf;
+  int   usedSampleId = -1;
   for (uniform int i = 0; i < reduce_max(volumeIntervals.numVolumeIntervals); i++) {
     if (i >= volumeIntervals.numVolumeIntervals)
       break;
