@@ -694,21 +694,11 @@ glm::mat4 Plugin::getCurrentCameraTransform() {
       glm::scale(currentCameraTransform, glm::vec3(1.f / scale, 1.f / scale, 1.f / scale));
   currentCameraTransform[3] *= glm::vec4(1 / r[0], 1 / r[1], 1 / r[2], 1);
 
-  logger().trace("Camera mat:");
-  logger().trace("{}, {}, {}, {}", currentCameraTransform[0][0], currentCameraTransform[1][0],
-      currentCameraTransform[2][0], currentCameraTransform[3][0]);
-  logger().trace("{}, {}, {}, {}", currentCameraTransform[0][1], currentCameraTransform[1][1],
-      currentCameraTransform[2][1], currentCameraTransform[3][1]);
-  logger().trace("{}, {}, {}, {}", currentCameraTransform[0][2], currentCameraTransform[1][2],
-      currentCameraTransform[2][2], currentCameraTransform[3][2]);
-  logger().trace("{}, {}, {}, {}", currentCameraTransform[0][3], currentCameraTransform[1][3],
-      currentCameraTransform[2][3], currentCameraTransform[3][3]);
+  // Also apply the OpenGL/Vista model view matrix to the camera transform.
+  // On desktop, this is the unit matrix, but on HMDs this is used for the headtracking,
+  // so it has to be included to get the actual view direction of the volume.
   glm::mat4 vistaMV = mActiveDisplay->getVistaModelView();
-  logger().trace("Vista mat:");
-  logger().trace("{}, {}, {}, {}", vistaMV[0][0], vistaMV[1][0], vistaMV[2][0], vistaMV[3][0]);
-  logger().trace("{}, {}, {}, {}", vistaMV[0][1], vistaMV[1][1], vistaMV[2][1], vistaMV[3][1]);
-  logger().trace("{}, {}, {}, {}", vistaMV[0][2], vistaMV[1][2], vistaMV[2][2], vistaMV[3][2]);
-  logger().trace("{}, {}, {}, {}", vistaMV[0][3], vistaMV[1][3], vistaMV[2][3], vistaMV[3][3]);
+  currentCameraTransform *= glm::inverse(vistaMV);
 
   mCameraTransforms[mCameraTransformsIndex] =
       currentCameraTransform * glm::inverse(mLastCameraTransform);
