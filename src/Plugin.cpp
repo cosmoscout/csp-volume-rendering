@@ -425,7 +425,7 @@ void Plugin::connectAllSettings() {
     if (mDataManager->isReady() && scalar.getId() == mPluginSettings.mData.mActiveScalar.get()) {
       mSampleCount    = 0;
       mResetTfHandles = false;
-    }else{
+    } else {
       mResetTfHandles = true;
     }
   });
@@ -694,6 +694,22 @@ glm::mat4 Plugin::getCurrentCameraTransform() {
       glm::scale(currentCameraTransform, glm::vec3(1.f / scale, 1.f / scale, 1.f / scale));
   currentCameraTransform[3] *= glm::vec4(1 / r[0], 1 / r[1], 1 / r[2], 1);
 
+  logger().trace("Camera mat:");
+  logger().trace("{}, {}, {}, {}", currentCameraTransform[0][0], currentCameraTransform[1][0],
+      currentCameraTransform[2][0], currentCameraTransform[3][0]);
+  logger().trace("{}, {}, {}, {}", currentCameraTransform[0][1], currentCameraTransform[1][1],
+      currentCameraTransform[2][1], currentCameraTransform[3][1]);
+  logger().trace("{}, {}, {}, {}", currentCameraTransform[0][2], currentCameraTransform[1][2],
+      currentCameraTransform[2][2], currentCameraTransform[3][2]);
+  logger().trace("{}, {}, {}, {}", currentCameraTransform[0][3], currentCameraTransform[1][3],
+      currentCameraTransform[2][3], currentCameraTransform[3][3]);
+  glm::mat4 vistaMV = mActiveDisplay->getVistaModelView();
+  logger().trace("Vista mat:");
+  logger().trace("{}, {}, {}, {}", vistaMV[0][0], vistaMV[1][0], vistaMV[2][0], vistaMV[3][0]);
+  logger().trace("{}, {}, {}, {}", vistaMV[0][1], vistaMV[1][1], vistaMV[2][1], vistaMV[3][1]);
+  logger().trace("{}, {}, {}, {}", vistaMV[0][2], vistaMV[1][2], vistaMV[2][2], vistaMV[3][2]);
+  logger().trace("{}, {}, {}, {}", vistaMV[0][3], vistaMV[1][3], vistaMV[2][3], vistaMV[3][3]);
+
   mCameraTransforms[mCameraTransformsIndex] =
       currentCameraTransform * glm::inverse(mLastCameraTransform);
   mLastCameraTransform = currentCameraTransform;
@@ -806,7 +822,7 @@ std::vector<ScalarFilter> csp::volumerendering::Plugin::parseScalarFilters(
   std::vector<ScalarFilter> filters;
   for (auto const& [axis, value] : j.items()) {
     auto const& scalar = std::find_if(scalars.begin(), scalars.end(),
-        [& axis = axis](Scalar const& s) { return s.mName == axis; });
+        [&axis = axis](Scalar const& s) { return s.mName == axis; });
     if (scalar != scalars.end()) {
       ScalarFilter filter;
       filter.mAttrIndex = (int)std::distance(scalars.begin(), scalar);
@@ -834,7 +850,8 @@ void Plugin::displayFrame(std::unique_ptr<Renderer::RenderedImage> frame, Displa
   displayNode->setDepthTexture(
       frame->getDepthData(), frame->getResolution(), frame->getResolution());
   displayNode->setTransform(glm::toMat4(glm::toQuat(frame->getCameraTransform())));
-  displayNode->setRendererMatrices(frame->getModelView(), frame->getProjection(), frame->isInside());
+  displayNode->setRendererMatrices(
+      frame->getModelView(), frame->getProjection(), frame->isInside());
 
   if (mDisplayedImage) {
     mRenderedImages.insert(std::move(mDisplayedImage));

@@ -110,10 +110,21 @@ glm::dvec3 DisplayNode::getRadii() const {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+glm::mat4 DisplayNode::getVistaModelView() const {
+  return mVistaModelView;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 bool DisplayNode::Do() {
   if (!mEnabled || !getIsInExistence() || !pVisible.get()) {
     return true;
   }
+
+  std::array<GLfloat, 16> glMatMV{};
+  glGetFloatv(GL_MODELVIEW_MATRIX, glMatMV.data());
+  mVistaModelView = glm::make_mat4(glMatMV.data());
+
   return DoImpl();
 }
 

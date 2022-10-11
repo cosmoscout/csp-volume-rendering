@@ -64,6 +64,8 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
 
   virtual glm::dvec3 getRadii() const;
 
+  glm::mat4 getVistaModelView() const;
+
   /// Interface implementation of IVistaOpenGLDraw.
   bool Do() override;
   bool GetBoundingBox(VistaBoundingBox& bb) override;
@@ -90,6 +92,9 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   bool mShaderDirty;
 
   virtual bool DoImpl() = 0;
+
+private:
+  glm::mat4 mVistaModelView;
 };
 
 } // namespace csp::volumerendering
