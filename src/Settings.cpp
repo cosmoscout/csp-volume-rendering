@@ -84,6 +84,10 @@ void from_json(nlohmann::json const& j, Settings::Data& o) {
       break;
     }
   }
+
+  if (j.contains("timeBar")) {
+    cs::core::Settings::deserialize(j, "timeBar", o.mUseTimeBar);
+  }
 };
 
 void to_json(nlohmann::json& j, Settings::Data const& o) {
