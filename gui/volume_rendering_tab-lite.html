@@ -1,0 +1,496 @@
+<div class="accordion" id="volumeRenderingTab-accordion">
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-data" data-toggle="collapse"
+      data-target="#collapseVolume-data" aria-expanded="false" aria-controls="collapseVolume-data" type="button">
+      <i class="material-icons">storage</i>
+      <span>Data</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-data" aria-labelledby="headingVolume-data"
+      data-parent="#volumeRenderingTab-accordion">
+      <div class="row">
+        <div class="col-5">
+          Scalar
+        </div>
+        <div class="col-7">
+          <select data-callback="volumeRendering.setScalar" class="simple-value-dropdown"></select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-rendering" data-toggle="collapse"
+      data-target="#collapseVolume-rendering" aria-expanded="false" aria-controls="collapseVolume-rendering"
+      type="button">
+      <i class="material-icons">camera</i>
+      <span>Rendering</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-rendering"
+      aria-labelledby="headingVolume-rendering" data-parent="#volumeRenderingTab-accordion">
+      <div class="col-7 offset-5">
+        <label class="checklabel">
+          <input type="checkbox" data-callback="volumeRendering.setEnableRequestImages" />
+          <i class="material-icons"></i>
+          <span>Request new images</span>
+        </label>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          <a class="btn glass block px-3" onclick="CosmoScout.callbacks.volumeRendering.cancel()">
+            <i class="material-icons">cancel</i>
+            Cancel
+          </a>
+        </div>
+        <div class="col-7">
+          <div id="volumeRendering.progressContainer">
+            <div id="volumeRendering.progress">
+              <div id="volumeRendering.progressBar">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Resolution
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setResolution">
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Sampling rate
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setSamplingRate">
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Max render passes
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setMaxRenderPasses">
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Density scale
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setDensityScale">
+          </div>
+        </div>
+      </div>
+
+      <div class="col-7 offset-5">
+        <label class="checklabel">
+          <input type="checkbox" data-callback="volumeRendering.setUseMaxDepth" />
+          <i class="material-icons"></i>
+          <span>Use max depth</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-lighting" data-toggle="collapse"
+      data-target="#collapseVolume-lighting" aria-expanded="false" aria-controls="collapseVolume-lighting"
+      type="button">
+      <i class="material-icons">lightbulb</i>
+      <span>Lighting</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-lighting"
+      aria-labelledby="headingVolume-lighting" data-parent="#volumeRenderingTab-accordion">
+      <div class="row">
+        <div class="col-7 offset-5">
+          <label class="checklabel">
+            <input type="checkbox" data-callback="volumeRendering.setEnableLighting" />
+            <i class="material-icons"></i>
+            <span>Enable lighting</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Sun strength
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setSunStrength">
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Ambient strength
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setAmbientStrength">
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          AO samples
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setAOSamples">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-transferFunction" data-toggle="collapse"
+      data-target="#collapseVolume-transferFunction" aria-expanded="false"
+      aria-controls="collapseVolume-transferFunction" type="button">
+      <i class="material-icons">show_chart</i>
+      <span>Transfer function</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-transferFunction"
+      aria-labelledby="headingVolume-transferFunction" data-parent="#volumeRenderingTab-accordion">
+      <div id="volumeRendering.tfEditor"></div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-parcoords" data-toggle="collapse"
+      data-target="#collapseVolume-parcoords" aria-expanded="false" aria-controls="collapseVolume-parcoords"
+      type="button">
+      <i class="material-icons">waves</i>
+      <span>Parallel Coordinates</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-parcoords"
+      aria-labelledby="headingVolume-parcoords" data-parent="#volumeRenderingTab-accordion">
+      <div id="volumeRendering-parcoordsVolume"></div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-display" data-toggle="collapse"
+      data-target="#collapseVolume-display" aria-expanded="false" aria-controls="collapseVolume-display" type="button">
+      <i class="material-icons">image</i>
+      <span>Display</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-display"
+      aria-labelledby="headingVolume-display" data-parent="#volumeRenderingTab-accordion">
+      <div class="row">
+        <div class="col-5">
+          Display method
+        </div>
+        <div class="col-7">
+          <label class="radiolabel">
+            <input name="display_method" type="radio" data-callback="volumeRendering.setDisplayMode0" checked />
+            <span>Mesh</span>
+          </label>
+        </div>
+        <div class="col-7 offset-5">
+          <label class="radiolabel">
+            <input name="display_method" type="radio" data-callback="volumeRendering.setDisplayMode1" />
+            <span>Points</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-depth" data-toggle="collapse"
+      data-target="#collapseVolume-depth" aria-expanded="false" aria-controls="collapseVolume-depth" type="button">
+      <i class="material-icons">blur_on</i>
+      <span>Depth</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-depth" aria-labelledby="headingVolume-depth"
+      data-parent="#volumeRenderingTab-accordion">
+      <div class="col-7 offset-5">
+        <label class="checklabel">
+          <input type="checkbox" data-callback="volumeRendering.setEnableDepthData" />
+          <i class="material-icons"></i>
+          <span>Use depth data</span>
+        </label>
+      </div>
+
+      <div class="col-7 offset-5">
+        <label class="checklabel">
+          <input type="checkbox" data-callback="volumeRendering.setEnableDrawDepth" />
+          <i class="material-icons"></i>
+          <span>Draw depth data</span>
+        </label>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Depth source
+        </div>
+        <div class="col-7">
+          <label class="radiolabel">
+            <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode0" checked />
+            <span>None</span>
+          </label>
+        </div>
+        <div class="col-7 offset-5">
+          <label class="radiolabel">
+            <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode1" />
+            <span>Isosurface</span>
+          </label>
+        </div>
+        <div class="col-7 offset-5">
+          <label class="radiolabel">
+            <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode2" />
+            <span>First hit</span>
+          </label>
+        </div>
+        <div class="col-7 offset-5">
+          <label class="radiolabel">
+            <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode3" />
+            <span>Last hit</span>
+          </label>
+        </div>
+        <div class="col-7 offset-5">
+          <label class="radiolabel">
+            <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode4" />
+            <span>Opacity threshold</span>
+          </label>
+        </div>
+        <div class="col-7 offset-5">
+          <label class="radiolabel">
+            <input name="depth_mode" type="radio" data-callback="volumeRendering.setDepthMode5" />
+            <span>Multiple opacity thresholds</span>
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-denoising" data-toggle="collapse"
+      data-target="#collapseVolume-denoising" aria-expanded="false" aria-controls="collapseVolume-denoising"
+      type="button">
+      <i class="material-icons">gradient</i>
+      <span>Denoising</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-denoising"
+      aria-labelledby="headingVolume-denoising" data-parent="#volumeRenderingTab-accordion">
+      <div class="col-7 offset-5">
+        <label class="checklabel">
+          <input type="checkbox" data-callback="volumeRendering.setEnableDenoiseColor" />
+          <i class="material-icons"></i>
+          <span>Denoise color image</span>
+        </label>
+      </div>
+
+      <div class="col-7 offset-5">
+        <label class="checklabel">
+          <input type="checkbox" data-callback="volumeRendering.setEnableDenoiseDepth" />
+          <i class="material-icons"></i>
+          <span>Denoise depth image</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <div class="section-header collapsed font-alegreya" id="headingVolume-latencyCompensation" data-toggle="collapse"
+      data-target="#collapseVolume-latencyCompensation" aria-expanded="false"
+      aria-controls="collapseVolume-latencyCompensation" type="button">
+      <i class="material-icons">timer</i>
+      <span>Latency compensation</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-latencyCompensation"
+      aria-labelledby="headingVolume-latencyCompensation" data-parent="#volumeRenderingTab-accordion">
+      <div class="col-7 offset-5">
+        <label class="checklabel">
+          <input type="checkbox" data-callback="volumeRendering.setEnablePredictiveRendering" />
+          <i class="material-icons"></i>
+          <span>Predictive Rendering</span>
+        </label>
+      </div>
+
+      <div class="col-7 offset-5">
+        <label class="checklabel">
+          <input type="checkbox" data-callback="volumeRendering.setEnableReuseImages" />
+          <i class="material-icons"></i>
+          <span>Reuse images</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section" hidden>
+    <div class="section-header collapsed font-alegreya" id="headingVolume-pathlines" data-toggle="collapse"
+      data-target="#collapseVolume-pathlines" aria-expanded="false" aria-controls="collapseVolume-pathlines"
+      type="button">
+      <i class="material-icons">texture</i>
+      <span>Pathlines</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-pathlines"
+      aria-labelledby="headingVolume-pathlines" data-parent="#volumeRenderingTab-accordion">
+      <div class="row">
+        <div class="col-7 offset-5">
+          <label class="checklabel">
+            <input type="checkbox" data-callback="volumeRendering.setEnablePathlines" />
+            <i class="material-icons"></i>
+            <span>Render pathlines</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Line size
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setPathlineSize">
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-7 offset-5">
+          <label class="checklabel">
+            <input type="checkbox" data-callback="volumeRendering.setEnablePathlinesParcoords" />
+            <i class="material-icons"></i>
+            <span>Separate parallel coordinates</span>
+          </label>
+        </div>
+      </div>
+
+      <div id="volumeRendering-parcoordsPathlines" hidden></div>
+    </div>
+  </div>
+</div>
+
+<div class="settings-section">
+  <div class="section-header collapsed font-alegreya" id="headingVolume-transform" data-toggle="collapse"
+    data-target="#collapseVolume-transform" aria-expanded="false" aria-controls="collapseVolume-transform"
+    type="button">
+    <i class="material-icons">gamepad</i>
+    <span>Transform</span>
+    <i class="material-icons caret-icon">keyboard_arrow_left</i>
+  </div>
+  <div class="section-body collapse container-fluid" id="collapseVolume-transform"
+    aria-labelledby="headingVolume-transform" data-parent="#volumeRenderingTab-accordion">
+    <div class="strike">
+      <span>Rotation</span>
+    </div>
+
+    <div class="row">
+      <div class="col-5">
+        Yaw
+      </div>
+      <div class="col-7">
+        <div data-callback="volumeRendering.setRotationYaw">
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-5">
+        Pitch
+      </div>
+      <div class="col-7">
+        <div data-callback="volumeRendering.setRotationPitch">
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-5">
+        Roll
+      </div>
+      <div class="col-7">
+        <div data-callback="volumeRendering.setRotationRoll">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<template id="volumeRendering-parcoords-template">
+  <div class="parcoordsContainer">
+    <a class="btn glass block px-3 parcoordsUndockButton">
+      <i class="material-icons">launch</i>
+    </a>
+    <div class="parcoordsWidget">
+      <div class="parcoordsScroller">
+        <div class="parcoords" style="height:200px"></div>
+      </div>
+      <div class="parcoordsControls">
+        <div class="row">
+          <div class="col-5">Active axis:</div>
+          <div class="col-7 parcoordsActiveBrushLabel">None</div>
+        </div>
+        <div class="row">
+          <div class="col-5">
+            <input type="number" placeholder="Min" class="parcoordsBrushMin text-input" disabled>
+          </div>
+          <div class="col-2 text-center">
+            -
+          </div>
+          <div class="col-5">
+            <input type="number" placeholder="Max" class="parcoordsBrushMax text-input" disabled>
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-5">
+            <button class="parcoordsExport waves-effect waves-light block btn glass text">Export</button>
+          </div>
+          <div class="col-7">
+            <input type="text" placeholder="Filename" class="parcoordsExportLocation text-input text">
+          </div>
+        </div>
+        <div class="row">
+          <div class="col-5">
+            <button class="parcoordsImport waves-effect waves-light block btn glass text">Import</button>
+          </div>
+          <div class="parcoordsImportSelectParent col-7">
+            <select class="parcoordsImportSelect">
+              <option value="-1">none</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<template id="volumeRendering-parcoordsPopout-template">
+  <div class="draggable-window resizable-window">
+    <div class="window-wrapper">
+      <div class="window-header">
+        <span class="window-title">
+          <i class="material-icons">waves</i>
+          <span>Parallel Coordinates - %NAME%</span>
+        </span>
+        <a class="btn light-glass" data-action="close" data-toggle="tooltip" title="Close">
+          <i class="material-icons">close</i>
+        </a>
+      </div>
+      <div class="window-content container-fluid parcoordsContainer">
+      </div>
+    </div>
+  </div>
+</template>

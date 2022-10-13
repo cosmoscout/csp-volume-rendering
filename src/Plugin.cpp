@@ -70,6 +70,15 @@ void Plugin::init() {
   mOnSaveConnection = mAllSettings->onSave().connect(
       [this]() { mAllSettings->mPlugins["csp-volume-rendering"] = mPluginSettings; });
 
+  // Update the time shown in the user interface when the simulation time changes.
+  mTimeControl->pSimulationTime.connect([this](double val) {
+    if (mPluginSettings.mData.mUseTimeBar.get()) {
+      boost::posix_time::ptime time = cs::utils::convert::time::toPosix(val);
+      mDataManager->setTimestep(static_cast<int>(boost::posix_time::to_time_t(
+          time))); // in this one search for the closest match and load the corresponding data
+    }
+  });
+
   onLoad();
   registerAllUICallbacks();
   initUI();
@@ -240,32 +249,34 @@ void Plugin::registerAllUICallbacks() {
       std::function([this]() { mRenderer->cancelRendering(); }));
 
   // Data settings
-  mGuiManager->getGui()->registerCallback("volumeRendering.setTimestep",
-      "Sets the timestep of the rendered volume images.", std::function([this](double value) {
-        invalidateCache();
-        mDataManager->setTimestep((int)std::lround(value));
-        mSampleCount    = 0;
-        mResetTfHandles = true;
-      }));
+  if (mPluginSettings.mData.mUseTimeBar.get() == false) {
+    mGuiManager->getGui()->registerCallback("volumeRendering.setTimestep",
+        "Sets the timestep of the rendered volume images.", std::function([this](double value) {
+          invalidateCache();
+          mDataManager->setTimestep((int)std::lround(value));
+          mSampleCount    = 0;
+          mResetTfHandles = true;
+        }));
 
-  mGuiManager->getGui()->registerCallback("volumeRendering.preloadTimestep",
-      "Prepares the renderer for rendering.", std::function([this](double value) {
-        DataManager::State state = mDataManager->getState();
-        state.mTimestep          = (int)std::lround(value);
-        std::optional<DataManager::State> coreState;
-        if (mPluginSettings.mCore.has_value()) {
-          coreState = state;
-          auto scalar =
-              std::find_if(mDataManager->pScalars.get().begin(), mDataManager->pScalars.get().end(),
-                  [this](Scalar s) { return s.getId() == mPluginSettings.mCore->mScalar.get(); });
-          if (scalar != mDataManager->pScalars.get().end()) {
-            coreState->mScalar = *scalar;
-          } else {
-            coreState = {};
+    mGuiManager->getGui()->registerCallback("volumeRendering.preloadTimestep",
+        "Prepares the renderer for rendering.", std::function([this](double value) {
+          DataManager::State state = mDataManager->getState();
+          state.mTimestep          = (int)std::lround(value);
+          std::optional<DataManager::State> coreState;
+          if (mPluginSettings.mCore.has_value()) {
+            coreState   = state;
+            auto scalar = std::find_if(mDataManager->pScalars.get().begin(),
+                mDataManager->pScalars.get().end(),
+                [this](Scalar s) { return s.getId() == mPluginSettings.mCore->mScalar.get(); });
+            if (scalar != mDataManager->pScalars.get().end()) {
+              coreState->mScalar = *scalar;
+            } else {
+              coreState = {};
+            }
           }
-        }
-        mRenderer->preloadData(state, coreState);
-      }));
+          mRenderer->preloadData(state, coreState);
+        }));
+  }
 
   // Transferfunction
   mGuiManager->getGui()->registerCallback("volumeRendering.setTransferFunction",
@@ -285,17 +296,19 @@ void Plugin::registerAllUICallbacks() {
         mRenderer->setScalarFilters(filters);
       }));
 
-  mGuiManager->getGui()->registerCallback("volumeRendering.setTimestepAnimating",
-      "Specifies, whether timesteps are currently animated (increasing automatically).",
-      std::function([this](bool value) {
-        invalidateCache();
-        mAnimating = value;
-        if (value) {
-          mRenderer->setMaxLod(mDataManager->getMinLod(mDataManager->getState()));
-        } else {
-          mRenderer->clearMaxLod();
-        }
-      }));
+  if (mPluginSettings.mData.mUseTimeBar.get() == false) {
+    mGuiManager->getGui()->registerCallback("volumeRendering.setTimestepAnimating",
+        "Specifies, whether timesteps are currently animated (increasing automatically).",
+        std::function([this](bool value) {
+          invalidateCache();
+          mAnimating = value;
+          if (value) {
+            mRenderer->setMaxLod(mDataManager->getMinLod(mDataManager->getState()));
+          } else {
+            mRenderer->clearMaxLod();
+          }
+        }));
+  }
 
   // Pathline settings
   if (mPluginSettings.mPathlines.has_value()) {
@@ -416,11 +429,13 @@ void Plugin::connectAllSettings() {
           "CosmoScout.gui.setDropdownValue", "volumeRendering.setScalar", activeScalar->getId());
     }
   });
-  mDataManager->pTimesteps.connectAndTouch([this](std::vector<int> timesteps) {
-    nlohmann::json timestepsJson(timesteps);
-    mGuiManager->getGui()->callJavascript(
-        "CosmoScout.volumeRendering.setTimesteps", timestepsJson.dump());
-  });
+  if (mPluginSettings.mData.mUseTimeBar.get() == false) {
+    mDataManager->pTimesteps.connectAndTouch([this](std::vector<int> timesteps) {
+      nlohmann::json timestepsJson(timesteps);
+      mGuiManager->getGui()->callJavascript(
+          "CosmoScout.volumeRendering.setTimesteps", timestepsJson.dump());
+    });
+  }
   mDataManager->onScalarRangeUpdated().connect([this](Scalar const& scalar) {
     if (mDataManager->isReady() && scalar.getId() == mPluginSettings.mData.mActiveScalar.get()) {
       mSampleCount    = 0;
@@ -579,12 +594,20 @@ void Plugin::initUI() {
   // Add the volume rendering user interface components to the CosmoScout user interface.
   mGuiManager->addCssToGui("css/csp-volume-rendering.css");
   mGuiManager->addCssToGui("third-party/css/d3.parcoords.css");
-  mGuiManager->addPluginTabToSideBarFromHTML(
-      "Volume Rendering", "blur_circular", "../share/resources/gui/volume_rendering_tab.html");
+  if (mPluginSettings.mData.mUseTimeBar.get()) {
+    mGuiManager->addPluginTabToSideBarFromHTML("Volume Rendering", "blur_circular",
+        "../share/resources/gui/volume_rendering_tab-lite.html");
+    mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering-lite.js");
+  } else {
+    mGuiManager->addPluginTabToSideBarFromHTML(
+        "Volume Rendering", "blur_circular", "../share/resources/gui/volume_rendering_tab.html");
+    mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
+  }
+
   mGuiManager->addScriptToGuiFromJS(
       "../share/resources/gui/third-party/js/parcoords.standalone.js");
   mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/parcoords.js");
-  mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
+  // mGuiManager->addScriptToGuiFromJS("../share/resources/gui/js/csp-volume-rendering.js");
   mGuiManager->addScriptToGui(
       "CosmoScout.volumeRendering.initParcoords(`" + mDataManager->getCsvData() + "`, `" +
       (mPluginSettings.mPathlines ? mDataManager->getPathlines().getCsvData() : "") + "`);");

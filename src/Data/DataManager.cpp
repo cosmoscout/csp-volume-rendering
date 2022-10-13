@@ -198,20 +198,46 @@ std::array<double, 2> DataManager::getScalarRange(std::string scalarId) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void DataManager::setTimestep(int timestep) {
+  bool update = false;
   {
     std::scoped_lock lock(mStateMutex);
-    if (std::find(pTimesteps.get().begin(), pTimesteps.get().end(), timestep) !=
-        pTimesteps.get().end()) {
-      mCurrentTimestep = timestep;
-    } else {
-      logger().warn("'{}' is not a timestep in the current "
-                    "dataset. '{}' will be used instead.",
-          timestep, mCurrentTimestep);
-      timestep = mCurrentTimestep;
+
+    /// 1. check the special cases
+    if (timestep <= pTimesteps.get().front() && pTimesteps.get().front() != mCurrentTimestep) {
+      std::cout << "[setTimestep] Update front" << std::endl;
+      mCurrentTimestep = pTimesteps.get().front();
+      update           = true;
+    } else if (timestep >= pTimesteps.get().back() && pTimesteps.get().back() != mCurrentTimestep) {
+      std::cout << "[setTimestep] Update front" << std::endl;
+      mCurrentTimestep = pTimesteps.get().back();
+      update           = true;
+    } else if (timestep > pTimesteps.get().front() && timestep < pTimesteps.get().back()) {
+      // notice: lower bound returns the first entry that does not verify the < condition
+      auto low = std::lower_bound(pTimesteps.get().begin(), pTimesteps.get().end(), timestep);
+      // 1. we found the exact timestep that it is already loaded
+      if (*low == timestep && *low != mCurrentTimestep) {
+        std::cout << "[setTimestep] Update same" << std::endl;
+        mCurrentTimestep = *low;
+        update           = true;
+      } else { // 2. not exact entry found.. we get the closer entry that verify the < condition
+        auto prev = std::prev(low);
+        if (*prev != mCurrentTimestep) {
+          std::cout << "mCurrentTimestep: " << mCurrentTimestep << " timestep: " << timestep
+                    << std::endl;
+          std::cout << "prev: " << *prev << " low: " << *low << std::endl;
+          std::cout << "[setTimestep] Update close" << std::endl;
+          mCurrentTimestep = *prev;
+          update           = true;
+        }
+      }
     }
   }
-  mTimestepCv.notify_all();
-  getFromCache(timestep);
+
+  if (update) {
+    std::cout << "[setTimestep] Call getFromCache: " << mCurrentTimestep << std::endl;
+    mTimestepCv.notify_all();
+    getFromCache(mCurrentTimestep);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -232,7 +258,7 @@ void DataManager::cacheTimestep(int timestep) {
 void DataManager::setActiveScalar(std::string const& scalarId) {
   std::scoped_lock lock(mStateMutex, mScalarsMutex);
   auto             scalar = std::find_if(pScalars.get().begin(), pScalars.get().end(),
-      [&scalarId](Scalar const& s) { return s.getId() == scalarId; });
+                  [&scalarId](Scalar const& s) { return s.getId() == scalarId; });
   if (scalar != pScalars.get().end()) {
     mActiveScalar = *scalar;
   } else {
@@ -612,7 +638,8 @@ std::shared_future<vtkSmartPointer<vtkDataSet>> DataManager::getFromCache(
 
 void DataManager::loadData(Timestep timestep, Lod lod) {
   logger().debug("Loading data for timestep {}, level of detail {}...", timestep, lod);
-  auto data             = std::async(std::launch::async,
+  auto data = std::async(
+      std::launch::async,
       [this](Timestep timestep, Lod lod) {
         std::chrono::high_resolution_clock::time_point timer;
         vtkSmartPointer<vtkDataSet>                    data;
@@ -660,8 +687,7 @@ void DataManager::loadData(Timestep timestep, Lod lod) {
           mOnScalarRangeUpdated.emit(scalar.first);
         }
 
-        logger().info("Loaded timestep {} (LoD {}, {} s)",
-            timestep, lod,
+        logger().info("Loaded timestep {} (LoD {}, {} s)", timestep, lod,
             (float)(std::chrono::high_resolution_clock::now() - timer).count() / 1000000000);
 
         return data;

@@ -27,6 +27,7 @@ struct Settings {
     cs::utils::Property<VolumeStructure>    mStructure;
     cs::utils::Property<VolumeShape>        mShape;
     cs::utils::DefaultProperty<std::string> mActiveScalar{""};
+    cs::utils::DefaultProperty<bool>        mUseTimeBar{false};
 
     union Metadata {
       struct StructuredSpherical {
