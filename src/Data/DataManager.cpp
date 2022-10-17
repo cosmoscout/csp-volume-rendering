@@ -204,11 +204,11 @@ void DataManager::setTimestep(int timestep) {
 
     /// 1. check the special cases
     if (timestep <= pTimesteps.get().front() && pTimesteps.get().front() != mCurrentTimestep) {
-      std::cout << "[setTimestep] Update front" << std::endl;
+      // std::cout << "[setTimestep] Update front" << std::endl;
       mCurrentTimestep = pTimesteps.get().front();
       update           = true;
     } else if (timestep >= pTimesteps.get().back() && pTimesteps.get().back() != mCurrentTimestep) {
-      std::cout << "[setTimestep] Update front" << std::endl;
+      // std::cout << "[setTimestep] Update front" << std::endl;
       mCurrentTimestep = pTimesteps.get().back();
       update           = true;
     } else if (timestep > pTimesteps.get().front() && timestep < pTimesteps.get().back()) {
@@ -216,16 +216,16 @@ void DataManager::setTimestep(int timestep) {
       auto low = std::lower_bound(pTimesteps.get().begin(), pTimesteps.get().end(), timestep);
       // 1. we found the exact timestep that it is already loaded
       if (*low == timestep && *low != mCurrentTimestep) {
-        std::cout << "[setTimestep] Update same" << std::endl;
+        // std::cout << "[setTimestep] Update same" << std::endl;
         mCurrentTimestep = *low;
         update           = true;
       } else { // 2. not exact entry found.. we get the closer entry that verify the < condition
         auto prev = std::prev(low);
         if (*prev != mCurrentTimestep) {
-          std::cout << "mCurrentTimestep: " << mCurrentTimestep << " timestep: " << timestep
+          /*std::cout << "mCurrentTimestep: " << mCurrentTimestep << " timestep: " << timestep
                     << std::endl;
           std::cout << "prev: " << *prev << " low: " << *low << std::endl;
-          std::cout << "[setTimestep] Update close" << std::endl;
+          std::cout << "[setTimestep] Update close" << std::endl;*/
           mCurrentTimestep = *prev;
           update           = true;
         }
@@ -234,7 +234,7 @@ void DataManager::setTimestep(int timestep) {
   }
 
   if (update) {
-    std::cout << "[setTimestep] Call getFromCache: " << mCurrentTimestep << std::endl;
+    // std::cout << "[setTimestep] Call getFromCache: " << mCurrentTimestep << std::endl;
     mTimestepCv.notify_all();
     getFromCache(mCurrentTimestep);
   }
