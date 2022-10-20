@@ -711,17 +711,18 @@ bool Plugin::tryRequestFrame() {
 glm::mat4 Plugin::getCurrentCameraTransform() {
   glm::mat4 currentCameraTransform = mActiveDisplay->getRelativeTransform(
       mTimeControl->pSimulationTime.get(), mSolarSystem->getObserver());
-  float     scale = (float)mActiveDisplay->getRelativeScale(mSolarSystem->getObserver());
-  glm::vec3 r     = cs::core::SolarSystem::getRadii(mActiveDisplay->getCenterName());
-  currentCameraTransform =
-      glm::scale(currentCameraTransform, glm::vec3(1.f / scale, 1.f / scale, 1.f / scale));
-  currentCameraTransform[3] *= glm::vec4(1 / r[0], 1 / r[1], 1 / r[2], 1);
 
   // Also apply the OpenGL/Vista model view matrix to the camera transform.
   // On desktop, this is the unit matrix, but on HMDs this is used for the headtracking,
   // so it has to be included to get the actual view direction of the volume.
   glm::mat4 vistaMV = mActiveDisplay->getVistaModelView();
   currentCameraTransform *= glm::inverse(vistaMV);
+
+  float     scale = (float)mActiveDisplay->getRelativeScale(mSolarSystem->getObserver());
+  glm::vec3 r     = cs::core::SolarSystem::getRadii(mActiveDisplay->getCenterName());
+  currentCameraTransform =
+      glm::scale(currentCameraTransform, glm::vec3(1.f / scale, 1.f / scale, 1.f / scale));
+  currentCameraTransform[3] *= glm::vec4(1 / r[0], 1 / r[1], 1 / r[2], 1);
 
   mCameraTransforms[mCameraTransformsIndex] =
       currentCameraTransform * glm::inverse(mLastCameraTransform);
