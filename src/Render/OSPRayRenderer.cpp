@@ -156,50 +156,49 @@ OSPRayRenderer::Volume const& OSPRayRenderer::getVolume(
 OSPRayRenderer::Volume OSPRayRenderer::loadVolume(DataManager::State const& state, int lod) {
   Volume                      volume;
   vtkSmartPointer<vtkDataSet> volumeData = mDataManager->getData(state, lod);
+
+  std::vector<Scalar>         scalars    = mDataManager->pScalars.get();
+  scalars.insert(scalars.begin(), state.mScalar);
+
   switch (mStructure) {
   case VolumeStructure::eUnstructured:
     volume.mOsprayData = OSPRayUtility::createOSPRayVolume(
         vtkUnstructuredGrid::SafeDownCast(volumeData), state.mScalar.mType);
+    volume.mHeight = getHeight(volumeData);
     break;
   case VolumeStructure::eStructured: {
-    std::vector<Scalar> scalars = mDataManager->pScalars.get();
-    scalars.insert(scalars.begin(), state.mScalar);
     volume.mOsprayData =
         OSPRayUtility::createOSPRayVolume(vtkImageData::SafeDownCast(volumeData), scalars);
+    volume.mHeight = getHeight(volumeData);
     break;
   }
   case VolumeStructure::eRectilinear: {
-    std::vector<Scalar> scalars = mDataManager->pScalars.get();
-    scalars.insert(scalars.begin(), state.mScalar);
     volume.mOsprayData =
         OSPRayUtility::createOSPRayVolume(vtkRectilinearGrid::SafeDownCast(volumeData), scalars);
+    volume.mHeight = getHeight(volumeData);
     break;
   }
   case VolumeStructure::eStructuredSpherical: {
-    std::vector<Scalar> scalars = mDataManager->pScalars.get();
-    scalars.insert(scalars.begin(), state.mScalar);
     volume.mOsprayData = OSPRayUtility::createOSPRayVolume(
         vtkStructuredGrid::SafeDownCast(volumeData), scalars, mDataManager->getMetadata());
+    volume.mHeight = static_cast<float>(mDataManager->getMetadata().mRanges.mRad[1]);
     break;
   }
   case VolumeStructure::eRectilinearSpherical: {
-    std::vector<Scalar> scalars = mDataManager->pScalars.get();
-    scalars.insert(scalars.begin(), state.mScalar);
     volume.mOsprayData = OSPRayUtility::createOSPRayVolume(
         vtkRectilinearGrid::SafeDownCast(volumeData), scalars, mDataManager->getMetadata());
+    volume.mHeight = static_cast<float>(mDataManager->getMetadata().mRanges.mRad[1]);
     break;
   }
   case VolumeStructure::eImageSpherical: {
-    std::vector<Scalar> scalars = mDataManager->pScalars.get();
-    scalars.insert(scalars.begin(), state.mScalar);
     volume.mOsprayData = OSPRayUtility::createOSPRayVolume(
         vtkImageData::SafeDownCast(volumeData), scalars, mDataManager->getMetadata());
+    volume.mHeight = static_cast<float>(mDataManager->getMetadata().mRanges.mRad[1]);
     break;
   }
   case VolumeStructure::eInvalid:
     throw std::runtime_error("Trying to load volume with unknown/invalid structure!");
   }
-  volume.mHeight = getHeight(volumeData);
   volume.mLod    = lod;
   return volume;
 }
