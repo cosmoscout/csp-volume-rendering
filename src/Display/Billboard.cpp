@@ -86,6 +86,7 @@ bool Billboard::DoImpl() {
   glEnable(GL_CULL_FACE);
   glCullFace(GL_FRONT);
   glEnable(GL_BLEND);
+  glDisable(GL_DEPTH_TEST);
   glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
   // Draw.
