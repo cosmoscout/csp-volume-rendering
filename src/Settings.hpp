@@ -81,6 +81,7 @@ struct Settings {
     cs::utils::DefaultProperty<bool>        mEnabled{true};
     cs::utils::DefaultProperty<std::string> mScalar{""};
     cs::utils::Property<float>              mRadius;
+    cs::utils::DefaultProperty<glm::vec3>   mColor{glm::vec3(0.8f)};
 
     // Needed for deserialization.
     Core(){};

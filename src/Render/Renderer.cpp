@@ -160,6 +160,13 @@ void Renderer::setCoreRadius(float value) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void Renderer::setCoreColor(glm::vec3 value) {
+  std::scoped_lock lock(mParameterMutex);
+  mParameters.mWorld.mCore.mColor = value;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void Renderer::setPathlinesEnabled(bool enable) {
   std::scoped_lock lock(mParameterMutex);
   mParameters.mWorld.mPathlines.mEnable = enable;

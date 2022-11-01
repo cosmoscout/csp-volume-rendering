@@ -293,6 +293,17 @@ void Plugin::registerAllUICallbacks() {
         }
       }));
 
+  // Core settings
+  if (mPluginSettings.mCore.has_value()) {
+    mGuiManager->getGui()->registerCallback("volumeRendering.setCoreColor",
+        "Sets color for core when no scalar is selected.",
+        std::function([this](double r, double g, double b) {
+          invalidateCache();
+          glm::vec3 color               = glm::vec3(r / 255.f, g / 255.f, b / 255.f);
+          mPluginSettings.mCore->mColor = color;
+        }));
+  }
+
   // Pathline settings
   if (mPluginSettings.mPathlines.has_value()) {
     mGuiManager->getGui()->registerCallback("volumeRendering.setPathlinesScalarFilters",
@@ -363,13 +374,32 @@ void Plugin::connectAllSettings() {
     mGuiManager->addScriptToGui(code);
   });
 
+  // Core settings
+  if (mPluginSettings.mCore.has_value()) {
+    mPluginSettings.mCore->mColor.connectAndTouch([this](glm::vec3 value) {
+      mRenderer->setCoreColor(value);
+      mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setCoreColor",
+          value.r * 255.f, value.g * 255.f, value.b * 255.f);
+    });
+  }
+
   // Connect to data manager properties
   mDataManager->pScalars.connectAndTouch([this](std::vector<Scalar> scalars) {
     mGuiManager->getGui()->callJavascript(
         "CosmoScout.gui.clearDropdown", "volumeRendering.setScalar");
+    mGuiManager->getGui()->callJavascript(
+        "CosmoScout.gui.clearDropdown", "volumeRendering.setCoreScalar");
+    mGuiManager->getGui()->callJavascript(
+        "CosmoScout.gui.addDropdownValue", "volumeRendering.setCoreScalar", "none", "None", true);
     for (Scalar scalar : scalars) {
       mGuiManager->getGui()->callJavascript("CosmoScout.gui.addDropdownValue",
           "volumeRendering.setScalar", scalar.getId(), scalar.mName, false);
+      bool correctCoreScalar = false;
+      if (mPluginSettings.mCore.has_value()) {
+        correctCoreScalar = (scalar.getId() == mPluginSettings.mCore->mScalar.get());
+      }
+      mGuiManager->getGui()->callJavascript("CosmoScout.gui.addDropdownValue",
+          "volumeRendering.setCoreScalar", scalar.getId(), scalar.mName, correctCoreScalar);
     }
     if (scalars.size() > 0) {
       auto activeScalar = std::find_if(scalars.begin(), scalars.end(),
@@ -432,6 +462,8 @@ Plugin::Setting<bool>::getSettings(Settings& pluginSettings) {
           ? Setting<bool>{"setEnableCore", "Enable/disable rendering of core",
                 pluginSettings.mCore->mEnabled, &Renderer::setCoreEnabled}
           : Setting<bool>{},
+      pluginSettings.mCore.has_value() ? Setting<bool>{"setEnableDependentCoreScalar", ""}
+                                       : Setting<bool>{},
       // Pathline settings
       pluginSettings.mPathlines.has_value()
           ? Setting<bool>{"setEnablePathlines", "Enable/disable rendering of pathlines.",
@@ -483,7 +515,7 @@ Plugin::Setting<float>::getSettings(Settings& pluginSettings) {
       // Core settings
       pluginSettings.mCore.has_value()
           ? Setting<float>{"setCoreRadius", "Sets the radius of the rendered core.",
-                pluginSettings.mCore->mRadius, &Renderer::setCoreRadius}
+                pluginSettings.mCore->mRadius, {}, &Plugin::setCoreRadius}
           : Setting<float>{},
       // Pathline settings
       pluginSettings.mPathlines.has_value()
@@ -553,6 +585,14 @@ void Plugin::initUI() {
       "CosmoScout.volumeRendering.initParcoords(`" + mDataManager->getCsvData() + "`, `" +
       (mPluginSettings.mPathlines ? mDataManager->getPathlines().getCsvData() : "") + "`);");
 
+  mGuiManager->getGui()->callJavascript("CosmoScout.volumeRendering.setMaxCoreRadius",
+      mAllSettings->getAnchorRadii(mPluginSettings.mTransform.mAnchor.get())[0] / 1000. *
+          mPluginSettings.mTransform.mScale.get());
+
+  if (mPluginSettings.mCore.has_value()) {
+    mGuiManager->getGui()->callJavascript(
+        "CosmoScout.volumeRendering.enableSettingsSection", "core");
+  }
   if (mPluginSettings.mPathlines.has_value()) {
     mGuiManager->getGui()->callJavascript(
         "CosmoScout.volumeRendering.enableSettingsSection", "pathlines");
@@ -561,7 +601,7 @@ void Plugin::initUI() {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void csp::volumerendering::Plugin::setResolution(int value) {
+void Plugin::setResolution(int value) {
   mNextFrame.mResolution = value;
 }
 
@@ -573,7 +613,7 @@ void Plugin::setUseMaxDepth(bool value) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void csp::volumerendering::Plugin::setDepthData(bool value) {
+void Plugin::setDepthData(bool value) {
   for (auto const& node : mDisplayNodes) {
     node.second->setUseDepth(value);
   }
@@ -581,7 +621,7 @@ void csp::volumerendering::Plugin::setDepthData(bool value) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void csp::volumerendering::Plugin::setDrawDepth(bool value) {
+void Plugin::setDrawDepth(bool value) {
   for (auto const& node : mDisplayNodes) {
     node.second->setDrawDepth(value);
   }
@@ -589,7 +629,7 @@ void csp::volumerendering::Plugin::setDrawDepth(bool value) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void csp::volumerendering::Plugin::setScalar(std::string const& value) {
+void Plugin::setScalar(std::string const& value) {
   invalidateCache();
   if (mDataManager->isReady()) {
     mDataManager->setActiveScalar(value);
@@ -600,7 +640,7 @@ void csp::volumerendering::Plugin::setScalar(std::string const& value) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void csp::volumerendering::Plugin::setDisplayMode(DisplayMode value) {
+void Plugin::setDisplayMode(DisplayMode value) {
   for (auto const& node : mDisplayNodes) {
     if (node.first == value) {
       node.second->setEnabled(true);
@@ -616,6 +656,17 @@ void csp::volumerendering::Plugin::setDisplayMode(DisplayMode value) {
     // TODO What to do here?
     mParametersDirty = true;
   }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Plugin::setCoreRadius(float value) {
+  invalidateCache();
+  // Normalize core radius for renderer
+  mRenderer->setCoreRadius(
+      value /
+      static_cast<float>(mAllSettings->getAnchorRadii(mPluginSettings.mTransform.mAnchor.get())[0] /
+                         1000. * mPluginSettings.mTransform.mScale.get()));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

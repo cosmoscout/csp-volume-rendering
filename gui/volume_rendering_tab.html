@@ -360,6 +360,66 @@
   </div>
 
   <div class="settings-section" hidden>
+    <div class="section-header collapsed font-alegreya" id="headingVolume-core"
+         data-toggle="collapse" data-target="#collapseVolume-core" aria-expanded="false"
+         aria-controls="collapseVolume-core" type="button">
+      <i class="material-icons">adjust</i>
+      <span>Core</span>
+      <i class="material-icons caret-icon">keyboard_arrow_left</i>
+    </div>
+    <div class="section-body collapse container-fluid" id="collapseVolume-core"
+         aria-labelledby="headingVolume-core" data-parent="#volumeRenderingTab-accordion">
+      <div class="row">
+        <div class="col-7 offset-5">
+          <label class="checklabel">
+            <input type="checkbox" data-callback="volumeRendering.setEnableCore" />
+            <i class="material-icons"></i>
+            <span>Render core</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Core radius
+        </div>
+        <div class="col-7">
+          <div data-callback="volumeRendering.setCoreRadius">
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-7 offset-5">
+          <label class="checklabel">
+            <input id="volumeRendering-coreScalarCheckbox" data-callback="volumeRendering.setEnableDependentCoreScalar" type="checkbox" />
+            <i class="material-icons"></i>
+            <span>Use same scalar as volume</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Scalar
+        </div>
+        <div id="volumeRendering-coreScalarDropdown" class="col-7">
+          <select data-callback="volumeRendering.setCoreScalar" class="simple-value-dropdown"></select>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col-5">
+          Color
+        </div>
+        <div class="col-7">
+          <input type="text" class="form-control color-input" id="volumeRendering-coreColor" style="color: black;" value="">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section" hidden>
     <div class="section-header collapsed font-alegreya" id="headingVolume-pathlines"
          data-toggle="collapse" data-target="#collapseVolume-pathlines" aria-expanded="false"
          aria-controls="collapseVolume-pathlines" type="button">

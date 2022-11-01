@@ -258,13 +258,14 @@ void OSPRayRenderer::updateWorld(
         mCache.mCoreMaterial.setParam("map_kd", mCache.mCoreTexture);
         mCache.mCoreMaterial.commit();
       } else {
-        rkcommon::math::vec3f color = {0.8f, 0.8f, 0.8f};
+        rkcommon::math::vec3f color = {parameters.mWorld.mCore.mColor.r,
+            parameters.mWorld.mCore.mColor.g, parameters.mWorld.mCore.mColor.b};
         mCache.mCoreMaterial.removeParam("map_kd");
         mCache.mCoreMaterial.setParam("kd", color);
         mCache.mCoreMaterial.commit();
       }
 
-      mCache.mCore.setParam("radius", parameters.mWorld.mCore.mRadius);
+      mCache.mCore.setParam("radius", parameters.mWorld.mCore.mRadius * volume.mHeight);
       mCache.mCore.commit();
     }
   }

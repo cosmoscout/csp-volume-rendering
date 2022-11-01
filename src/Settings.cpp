@@ -170,12 +170,14 @@ void from_json(nlohmann::json const& j, Settings::Core& o) {
   cs::core::Settings::deserialize(j, "enabled", o.mEnabled);
   cs::core::Settings::deserialize(j, "scalar", o.mScalar);
   cs::core::Settings::deserialize(j, "radius", o.mRadius);
+  cs::core::Settings::deserialize(j, "color", o.mColor);
 }
 
 void to_json(nlohmann::json& j, Settings::Core const& o) {
   cs::core::Settings::serialize(j, "enabled", o.mEnabled);
   cs::core::Settings::serialize(j, "scalar", o.mScalar);
   cs::core::Settings::serialize(j, "radius", o.mRadius);
+  cs::core::Settings::serialize(j, "color", o.mColor);
 }
 
 void from_json(nlohmann::json const& j, Settings::Pathlines& o) {
