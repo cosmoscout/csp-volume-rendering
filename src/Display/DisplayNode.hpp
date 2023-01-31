@@ -49,7 +49,7 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   void setTexture(float* texture, int width, int height);
   /// Set the depth information for displaying the image.
   /// The depth data should be given as an array of z-positions in clip space per pixel.
-  void setDepthTexture(float* texture, int width, int height);
+  virtual void setDepthTexture(float* texture, int width, int height);
   /// Sets the base transform of the display node.
   /// This should correspond to the perspective, from which the image was rendered.
   void setTransform(glm::mat4 transform);

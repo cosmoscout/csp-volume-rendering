@@ -119,6 +119,33 @@ void main()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const std::string VIS_FRAG = R"(
+#version 330
+
+uniform float uFarClip;
+
+// inputs
+in vec2 vTexCoords;
+in vec3 vPosition;
+in float vDepth;
+
+// outputs
+layout(location = 0) out vec4 oColor;
+
+void main()
+{
+    if(vDepth < 0)
+    {
+      discard;
+    }
+
+    oColor = vec4(0, 0, 1, 1);
+    gl_FragDepth = length(vPosition) / uFarClip;
+}
+)";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const std::string POINTS_FORWARD_VERT = R"(
 #version 330
 
