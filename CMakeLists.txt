@@ -64,9 +64,30 @@ else()
   endif()
 endif()
 
+if (DEFINED ENV{THRUST_DIR})
+  SET(Thrust_DIR "$ENV{THRUST_DIR}")
+else()
+  SET(Thrust_DIR ${COSMOSCOUT_EXTERNALS_DIR}/include/thrust/cmake)
+endif()
+
+if (DEFINED ENV{LIBCUDA_DIR})
+  SET(libcudacxx_DIR "$ENV{LIBCUDA_DIR}")
+else()
+  SET(libcudacxx_DIR ${COSMOSCOUT_EXTERNALS_DIR}/lib/cmake)
+endif()
+
+if (DEFINED ENV{CUB_DIR})
+  SET(CUB_DIR "$ENV{CUB_DIR}")
+else()
+  SET(CUB_DIR ${COSMOSCOUT_EXTERNALS_DIR}/include/cub/cmake)
+endif()
+
 find_package(ospray REQUIRED)
 find_package(OpenImageDenoise REQUIRED)
 find_package(VTK REQUIRED)
+
+find_package(Thrust REQUIRED CONFIG)
+thrust_create_target(Thrust DEVICE TBB)
 
 # build plugin -------------------------------------------------------------------------------------
 
@@ -86,6 +107,7 @@ target_link_libraries(csp-volume-rendering
     ospray::ospray
     OpenImageDenoise
     ${VTK_LIBRARIES}
+    Thrust
     cs-core
 )
 
