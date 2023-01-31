@@ -8,6 +8,7 @@
 #define CSP_VOLUME_RENDERING_LOGGER_HPP
 
 #include <spdlog/spdlog.h>
+#include <spdlog/fmt/bundled/ranges.h>
 
 namespace csp::volumerendering {
 
