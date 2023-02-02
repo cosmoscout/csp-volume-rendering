@@ -14,15 +14,18 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
+#include <thrust/device_vector.h>
+
 namespace csp::volumerendering {
 
 /// DisplayNode implementation, that displays rendered volume images on a irregular grid mesh.
 class IrregularGrid : public DisplayNode {
  public:
-  IrregularGrid(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor);
+  IrregularGrid(
+      VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor);
 
   IrregularGrid(IrregularGrid const& other) = delete;
-  IrregularGrid(IrregularGrid&& other)  = default;
+  IrregularGrid(IrregularGrid&& other)      = default;
 
   IrregularGrid& operator=(IrregularGrid const& other) = delete;
   IrregularGrid& operator=(IrregularGrid&& other) = default;
@@ -34,7 +37,10 @@ class IrregularGrid : public DisplayNode {
   bool DoImpl() override;
 
  private:
-  void createBuffers(uint32_t width, uint32_t height);
+  using SurfaceDetectionBuffer = std::vector<thrust::device_vector<uint16_t>>;
+
+  SurfaceDetectionBuffer surfaceDetection(uint32_t width, uint32_t height, float* texture);
+  void                   createBuffers(uint32_t width, uint32_t height);
 
   VistaVertexArrayObject mVAO;
   VistaBufferObject      mVBO;

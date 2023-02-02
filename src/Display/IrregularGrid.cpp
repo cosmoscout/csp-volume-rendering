@@ -16,12 +16,16 @@
 #include <VistaMath/VistaBoundingBox.h>
 #include <VistaOGLExt/VistaOGLUtils.h>
 
+#include <thrust/execution_policy.h>
+#include <thrust/functional.h>
+#include <thrust/host_vector.h>
+#include <thrust/tabulate.h>
+
 #include <utility>
 
 namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
 
 IrregularGrid::IrregularGrid(
     VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor)
@@ -36,6 +40,7 @@ void IrregularGrid::setDepthTexture(float* texture, int width, int height) {
   // TODO Generate quadtree
   // TODO Pass quadtree to createBuffers?
   createBuffers(width, height);
+  surfaceDetection(width, height, texture);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -101,8 +106,7 @@ bool IrregularGrid::DoImpl() {
 
   // Draw.
   mVAO.Bind();
-  glDrawElements(GL_TRIANGLE_STRIP, mIndexCount,
-      GL_UNSIGNED_INT, nullptr);
+  glDrawElements(GL_TRIANGLE_STRIP, mIndexCount, GL_UNSIGNED_INT, nullptr);
   mVAO.Release();
 
   // Clean up.
@@ -148,6 +152,149 @@ bool IrregularGrid::DoImpl() {
   glPopAttrib();
 
   return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+#define BIT_IS_SURFACE 0
+
+#define BIT_CONTINUOUS_T 4
+#define BIT_CONTINUOUS_R 5
+#define BIT_CONTINUOUS_B 6
+#define BIT_CONTINUOUS_L 7
+
+#define BIT_CONTINUOUS_TR 8
+#define BIT_CONTINUOUS_TL 9
+#define BIT_CONTINUOUS_BR 10
+#define BIT_CONTINUOUS_BL 11
+
+// width and length should be width and length of current level
+size_t getIndexToLast(
+    size_t currentIndex, int width, int height, int offsetX = 0, int offsetY = 0) {
+  // Assume line by line layout
+  int curX  = static_cast<int>(currentIndex) % width;
+  int curY  = static_cast<int>(currentIndex) / width;
+  int lastX = std::clamp(curX * 2 + offsetX, 0, width * 2);
+  int lastY = std::clamp(curY * 2 + offsetY, 0, height * 2);
+  return lastY * width * 2 + lastX;
+}
+
+bool is_on_line(float a, float b, float c) {
+  float threshold = 0.1f;
+  return abs(a - 2 * b + c) < threshold;
+}
+
+IrregularGrid::SurfaceDetectionBuffer IrregularGrid::surfaceDetection(
+    uint32_t width, uint32_t height, float* texture) {
+  const int    cellSize   = 16;
+  const int    levels     = static_cast<int>(std::log2l(cellSize));
+  const size_t pixelCount = static_cast<size_t>(width) * static_cast<size_t>(height);
+
+  thrust::device_vector<float> dDepth(texture, texture + pixelCount);
+
+  SurfaceDetectionBuffer surfaceDetectionBuffers;
+  for (int i = 0; i < levels; ++i) {
+    thrust::device_vector<uint16_t>        currentSurface(pixelCount >> (2 * (i + 1)));
+    thrust::device_vector<uint16_t> const& lastSurface = surfaceDetectionBuffers.back();
+
+    const int curWidth  = static_cast<int>(width >> (i + 1));
+    const int curHeight = static_cast<int>(height >> (i + 1));
+    if (i == 0) {
+      thrust::tabulate(
+          thrust::device, currentSurface.begin(), currentSurface.end(), [&](size_t index) {
+            // d0  d1   d2   d3
+            //   \  |    |  /
+            // d4--d5-- d6-- d7
+            //      |    |
+            // d8--d9--d10--d11
+            //   /  |    |  \
+            // d12 d13  d14 d15
+
+            const float d0 = dDepth[getIndexToLast(index, curWidth, curHeight, -1, 2)];
+            const float d1 = dDepth[getIndexToLast(index, curWidth, curHeight, 0, 2)];
+            const float d2 = dDepth[getIndexToLast(index, curWidth, curHeight, 1, 2)];
+            const float d3 = dDepth[getIndexToLast(index, curWidth, curHeight, 2, 2)];
+
+            const float d4 = dDepth[getIndexToLast(index, curWidth, curHeight, -1, 1)];
+            const float d5 = dDepth[getIndexToLast(index, curWidth, curHeight, 0, 1)];
+            const float d6 = dDepth[getIndexToLast(index, curWidth, curHeight, 1, 1)];
+            const float d7 = dDepth[getIndexToLast(index, curWidth, curHeight, 2, 1)];
+
+            const float d8  = dDepth[getIndexToLast(index, curWidth, curHeight, -1, 0)];
+            const float d9  = dDepth[getIndexToLast(index, curWidth, curHeight, 0, 0)];
+            const float d10 = dDepth[getIndexToLast(index, curWidth, curHeight, 1, 0)];
+            const float d11 = dDepth[getIndexToLast(index, curWidth, curHeight, 2, 0)];
+
+            const float d12 = dDepth[getIndexToLast(index, curWidth, curHeight, -1, -1)];
+            const float d13 = dDepth[getIndexToLast(index, curWidth, curHeight, 0, -1)];
+            const float d14 = dDepth[getIndexToLast(index, curWidth, curHeight, 1, -1)];
+            const float d15 = dDepth[getIndexToLast(index, curWidth, curHeight, 2, -1)];
+
+            // check for horizontal and vertical continuity
+            const bool t = is_on_line(d1, d5, d9) && is_on_line(d2, d6, d10);
+            const bool r = is_on_line(d5, d6, d7) && is_on_line(d9, d10, d11);
+            const bool b = is_on_line(d5, d9, d13) && is_on_line(d6, d10, d14);
+            const bool l = is_on_line(d4, d5, d6) && is_on_line(d8, d9, d10);
+
+            // check for diagonal continuity
+            const bool tl = is_on_line(d0, d5, d10);
+            const bool tr = is_on_line(d3, d6, d9);
+            const bool bl = is_on_line(d12, d9, d6);
+            const bool br = is_on_line(d5, d10, d15);
+
+            // if the patch is connected on two othogonal sides, it represents a surface
+            const uint16_t is_surface = (t & r) | (r & b) | (b & l) | (l & t);
+            const uint16_t continuous = (t << BIT_CONTINUOUS_T) | (r << BIT_CONTINUOUS_R) |
+                                        (b << BIT_CONTINUOUS_B) | (l << BIT_CONTINUOUS_L) |
+                                        (tl << BIT_CONTINUOUS_TL) | (tr << BIT_CONTINUOUS_TR) |
+                                        (bl << BIT_CONTINUOUS_BL) | (br << BIT_CONTINUOUS_BR);
+
+            // store all continuities
+            return is_surface | continuous;
+          });
+    } else {
+      thrust::tabulate(
+          thrust::device, currentSurface.begin(), currentSurface.end(), [&](size_t index) {
+            // s0-s1
+            // |   |
+            // s2-s3
+
+            const uint16_t s0 = lastSurface[getIndexToLast(index, curWidth, curHeight, 0, 1)];
+            const uint16_t s1 = lastSurface[getIndexToLast(index, curWidth, curHeight, 1, 1)];
+            const uint16_t s2 = lastSurface[getIndexToLast(index, curWidth, curHeight, 0, 0)];
+            const uint16_t s3 = lastSurface[getIndexToLast(index, curWidth, curHeight, 1, 0)];
+
+            // check for internal continuity
+            const uint16_t internal_continuity =
+                (s0 >> BIT_CONTINUOUS_R) & (s0 >> BIT_CONTINUOUS_B) & (s3 >> BIT_CONTINUOUS_T) &
+                (s3 >> BIT_CONTINUOUS_L) & 1;
+
+            // if any child is no complete surface, the parent is neither
+            const uint16_t is_surface = s0 & s1 & s2 & s3 & internal_continuity;
+
+            // check for horizontal and vertical continuity
+            const uint16_t t = (s0 >> BIT_CONTINUOUS_T) & (s1 >> BIT_CONTINUOUS_T) & 1;
+            const uint16_t r = (s1 >> BIT_CONTINUOUS_R) & (s3 >> BIT_CONTINUOUS_R) & 1;
+            const uint16_t b = (s2 >> BIT_CONTINUOUS_B) & (s3 >> BIT_CONTINUOUS_B) & 1;
+            const uint16_t l = (s0 >> BIT_CONTINUOUS_L) & (s2 >> BIT_CONTINUOUS_L) & 1;
+
+            // check for diagonal continuity
+            const uint16_t tl = (s0 >> BIT_CONTINUOUS_TL) & 1;
+            const uint16_t tr = (s1 >> BIT_CONTINUOUS_TR) & 1;
+            const uint16_t bl = (s2 >> BIT_CONTINUOUS_BL) & 1;
+            const uint16_t br = (s3 >> BIT_CONTINUOUS_BR) & 1;
+
+            // check for external continuity
+            const uint16_t continuous = (t << BIT_CONTINUOUS_T) | (r << BIT_CONTINUOUS_R) |
+                                        (b << BIT_CONTINUOUS_B) | (l << BIT_CONTINUOUS_L) |
+                                        (tl << BIT_CONTINUOUS_TL) | (tr << BIT_CONTINUOUS_TR) |
+                                        (bl << BIT_CONTINUOUS_BL) | (br << BIT_CONTINUOUS_BR);
+
+            return is_surface | continuous;
+          });
+    }
+    surfaceDetectionBuffers.push_back(currentSurface);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
