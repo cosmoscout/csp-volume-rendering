@@ -8,6 +8,7 @@
 #define CSP_VOLUME_RENDERING_IRREGULAR_GRID_HPP
 
 #include "DisplayNode.hpp"
+#include "SurfaceDetectionBuffer.hpp"
 
 #include <VistaOGLExt/VistaBufferObject.h>
 #include <VistaOGLExt/VistaVertexArrayObject.h>
@@ -37,10 +38,9 @@ class IrregularGrid : public DisplayNode {
   bool DoImpl() override;
 
  private:
-  using SurfaceDetectionBuffer = std::vector<thrust::device_vector<uint16_t>>;
+  void createBuffers(uint32_t width, uint32_t height);
 
-  SurfaceDetectionBuffer surfaceDetection(uint32_t width, uint32_t height, float* texture);
-  void                   createBuffers(uint32_t width, uint32_t height);
+  std::optional<SurfaceDetectionBuffer> mSurfaces;
 
   VistaVertexArrayObject mVAO;
   VistaBufferObject      mVBO;
