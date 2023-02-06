@@ -15,8 +15,6 @@
 
 #include <glm/gtc/type_ptr.hpp>
 
-#include <thrust/device_vector.h>
-
 namespace csp::volumerendering {
 
 /// DisplayNode implementation, that displays rendered volume images on a irregular grid mesh.
