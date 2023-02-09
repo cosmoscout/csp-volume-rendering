@@ -11,6 +11,82 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const std::string IRREGULAR_GRID_VERT = R"(
+#version 330
+
+uniform sampler2D uDepthTexture;
+uniform vec3 uRadii;
+uniform mat4 uMatModelView;
+uniform mat4 uMatProjection;
+uniform mat4 uMatTransform;
+uniform mat4 uMatRendererProjection;
+uniform mat4 uMatRendererProjectionInv;
+uniform mat4 uMatRendererMVP;
+uniform mat4 uMatRendererMVPInv;
+uniform bool uUseDepth;
+uniform bool uInside;
+
+// inputs
+layout(location = 0) in uvec3 iPos;
+
+// outputs
+out vec2 vTexCoords;
+out vec3 vPosition;
+out float vDepth;
+
+float normalizeDepth(float cameraDistance, vec4 pos) {
+    if (isinf(cameraDistance)) {
+      if (-uMatRendererMVP[3][2] / uMatRendererMVP[2][2] < 0.7) {
+        return uInside ? 1 : 0;
+      } else {
+        return 1;
+      }
+    }
+    pos = uMatRendererProjectionInv * pos;
+    pos /= pos.w;
+    pos = vec4(normalize(pos.xyz) * cameraDistance, 1);
+    pos = uMatRendererProjection * pos;
+    pos /= pos.w;
+    return pos.z;
+}
+
+void main()
+{
+    vec3 pos = iPos;
+    vDepth = (normalizeDepth(texture(uDepthTexture, (pos.xy + vec2(1)) / 2.f).r, vec4(pos, 1)) + 1) / 2;
+    if (uUseDepth) {
+      pos.z = vDepth * 2 - 1;
+    } else {
+      pos.z = 0;
+    }
+
+    vTexCoords  = pos.xy / 32;
+
+    vec4 objSpacePos = vec4(pos, 1);
+    /*if (!uUseDepth) {
+      objSpacePos.z = -uMatRendererMVP[3][2] / uMatRendererMVP[2][2];
+    }*/
+
+    objSpacePos = uMatRendererMVPInv * objSpacePos;
+
+    vPosition    = objSpacePos.xyz / objSpacePos.w;
+    vPosition    = uRadii * vPosition;
+    vPosition    = (uMatTransform * vec4(vPosition, 1.0)).xyz;
+    vPosition    = (uMatModelView * vec4(vPosition, 1.0)).xyz;
+    gl_Position  = uMatProjection * vec4(vPosition, 1);
+    gl_PointSize = 10;
+
+    if (gl_Position.w > 0) {
+      gl_Position /= gl_Position.w;
+      if (gl_Position.z >= 1) {
+        gl_Position.z = 0.999999;
+      }
+    }
+}
+)";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const std::string BILLBOARD_VERT = R"(
 #version 330
 

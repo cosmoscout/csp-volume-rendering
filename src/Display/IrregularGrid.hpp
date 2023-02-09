@@ -36,19 +36,13 @@ class IrregularGrid : public DisplayNode {
   bool DoImpl() override;
 
  private:
-  void createBuffers(uint32_t width, uint32_t height);
+  void createBuffers();
 
   std::optional<SurfaceDetectionBuffer> mSurfaces;
 
   VistaVertexArrayObject mVAO;
   VistaBufferObject      mVBO;
-  VistaBufferObject      mIBO;
-  VistaVertexArrayObject mVisVAO;
-  VistaBufferObject      mVisIBO;
-  int                    mVisIndexCount;
-  int                    mIndexCount;
-
-  VistaGLSLShader mVisShader;
+  int                    mVertexCount;
 };
 
 } // namespace csp::volumerendering

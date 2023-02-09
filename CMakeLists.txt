@@ -87,7 +87,7 @@ find_package(OpenImageDenoise REQUIRED)
 find_package(VTK REQUIRED)
 
 find_package(Thrust REQUIRED CONFIG)
-thrust_create_target(Thrust DEVICE TBB)
+thrust_create_target(Thrust DEVICE OMP)
 
 # build plugin -------------------------------------------------------------------------------------
 

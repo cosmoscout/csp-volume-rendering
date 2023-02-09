@@ -16,28 +16,30 @@ namespace csp::volumerendering {
 
 class SurfaceDetectionBuffer {
  public:
-  using Buffer = thrust::device_vector<uint16_t>;
+  using Index2d = glm::uvec2;
+  using Vertex  = glm::uvec3;
+  using Buffer  = thrust::device_vector<uint16_t>;
 
   SurfaceDetectionBuffer(float* depthTexture, int width, int height, int cellSize = 16);
 
-  void                              print() const;
-  thrust::device_vector<glm::ivec3> generateVertices();
+  void                          print() const;
+  thrust::device_vector<Vertex> generateVertices();
 
  private:
-  int        to1dIndex(glm::ivec2 index, int level) const;
-  glm::ivec2 to2dIndex(int index, int level) const;
-  glm::ivec2 toLevel(glm::ivec2 index, int from, int to) const;
-  int        toLevel(int index, int from, int to, glm::ivec2 offset) const;
+  int        to1dIndex(Index2d index, int level) const;
+  Index2d    to2dIndex(int index, int level) const;
+  Index2d    toLevel(Index2d index, int from, int to) const;
+  int        toLevel(int index, int from, int to, Index2d offset) const;
   int        levelSize(int level) const;
-  glm::ivec2 levelDim(int level) const;
-  void emit(thrust::device_vector<glm::ivec3>& verts, glm::ivec3 pos, glm::ivec2 offset, int factor,
-      int data) const;
+  glm::uvec2 levelDim(unsigned int level) const;
+  void       emit(thrust::device_vector<Vertex>& verts, Vertex pos, Index2d offset,
+            unsigned int factor, int data) const;
 
-  const int           mCellSize;
-  const int           mWidth;
-  const int           mHeight;
-  const int           mLevels;
-  const int           mLastLevel;
+  const unsigned int  mCellSize;
+  const unsigned int  mWidth;
+  const unsigned int  mHeight;
+  const unsigned int  mLevels;
+  const unsigned int  mLastLevel;
   std::vector<Buffer> mBuffers;
 
   // Bit pattern for storing connectivity
