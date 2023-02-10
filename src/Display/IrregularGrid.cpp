@@ -26,12 +26,17 @@ namespace csp::volumerendering {
 
 IrregularGrid::IrregularGrid(
     VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor)
-    : DisplayNode(shape, settings, anchor) {
+    : DisplayNode(shape, settings, anchor)
+    , mWidth(0)
+    , mHeight(0)
+    , mVertexCount(0) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void IrregularGrid::setDepthTexture(float* texture, int width, int height) {
+  mWidth  = width;
+  mHeight = height;
   DisplayNode::setDepthTexture(texture, width, height);
   mSurfaces.emplace(texture, width, height);
   createBuffers();
@@ -40,11 +45,16 @@ void IrregularGrid::setDepthTexture(float* texture, int width, int height) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool IrregularGrid::DoImpl() {
+  if (!mSurfaces.has_value()) {
+    return false;
+  }
+
   cs::utils::FrameTimings::ScopedTimer timer("Volume Rendering");
 
   if (mShaderDirty) {
     mShader = VistaGLSLShader();
-    mShader.InitVertexShaderFromString(IRREGULAR_GRID_VERT);
+    mShader.InitVertexShaderFromString(PASS_VERT);
+    mShader.InitGeometryShaderFromString(IRREGULAR_GRID_GEOM);
     mShader.InitFragmentShaderFromString(BILLBOARD_FRAG);
     mShader.Link();
 
@@ -82,13 +92,14 @@ bool IrregularGrid::DoImpl() {
   mShader.SetUniform(mShader.GetUniformLocation("uUseDepth"), mUseDepth);
   mShader.SetUniform(mShader.GetUniformLocation("uDrawDepth"), mDrawDepth);
   mShader.SetUniform(mShader.GetUniformLocation("uInside"), mInside);
+  glUniform2ui(mShader.GetUniformLocation("uResolution"), mWidth, mHeight);
 
   mTexture.Bind(GL_TEXTURE0);
   mDepthTexture.Bind(GL_TEXTURE1);
 
   glPushAttrib(GL_ENABLE_BIT);
   glEnable(GL_CULL_FACE);
-  glCullFace(GL_FRONT);
+  glCullFace(GL_BACK);
   glEnable(GL_BLEND);
   glDisable(GL_DEPTH_TEST);
   glEnable(GL_PROGRAM_POINT_SIZE);

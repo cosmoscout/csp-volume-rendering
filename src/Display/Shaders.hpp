@@ -11,8 +11,41 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-const std::string IRREGULAR_GRID_VERT = R"(
+const std::string PASS_VERT = R"(
 #version 330
+
+layout(location=0) in uvec3 position;
+
+flat out uvec3 iPos;
+
+void main() {
+  iPos = position;
+}
+)";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const std::string IRREGULAR_GRID_GEOM = R"(
+#version 330
+
+#define GAP 0
+
+#define BIT_IS_SURFACE   0
+
+#define BIT_CONTINUOUS_T    4
+#define BIT_CONTINUOUS_R    5
+#define BIT_CONTINUOUS_B    6
+#define BIT_CONTINUOUS_L    7
+
+#define BIT_CONTINUOUS_TR   8
+#define BIT_CONTINUOUS_TL   9
+#define BIT_CONTINUOUS_BR   10
+#define BIT_CONTINUOUS_BL   11
+
+#define BIT_CURRENT_LEVEL   12 // 12-15 (requires 3 bits)
+
+#define ALL_CONTINUITY_BITS 4080
+#define ALL_DATA_BITS       4095
 
 uniform sampler2D uDepthTexture;
 uniform vec3 uRadii;
@@ -25,63 +58,153 @@ uniform mat4 uMatRendererMVP;
 uniform mat4 uMatRendererMVPInv;
 uniform bool uUseDepth;
 uniform bool uInside;
+uniform uvec2 uResolution;
+
+layout(points) in;
+layout(triangle_strip, max_vertices = 16) out;
 
 // inputs
-layout(location = 0) in uvec3 iPos;
+flat in uvec3 iPos[];
 
 // outputs
 out vec2 vTexCoords;
 out vec3 vPosition;
 out float vDepth;
 
-float normalizeDepth(float cameraDistance, vec4 pos) {
-    if (isinf(cameraDistance)) {
-      if (-uMatRendererMVP[3][2] / uMatRendererMVP[2][2] < 0.7) {
-        return uInside ? 1 : 0;
-      } else {
-        return 1;
-      }
+float get_depth_raw(vec2 pos) {
+  float cameraDistance = texelFetch(sampler2D(uDepthTexture), ivec2(pos), 0).x;
+
+  if (isinf(cameraDistance)) {
+    if (-uMatRendererMVP[3][2] / uMatRendererMVP[2][2] < 0.7) {
+      return uInside ? 1 : 0;
+    } else {
+      return 1;
     }
-    pos = uMatRendererProjectionInv * pos;
-    pos /= pos.w;
-    pos = vec4(normalize(pos.xyz) * cameraDistance, 1);
-    pos = uMatRendererProjection * pos;
-    pos /= pos.w;
-    return pos.z;
+  }
+
+  vec4 normalizedPos = vec4(pos / uResolution, 0, 1);
+  normalizedPos = uMatRendererProjectionInv * normalizedPos;
+  normalizedPos /= normalizedPos.w;
+  normalizedPos = vec4(normalize(normalizedPos.xyz) * cameraDistance, 1);
+  normalizedPos = uMatRendererProjection * normalizedPos;
+  normalizedPos /= normalizedPos.w;
+  return normalizedPos.z;
+}
+
+float get_min_depth(vec2 frag_pos) {
+  float depth0 = get_depth_raw(frag_pos + vec2(-0.5, -0.5));
+  float depth1 = get_depth_raw(frag_pos + vec2( 0.5, -0.5));
+  float depth2 = get_depth_raw(frag_pos + vec2(-0.5,  0.5));
+  float depth3 = get_depth_raw(frag_pos + vec2( 0.5,  0.5));
+
+  return min(depth0, min(depth1, min(depth2, depth3)));
+}
+
+void emit_grid_vertex(vec2 frag_pos, float depth) {
+  vDepth = (depth + 1) / 2;
+
+  vec4 pos = vec4((frag_pos / uResolution) * 2 - vec2(1, 1), 0, 1);
+  if (uUseDepth) {
+    pos.z = depth;
+  } else {
+    pos.z = 0;
+  }
+
+  pos = uMatRendererMVPInv * pos;
+
+  vPosition    = pos.xyz / pos.w;
+  vPosition    = uRadii * vPosition;
+  vPosition    = (uMatTransform * vec4(vPosition, 1.0)).xyz;
+  vPosition    = (uMatModelView * vec4(vPosition, 1.0)).xyz;
+  gl_Position  = uMatProjection * vec4(vPosition, 1);
+
+  if (gl_Position.w > 0) {
+    gl_Position /= gl_Position.w;
+    if (gl_Position.z >= 1) {
+      gl_Position.z = 0.999999;
+    }
+  }
+  EmitVertex();
+}
+
+void emit_quad(uvec2 offset, uvec2 size) {
+  if (size.x > 0u && size.y > 0u) {
+    float depth1, depth2, depth3, depth4;
+
+    vec2 pos1 = vec2(iPos[0].xy)                        + vec2(offset);
+    vec2 pos2 = vec2(iPos[0].xy) + vec2(size.x, 0)      + vec2(offset);
+    vec2 pos3 = vec2(iPos[0].xy) + vec2(0,      size.y) + vec2(offset);
+    vec2 pos4 = vec2(iPos[0].xy) + vec2(size.x, size.y) + vec2(offset);
+
+    int cont_l = int(iPos[0].z >> BIT_CONTINUOUS_L) & 1;
+    int cont_r = int(iPos[0].z >> BIT_CONTINUOUS_R) & 1;
+    int cont_t = int(iPos[0].z >> BIT_CONTINUOUS_T) & 1;
+    int cont_b = int(iPos[0].z >> BIT_CONTINUOUS_B) & 1;
+
+    int cont_tl = int(iPos[0].z >> BIT_CONTINUOUS_TL) & 1;
+    int cont_tr = int(iPos[0].z >> BIT_CONTINUOUS_TR) & 1;
+    int cont_bl = int(iPos[0].z >> BIT_CONTINUOUS_BL) & 1;
+    int cont_br = int(iPos[0].z >> BIT_CONTINUOUS_BR) & 1;
+
+    depth1 = get_depth_raw(vec2(-cont_l, -cont_b)*cont_bl*0.5 + pos1+vec2( 0.5,  0.5));
+    depth2 = get_depth_raw(vec2( cont_r, -cont_b)*cont_br*0.5 + pos2+vec2(-0.5,  0.5));
+    depth3 = get_depth_raw(vec2(-cont_l,  cont_t)*cont_tl*0.5 + pos3+vec2( 0.5, -0.5));
+    depth4 = get_depth_raw(vec2( cont_r,  cont_t)*cont_tr*0.5 + pos4+vec2(-0.5, -0.5));
+
+    //cellsize = min(size.x, size.y);
+
+    vTexCoords = pos1 / uResolution;
+    //TODO output cellcoords = vec2(0, 0);
+    emit_grid_vertex(pos1 + vec2(-GAP, -GAP), depth1);
+
+    vTexCoords = pos2 / uResolution;
+    //cellcoords = vec2(1, 0);
+    emit_grid_vertex(pos2 + vec2( GAP, -GAP), depth2);
+
+    vTexCoords = pos3 / uResolution;
+    //cellcoords = vec2(0, 1);
+    emit_grid_vertex(pos3 + vec2(-GAP,  GAP), depth3);
+
+    vTexCoords = pos4 / uResolution;
+    //cellcoords = vec2(1, 1);
+    emit_grid_vertex(pos4 + vec2( GAP,  GAP), depth4);
+
+    EndPrimitive();
+  }
+}
+
+void emit_pixel(uvec2 offset) {
+  //TODO output cellsize = 1;
+  vec2 position = iPos[0].xy + offset;
+
+  // remove strange one-pixel line
+  if (position.y == uResolution.y) return;
+
+  vTexCoords = position / uResolution;
+  float depth = get_depth_raw(position);
+
+  //cellcoords = vec2(0, 0);
+  emit_grid_vertex(position + vec2(0, 0) + vec2(-GAP, -GAP), depth);
+  //cellcoords = vec2(1, 0);
+  emit_grid_vertex(position + vec2(1, 0) + vec2( GAP, -GAP), depth);
+  //cellcoords = vec2(1, 1);
+  emit_grid_vertex(position + vec2(0, 1) + vec2(-GAP,  GAP), depth);
+  //cellcoords = vec2(0, 1);
+  emit_grid_vertex(position + vec2(1, 1) + vec2( GAP,  GAP), depth);
+
+  EndPrimitive();
 }
 
 void main()
 {
-    vec3 pos = iPos;
-    vDepth = (normalizeDepth(texture(uDepthTexture, (pos.xy + vec2(1)) / 2.f).r, vec4(pos, 1)) + 1) / 2;
-    if (uUseDepth) {
-      pos.z = vDepth * 2 - 1;
-    } else {
-      pos.z = 0;
-    }
-
-    vTexCoords  = pos.xy / 32;
-
-    vec4 objSpacePos = vec4(pos, 1);
-    /*if (!uUseDepth) {
-      objSpacePos.z = -uMatRendererMVP[3][2] / uMatRendererMVP[2][2];
-    }*/
-
-    objSpacePos = uMatRendererMVPInv * objSpacePos;
-
-    vPosition    = objSpacePos.xyz / objSpacePos.w;
-    vPosition    = uRadii * vPosition;
-    vPosition    = (uMatTransform * vec4(vPosition, 1.0)).xyz;
-    vPosition    = (uMatModelView * vec4(vPosition, 1.0)).xyz;
-    gl_Position  = uMatProjection * vec4(vPosition, 1);
-    gl_PointSize = 10;
-
-    if (gl_Position.w > 0) {
-      gl_Position /= gl_Position.w;
-      if (gl_Position.z >= 1) {
-        gl_Position.z = 0.999999;
-      }
-    }
+  if ((iPos[0].z & 1u) > 0u) {
+    emit_quad(uvec2(0), uvec2(1 << ((iPos[0].z >> BIT_CURRENT_LEVEL) + 1u)));
+  } else {
+    emit_pixel(uvec2(0, 0));
+    emit_pixel(uvec2(1, 0));
+    emit_pixel(uvec2(1, 1));
+    emit_pixel(uvec2(0, 1));
+  }
 }
 )";
 

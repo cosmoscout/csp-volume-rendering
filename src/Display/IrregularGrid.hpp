@@ -39,6 +39,8 @@ class IrregularGrid : public DisplayNode {
   void createBuffers();
 
   std::optional<SurfaceDetectionBuffer> mSurfaces;
+  unsigned int                          mWidth;
+  unsigned int                          mHeight;
 
   VistaVertexArrayObject mVAO;
   VistaBufferObject      mVBO;
