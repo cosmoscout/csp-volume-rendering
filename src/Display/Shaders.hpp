@@ -67,6 +67,9 @@ layout(triangle_strip, max_vertices = 16) out;
 flat in uvec3 iPos[];
 
 // outputs
+flat out uint vCellsize;
+out vec2 vCellcoords;
+
 out vec2 vTexCoords;
 out vec3 vPosition;
 out float vDepth;
@@ -151,22 +154,22 @@ void emit_quad(uvec2 offset, uvec2 size) {
     depth3 = get_depth_raw(vec2(-cont_l,  cont_t)*cont_tl*0.5 + pos3+vec2( 0.5, -0.5));
     depth4 = get_depth_raw(vec2( cont_r,  cont_t)*cont_tr*0.5 + pos4+vec2(-0.5, -0.5));
 
-    //cellsize = min(size.x, size.y);
+    vCellsize = min(size.x, size.y);
 
     vTexCoords = pos1 / uResolution;
-    //TODO output cellcoords = vec2(0, 0);
+    vCellcoords = vec2(0, 0);
     emit_grid_vertex(pos1 + vec2(-GAP, -GAP), depth1);
 
     vTexCoords = pos2 / uResolution;
-    //cellcoords = vec2(1, 0);
+    vCellcoords = vec2(1, 0);
     emit_grid_vertex(pos2 + vec2( GAP, -GAP), depth2);
 
     vTexCoords = pos3 / uResolution;
-    //cellcoords = vec2(0, 1);
+    vCellcoords = vec2(0, 1);
     emit_grid_vertex(pos3 + vec2(-GAP,  GAP), depth3);
 
     vTexCoords = pos4 / uResolution;
-    //cellcoords = vec2(1, 1);
+    vCellcoords = vec2(1, 1);
     emit_grid_vertex(pos4 + vec2( GAP,  GAP), depth4);
 
     EndPrimitive();
@@ -174,7 +177,7 @@ void emit_quad(uvec2 offset, uvec2 size) {
 }
 
 void emit_pixel(uvec2 offset) {
-  //TODO output cellsize = 1;
+  vCellsize = 1u;
   vec2 position = iPos[0].xy + offset;
 
   // remove strange one-pixel line
@@ -183,13 +186,13 @@ void emit_pixel(uvec2 offset) {
   vTexCoords = position / uResolution;
   float depth = get_depth_raw(position);
 
-  //cellcoords = vec2(0, 0);
+  vCellcoords = vec2(0, 0);
   emit_grid_vertex(position + vec2(0, 0) + vec2(-GAP, -GAP), depth);
-  //cellcoords = vec2(1, 0);
+  vCellcoords = vec2(1, 0);
   emit_grid_vertex(position + vec2(1, 0) + vec2( GAP, -GAP), depth);
-  //cellcoords = vec2(1, 1);
+  vCellcoords = vec2(1, 1);
   emit_grid_vertex(position + vec2(0, 1) + vec2(-GAP,  GAP), depth);
-  //cellcoords = vec2(0, 1);
+  vCellcoords = vec2(0, 1);
   emit_grid_vertex(position + vec2(1, 1) + vec2( GAP,  GAP), depth);
 
   EndPrimitive();
@@ -201,10 +204,62 @@ void main()
     emit_quad(uvec2(0), uvec2(1 << ((iPos[0].z >> BIT_CURRENT_LEVEL) + 1u)));
   } else {
     emit_pixel(uvec2(0, 0));
-    emit_pixel(uvec2(1, 0));
+    /*emit_pixel(uvec2(1, 0));
     emit_pixel(uvec2(1, 1));
-    emit_pixel(uvec2(0, 1));
+    emit_pixel(uvec2(0, 1));*/
   }
+}
+)";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const std::string IRREGULAR_GRID_FRAG = R"(
+#version 330
+
+uniform sampler2D uTexture;
+uniform sampler2D uDepthTexture;
+uniform float uFarClip;
+uniform bool uDrawDepth;
+
+// inputs
+flat in uint vCellsize;
+in vec2 vCellcoords;
+
+in vec2 vTexCoords;
+in vec3 vPosition;
+in float vDepth;
+
+// outputs
+layout(location = 0) out vec4 oColor;
+
+vec3 heat(float v) {
+  float value = 1.0-v;
+  return (0.5+0.5*smoothstep(0.0, 0.1, value))*vec3(
+    smoothstep(0.5, 0.3, value),
+    value < 0.3 ? smoothstep(0.0, 0.3, value) : smoothstep(1.0, 0.6, value),
+    smoothstep(0.4, 0.6, value)
+  );
+}
+
+void main()
+{
+    oColor = texture(uTexture, vTexCoords);
+    if(oColor.a <= 0)
+    {
+      discard;
+    }
+    if (uDrawDepth) {
+      oColor = vec4(vDepth, vDepth, vDepth, 1);
+
+      float intensity = log2(float(vCellsize)) / 7.0;
+      oColor.rgb = heat(1-intensity);
+
+      if (any(lessThan(vCellcoords, vec2(0.6/float(vCellsize)))) || any(greaterThan(vCellcoords, vec2(1.0-0.6/float(vCellsize))))) {
+        oColor.rgb = mix(oColor.rgb, vec3(0), 0.7);
+      }
+    }
+
+    gl_FragDepth = length(vPosition) / uFarClip;
 }
 )";
 
@@ -300,7 +355,7 @@ in float vDepth;
 
 // outputs
 layout(location = 0) out vec4 oColor;
-    
+
 void main()
 {
     oColor = texture(uTexture, vTexCoords);

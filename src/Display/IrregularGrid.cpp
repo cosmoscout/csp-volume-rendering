@@ -55,7 +55,7 @@ bool IrregularGrid::DoImpl() {
     mShader = VistaGLSLShader();
     mShader.InitVertexShaderFromString(PASS_VERT);
     mShader.InitGeometryShaderFromString(IRREGULAR_GRID_GEOM);
-    mShader.InitFragmentShaderFromString(BILLBOARD_FRAG);
+    mShader.InitFragmentShaderFromString(IRREGULAR_GRID_FRAG);
     mShader.Link();
 
     mShaderDirty = false;
