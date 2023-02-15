@@ -32,8 +32,7 @@ class SurfaceDetectionBuffer {
   int        toLevel(int index, int from, int to, Index2d offset) const;
   int        levelSize(int level) const;
   glm::uvec2 levelDim(unsigned int level) const;
-  void       emit(thrust::device_vector<Vertex>& verts, Vertex pos, Index2d offset,
-            unsigned int factor, int data) const;
+  Vertex     emit(Vertex pos, Index2d offset, unsigned int factor, int data) const;
 
   const unsigned int  mCellSize;
   const unsigned int  mWidth;

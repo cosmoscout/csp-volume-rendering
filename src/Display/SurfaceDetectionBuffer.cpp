@@ -39,13 +39,14 @@ SurfaceDetectionBuffer::SurfaceDetectionBuffer(
     , mLevels(static_cast<int>(std::log2(mCellSize)))
     , mLastLevel(mLevels - 1) {
   thrust::device_vector<float> dDepth(depthTexture, depthTexture + levelSize(0));
+  const float*                 pDepth = thrust::raw_pointer_cast(dDepth.data());
 
   for (unsigned int i = 0; i < mLevels; ++i) {
-    thrust::device_vector<uint16_t>        currentSurface(levelSize(i + 1));
-    thrust::device_vector<uint16_t> const& lastSurface = mBuffers.back();
+    thrust::device_vector<uint16_t> currentSurface(levelSize(i + 1));
+    const uint16_t*                 lastSurface = thrust::raw_pointer_cast(mBuffers.back().data());
     if (i == 0) {
-      thrust::tabulate(
-          thrust::device, currentSurface.begin(), currentSurface.end(), [&](int const& index) {
+      thrust::tabulate(thrust::host, currentSurface.begin(), currentSurface.end(),
+          [=] __host__ __device__(int const& index) {
             // d0  d1   d2   d3
             //   \  |    |  /
             // d4--d5-- d6-- d7
@@ -54,25 +55,25 @@ SurfaceDetectionBuffer::SurfaceDetectionBuffer(
             //   /  |    |  \
             // d12 d13  d14 d15
 
-            const float d0 = dDepth[toLevel(index, 1, 0, Index2d(-1, 2))];
-            const float d1 = dDepth[toLevel(index, 1, 0, Index2d(0, 2))];
-            const float d2 = dDepth[toLevel(index, 1, 0, Index2d(1, 2))];
-            const float d3 = dDepth[toLevel(index, 1, 0, Index2d(2, 2))];
+            const float d0 = pDepth[toLevel(index, 1, 0, Index2d(-1, 2))];
+            const float d1 = pDepth[toLevel(index, 1, 0, Index2d(0, 2))];
+            const float d2 = pDepth[toLevel(index, 1, 0, Index2d(1, 2))];
+            const float d3 = pDepth[toLevel(index, 1, 0, Index2d(2, 2))];
 
-            const float d4 = dDepth[toLevel(index, 1, 0, Index2d(-1, 1))];
-            const float d5 = dDepth[toLevel(index, 1, 0, Index2d(0, 1))];
-            const float d6 = dDepth[toLevel(index, 1, 0, Index2d(1, 1))];
-            const float d7 = dDepth[toLevel(index, 1, 0, Index2d(2, 1))];
+            const float d4 = pDepth[toLevel(index, 1, 0, Index2d(-1, 1))];
+            const float d5 = pDepth[toLevel(index, 1, 0, Index2d(0, 1))];
+            const float d6 = pDepth[toLevel(index, 1, 0, Index2d(1, 1))];
+            const float d7 = pDepth[toLevel(index, 1, 0, Index2d(2, 1))];
 
-            const float d8  = dDepth[toLevel(index, 1, 0, Index2d(-1, 0))];
-            const float d9  = dDepth[toLevel(index, 1, 0, Index2d(0, 0))];
-            const float d10 = dDepth[toLevel(index, 1, 0, Index2d(1, 0))];
-            const float d11 = dDepth[toLevel(index, 1, 0, Index2d(2, 0))];
+            const float d8  = pDepth[toLevel(index, 1, 0, Index2d(-1, 0))];
+            const float d9  = pDepth[toLevel(index, 1, 0, Index2d(0, 0))];
+            const float d10 = pDepth[toLevel(index, 1, 0, Index2d(1, 0))];
+            const float d11 = pDepth[toLevel(index, 1, 0, Index2d(2, 0))];
 
-            const float d12 = dDepth[toLevel(index, 1, 0, Index2d(-1, -1))];
-            const float d13 = dDepth[toLevel(index, 1, 0, Index2d(0, -1))];
-            const float d14 = dDepth[toLevel(index, 1, 0, Index2d(1, -1))];
-            const float d15 = dDepth[toLevel(index, 1, 0, Index2d(2, -1))];
+            const float d12 = pDepth[toLevel(index, 1, 0, Index2d(-1, -1))];
+            const float d13 = pDepth[toLevel(index, 1, 0, Index2d(0, -1))];
+            const float d14 = pDepth[toLevel(index, 1, 0, Index2d(1, -1))];
+            const float d15 = pDepth[toLevel(index, 1, 0, Index2d(2, -1))];
 
             // check for horizontal and vertical continuity
             const bool t = is_on_line(d1, d5, d9) && is_on_line(d2, d6, d10);
@@ -97,8 +98,8 @@ SurfaceDetectionBuffer::SurfaceDetectionBuffer(
             return is_surface | continuous;
           });
     } else {
-      thrust::tabulate(
-          thrust::device, currentSurface.begin(), currentSurface.end(), [&](int const& index) {
+      thrust::tabulate(thrust::host, currentSurface.begin(), currentSurface.end(),
+          [=] __host__ __device__(int const& index) {
             // s0-s1
             // |   |
             // s2-s3
@@ -158,8 +159,7 @@ void SurfaceDetectionBuffer::print() const {
 
 thrust::device_vector<SurfaceDetectionBuffer::Vertex> SurfaceDetectionBuffer::generateVertices() {
   thrust::device_vector<Vertex> dVertices;
-
-  thrust::host_vector<Vertex> hVertices(levelSize(mLastLevel));
+  thrust::host_vector<Vertex>   hVertices(levelSize(mLastLevel));
   thrust::tabulate(thrust::host, hVertices.begin(), hVertices.end(), [&](int index) {
     Vertex val;
     val.xy = to2dIndex(index, mLastLevel) * mCellSize;
@@ -168,57 +168,92 @@ thrust::device_vector<SurfaceDetectionBuffer::Vertex> SurfaceDetectionBuffer::ge
   });
   dVertices = hVertices;
 
-  for (int level = mLastLevel; level >= 0; --level) {
-    thrust::device_vector<uint16_t> const& currentSurface = mBuffers[level];
-    thrust::device_vector<uint16_t> const& finerSurface   = mBuffers[level - 1];
-    thrust::device_vector<Vertex>          dNewVertices;
-    dVertices = thrust::transform_reduce(
-        thrust::device, dVertices.begin(), dVertices.end(),
-        [&](Vertex const& val) {
-          thrust::device_vector<Vertex> out;
+  constexpr Vertex NO_VERTEX = {0u, 0u, ~0u};
 
+  for (int level = mLastLevel; level >= 0; --level) {
+    const uint16_t* currentSurface = thrust::raw_pointer_cast(mBuffers[level].data());
+    const uint16_t* finerSurface   = thrust::raw_pointer_cast(mBuffers[level - 1].data());
+
+    const Vertex*                 pOldVertices = thrust::raw_pointer_cast(dVertices.data());
+    thrust::device_vector<Vertex> dNewVertices(dVertices.size() * 4);
+    thrust::tabulate(thrust::host, dNewVertices.begin(), dNewVertices.end(),
+        [=] __host__ __device__(int const& index) {
+          Vertex       oldVal      = pOldVertices[index >> 2];
           int          quadSize    = 1 << (level);
-          unsigned int vertexLevel = val.z >> BIT_CURRENT_LEVEL;
+          unsigned int vertexLevel = oldVal.z >> BIT_CURRENT_LEVEL;
           unsigned int surfaceData =
-              currentSurface[to1dIndex(toLevel(val.xy, 0, level + 1), level + 1)];
+              currentSurface[to1dIndex(toLevel(oldVal.xy, 0, level + 1), level + 1)];
 
           if (vertexLevel == level) {
             if ((surfaceData & (1 << BIT_IS_SURFACE)) == 0) {
               if (level == mLastLevel) {
                 const unsigned int s0 =
-                    finerSurface[to1dIndex(toLevel(val.xy, 0, level) + Index2d(0, 1), level)];
+                    finerSurface[to1dIndex(toLevel(oldVal.xy, 0, level) + Index2d(0, 1), level)];
                 const unsigned int s1 =
-                    finerSurface[to1dIndex(toLevel(val.xy, 0, level) + Index2d(1, 1), level)];
+                    finerSurface[to1dIndex(toLevel(oldVal.xy, 0, level) + Index2d(1, 1), level)];
                 const unsigned int s2 =
-                    finerSurface[to1dIndex(toLevel(val.xy, 0, level) + Index2d(0, 0), level)];
+                    finerSurface[to1dIndex(toLevel(oldVal.xy, 0, level) + Index2d(0, 0), level)];
                 const unsigned int s3 =
-                    finerSurface[to1dIndex(toLevel(val.xy, 0, level) + Index2d(1, 0), level)];
+                    finerSurface[to1dIndex(toLevel(oldVal.xy, 0, level) + Index2d(1, 0), level)];
 
-                emit(out, val, Index2d(0, 1), quadSize, ((level - 1) << BIT_CURRENT_LEVEL) | s0);
-                emit(out, val, Index2d(1, 1), quadSize, ((level - 1) << BIT_CURRENT_LEVEL) | s1);
-                emit(out, val, Index2d(0, 0), quadSize, ((level - 1) << BIT_CURRENT_LEVEL) | s2);
-                emit(out, val, Index2d(1, 0), quadSize, ((level - 1) << BIT_CURRENT_LEVEL) | s3);
+                switch (index % 4) {
+                case 0:
+                  return emit(
+                      oldVal, Index2d(0, 1), quadSize, ((level - 1) << BIT_CURRENT_LEVEL) | s0);
+                case 1:
+                  return emit(
+                      oldVal, Index2d(1, 1), quadSize, ((level - 1) << BIT_CURRENT_LEVEL) | s1);
+                case 2:
+                  return emit(
+                      oldVal, Index2d(0, 0), quadSize, ((level - 1) << BIT_CURRENT_LEVEL) | s2);
+                case 3:
+                  return emit(
+                      oldVal, Index2d(1, 0), quadSize, ((level - 1) << BIT_CURRENT_LEVEL) | s3);
+                }
               } else {
-                emit(out, val, Index2d(0, 1), quadSize, ((level - 1) << BIT_CURRENT_LEVEL));
-                emit(out, val, Index2d(1, 1), quadSize, ((level - 1) << BIT_CURRENT_LEVEL));
-                emit(out, val, Index2d(0, 0), quadSize, ((level - 1) << BIT_CURRENT_LEVEL));
-                emit(out, val, Index2d(1, 0), quadSize, ((level - 1) << BIT_CURRENT_LEVEL));
+                switch (index % 4) {
+                case 0:
+                  return emit(oldVal, Index2d(0, 1), quadSize, ((level - 1) << BIT_CURRENT_LEVEL));
+                case 1:
+                  return emit(oldVal, Index2d(1, 1), quadSize, ((level - 1) << BIT_CURRENT_LEVEL));
+                case 2:
+                  return emit(oldVal, Index2d(0, 0), quadSize, ((level - 1) << BIT_CURRENT_LEVEL));
+                case 3:
+                  return emit(oldVal, Index2d(1, 0), quadSize, ((level - 1) << BIT_CURRENT_LEVEL));
+                }
               }
             } else {
-              emit(out, val, glm::u16vec2(0, 0), 1,
-                  (level << BIT_CURRENT_LEVEL | (ALL_CONTINUITY_BITS & surfaceData) | 1));
+              return index % 4 == 0 ? emit(oldVal, glm::u16vec2(0, 0), 1,
+                                          (level << BIT_CURRENT_LEVEL |
+                                              (ALL_CONTINUITY_BITS & surfaceData) | 1))
+                                    : NO_VERTEX;
             }
           } else {
-            out.push_back(val);
+            return index % 4 == 0 ? oldVal : NO_VERTEX;
           }
-          return out;
-        },
-        dNewVertices,
-        [](thrust::device_vector<Vertex>& acc, thrust::device_vector<Vertex> val) {
-          acc.reserve(acc.capacity() + val.size());
-          thrust::copy(thrust::device, val.begin(), val.end(), std::back_inserter(acc));
-          return acc;
         });
+
+    thrust::device_vector<int> dVertexCounts(dVertices.size());
+    thrust::tabulate(thrust::host, dVertexCounts.begin(), dVertexCounts.end(),
+        [=] __host__ __device__(int const& index) {
+          Vertex       oldVal      = pOldVertices[index >> 2];
+          unsigned int vertexLevel = oldVal.z >> BIT_CURRENT_LEVEL;
+          unsigned int surfaceData =
+              currentSurface[to1dIndex(toLevel(oldVal.xy, 0, level + 1), level + 1)];
+
+          if (vertexLevel == level) {
+            if ((surfaceData & (1 << BIT_IS_SURFACE)) == 0) {
+              return 4;
+            } else {
+              return 1;
+            }
+          } else {
+            return 1;
+          }
+        });
+
+    thrust::device_vector<int> dVertexStartIndex(dVertices.size());
+    thrust::exclusive_scan(dVertexCounts.begin(), dVertexCounts.end(), dVertexStartIndex.begin());
   }
 
   logger().trace("Got {} verts", dVertices.size());
@@ -273,12 +308,12 @@ glm::uvec2 SurfaceDetectionBuffer::levelDim(unsigned int level) const {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void SurfaceDetectionBuffer::emit(thrust::device_vector<Vertex>& verts, Vertex pos, Index2d offset,
-    unsigned int factor, int data) const {
+SurfaceDetectionBuffer::Vertex SurfaceDetectionBuffer::emit(
+    Vertex pos, Index2d offset, unsigned int factor, int data) const {
   Vertex out(pos.xy + offset * factor, data);
-  if (out.x < mWidth && out.y < mHeight) {
-    verts.push_back(out);
-  }
+  out.x = std::min(out.x, mWidth);
+  out.y = std::min(out.y, mHeight);
+  return out;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
