@@ -39,6 +39,7 @@ void IrregularGrid::setDepthTexture(float* texture, int width, int height) {
   mHeight = height;
   DisplayNode::setDepthTexture(texture, width, height);
   mSurfaces.emplace(texture, width, height);
+  mSurfaces->print();
   createBuffers();
 }
 
@@ -126,9 +127,6 @@ void IrregularGrid::createBuffers() {
   thrust::device_vector<glm::uvec3> dVertices = mSurfaces->generateVertices();
   thrust::host_vector<glm::uvec3>   hVertices = dVertices;
   mVertexCount                                = hVertices.size();
-  std::vector<unsigned int> stdVertices(
-      (unsigned int*)hVertices.data(), (unsigned int*)hVertices.data() + hVertices.size() * 3);
-  //logger().trace("{}", stdVertices);
 
   mVAO.Bind();
 

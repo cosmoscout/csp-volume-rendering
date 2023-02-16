@@ -86,12 +86,13 @@ find_package(ospray REQUIRED)
 find_package(OpenImageDenoise REQUIRED)
 find_package(VTK REQUIRED)
 
+find_package(libcudacxx REQUIRED CONFIG)
 find_package(Thrust REQUIRED CONFIG)
-thrust_create_target(Thrust DEVICE OMP)
+thrust_create_target(Thrust DEVICE CUDA)
 
 # build plugin -------------------------------------------------------------------------------------
 
-file(GLOB_RECURSE SOURCE_FILES src/*.cpp)
+file(GLOB_RECURSE SOURCE_FILES src/*.cpp src/*.cu)
 # Resource files and header files are only added in order to make them available in your IDE.
 file(GLOB_RECURSE HEADER_FILES src/*.hpp)
 file(GLOB_RECURSE RESOUCRE_FILES gui/*)
@@ -101,6 +102,8 @@ add_library(csp-volume-rendering SHARED
   ${HEADER_FILES}
   ${RESOUCRE_FILES}
 )
+
+set_target_properties(csp-volume-rendering PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
 
 target_link_libraries(csp-volume-rendering
   PUBLIC
