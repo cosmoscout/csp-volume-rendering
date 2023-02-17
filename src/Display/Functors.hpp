@@ -15,74 +15,74 @@ namespace csp::volumerendering {
 
 struct DetectSurfaceInBase {
  public:
-  DetectSurfaceInBase(SurfaceDetectionBuffer surfaces, const float* depth);
+  DetectSurfaceInBase(SurfaceDetectionBuffer::GridParams params, const float* depth);
   __host__ __device__ uint16_t operator()(size_t const index) const;
 
  private:
-  SurfaceDetectionBuffer const mSurfaces;
-  const float*                 mDepth;
+  SurfaceDetectionBuffer::GridParams const mParams;
+  const float*                             mDepth;
 };
 
 struct DetectSurfaceInHigherLevel {
  public:
   DetectSurfaceInHigherLevel(
-      SurfaceDetectionBuffer surfaces, const uint16_t* surfaceBuffer, int level);
+      SurfaceDetectionBuffer::GridParams params, const uint16_t* surfaceBuffer, int level);
   __host__ __device__ uint16_t operator()(size_t const index) const;
 
  private:
-  SurfaceDetectionBuffer const mSurfaces;
-  const uint16_t*              mSurfaceBuffer;
-  int                          mLevel;
+  SurfaceDetectionBuffer::GridParams const mParams;
+  const uint16_t*                          mSurfaceBuffer;
+  int                                      mLevel;
 };
 
 struct GenerateHighLevelVerts {
  public:
-  GenerateHighLevelVerts(SurfaceDetectionBuffer surfaces);
+  GenerateHighLevelVerts(SurfaceDetectionBuffer::GridParams params);
   __host__ __device__ SurfaceDetectionBuffer::Vertex operator()(size_t const index) const;
 
  private:
-  SurfaceDetectionBuffer const mSurfaces;
+  SurfaceDetectionBuffer::GridParams const mParams;
 };
 
 struct SplitVerts {
  public:
-  SplitVerts(SurfaceDetectionBuffer surfaces, int level,
+  SplitVerts(SurfaceDetectionBuffer::GridParams params, int level,
       const SurfaceDetectionBuffer::Vertex* oldVerts, const uint16_t* currentSurface,
       const uint16_t* finerSurface);
   __host__ __device__ SurfaceDetectionBuffer::Vertex operator()(size_t const index) const;
 
  private:
-  SurfaceDetectionBuffer const          mSurfaces;
-  int                                   mLevel;
-  const SurfaceDetectionBuffer::Vertex* mOldVerts;
-  const uint16_t*                       mCurrentSurface;
-  const uint16_t*                       mFinerSurface;
+  SurfaceDetectionBuffer::GridParams const mParams;
+  int                                      mLevel;
+  const SurfaceDetectionBuffer::Vertex*    mOldVerts;
+  const uint16_t*                          mCurrentSurface;
+  const uint16_t*                          mFinerSurface;
 };
 
 struct GetVertCount {
  public:
-  GetVertCount(SurfaceDetectionBuffer surfaces, int level,
+  GetVertCount(SurfaceDetectionBuffer::GridParams params, int level,
       const SurfaceDetectionBuffer::Vertex* oldVerts, const uint16_t* currentSurface);
   __host__ __device__ int operator()(size_t const index) const;
 
  private:
-  SurfaceDetectionBuffer const          mSurfaces;
-  int                                   mLevel;
-  const SurfaceDetectionBuffer::Vertex* mOldVerts;
-  const uint16_t*                       mCurrentSurface;
+  SurfaceDetectionBuffer::GridParams const mParams;
+  int                                      mLevel;
+  const SurfaceDetectionBuffer::Vertex*    mOldVerts;
+  const uint16_t*                          mCurrentSurface;
 };
 
 struct GenerateStencil {
  public:
-  GenerateStencil(SurfaceDetectionBuffer surfaces, int level,
+  GenerateStencil(SurfaceDetectionBuffer::GridParams params, int level,
       const SurfaceDetectionBuffer::Vertex* oldVerts, const uint16_t* currentSurface);
   __host__ __device__ int operator()(size_t const index) const;
 
  private:
-  SurfaceDetectionBuffer const          mSurfaces;
-  int                                   mLevel;
-  const SurfaceDetectionBuffer::Vertex* mOldVerts;
-  const uint16_t*                       mCurrentSurface;
+  SurfaceDetectionBuffer::GridParams const mParams;
+  int                                      mLevel;
+  const SurfaceDetectionBuffer::Vertex*    mOldVerts;
+  const uint16_t*                          mCurrentSurface;
 };
 
 struct IsNoVertex {

@@ -68,27 +68,42 @@ class SurfaceDetectionBuffer {
   using Buffer = thrust::device_vector<uint16_t>;
   using Level  = unsigned int;
 
+  struct GridParams {
+    const unsigned int mCellSize;
+    const unsigned int mWidth;
+    const unsigned int mHeight;
+    const unsigned int mLevels;
+    const unsigned int mLastLevel;
+
+    __host__ GridParams(
+        const unsigned int cellSize, const unsigned int width, const unsigned int height)
+        : mCellSize(cellSize)
+        , mWidth(width)
+        , mHeight(height)
+        , mLevels(static_cast<int>(std::log2(mCellSize)))
+        , mLastLevel(mLevels - 1) {
+    }
+
+    GridParams(GridParams const& other) = default;
+
+    __host__ __device__ int    to1dIndex(Vec2 index, Level level) const;
+    __host__ __device__ Vec2   to2dIndex(size_t index, Level level) const;
+    __host__ __device__ Vec2   toLevel(Vec2 index, Level from, Level to) const;
+    __host__ __device__ int    toLevel(size_t index, Level from, Level to, Vec2 offset) const;
+    __host__ __device__ int    levelSize(Level level) const;
+    __host__ __device__ Vec2   levelDim(Level level) const;
+    __host__ __device__ Vertex emit(
+        Vertex pos, Vec2 offset, unsigned int factor, unsigned int data) const;
+  };
+
   SurfaceDetectionBuffer(float* depthTexture, int width, int height, int cellSize = 16);
 
   void                          print() const;
   thrust::device_vector<Vertex> generateVertices();
 
  private:
-  __host__ __device__ int    to1dIndex(Vec2 index, Level level) const;
-  __host__ __device__ Vec2   to2dIndex(size_t index, Level level) const;
-  __host__ __device__ Vec2   toLevel(Vec2 index, Level from, Level to) const;
-  __host__ __device__ int    toLevel(size_t index, Level from, Level to, Vec2 offset) const;
-  __host__ __device__ int    levelSize(Level level) const;
-  __host__ __device__ Vec2   levelDim(Level level) const;
-  __host__ __device__ Vertex emit(
-      Vertex pos, Vec2 offset, unsigned int factor, unsigned int data) const;
-
-  const unsigned int  mCellSize;
-  const unsigned int  mWidth;
-  const unsigned int  mHeight;
-  const unsigned int  mLevels;
-  const unsigned int  mLastLevel;
   std::vector<Buffer> mBuffers;
+  GridParams          mGridParams;
 
   friend struct DetectSurfaceInBase;
   friend struct DetectSurfaceInHigherLevel;

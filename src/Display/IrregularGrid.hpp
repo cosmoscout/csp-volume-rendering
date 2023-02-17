@@ -44,7 +44,7 @@ class IrregularGrid : public DisplayNode {
 
   VistaVertexArrayObject mVAO;
   VistaBufferObject      mVBO;
-  int                    mVertexCount;
+  size_t                 mVertexCount;
 };
 
 } // namespace csp::volumerendering

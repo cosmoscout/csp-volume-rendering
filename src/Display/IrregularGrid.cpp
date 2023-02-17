@@ -39,7 +39,7 @@ void IrregularGrid::setDepthTexture(float* texture, int width, int height) {
   mHeight = height;
   DisplayNode::setDepthTexture(texture, width, height);
   mSurfaces.emplace(texture, width, height);
-  mSurfaces->print();
+  //mSurfaces->print();
   createBuffers();
 }
 
