@@ -16,7 +16,7 @@ namespace csp::volumerendering {
 struct DetectSurfaceInBase {
  public:
   DetectSurfaceInBase(SurfaceDetectionBuffer surfaces, const float* depth);
-  __host__ __device__ uint16_t operator()(int const index) const;
+  __host__ __device__ uint16_t operator()(size_t const index) const;
 
  private:
   SurfaceDetectionBuffer const mSurfaces;
@@ -27,7 +27,7 @@ struct DetectSurfaceInHigherLevel {
  public:
   DetectSurfaceInHigherLevel(
       SurfaceDetectionBuffer surfaces, const uint16_t* surfaceBuffer, int level);
-  __host__ __device__ uint16_t operator()(int const index) const;
+  __host__ __device__ uint16_t operator()(size_t const index) const;
 
  private:
   SurfaceDetectionBuffer const mSurfaces;
@@ -38,7 +38,7 @@ struct DetectSurfaceInHigherLevel {
 struct GenerateHighLevelVerts {
  public:
   GenerateHighLevelVerts(SurfaceDetectionBuffer surfaces);
-  __host__ __device__ SurfaceDetectionBuffer::Vertex operator()(int const index) const;
+  __host__ __device__ SurfaceDetectionBuffer::Vertex operator()(size_t const index) const;
 
  private:
   SurfaceDetectionBuffer const mSurfaces;
@@ -49,7 +49,7 @@ struct SplitVerts {
   SplitVerts(SurfaceDetectionBuffer surfaces, int level,
       const SurfaceDetectionBuffer::Vertex* oldVerts, const uint16_t* currentSurface,
       const uint16_t* finerSurface);
-  __host__ __device__ SurfaceDetectionBuffer::Vertex operator()(int const index) const;
+  __host__ __device__ SurfaceDetectionBuffer::Vertex operator()(size_t const index) const;
 
  private:
   SurfaceDetectionBuffer const          mSurfaces;
@@ -63,7 +63,7 @@ struct GetVertCount {
  public:
   GetVertCount(SurfaceDetectionBuffer surfaces, int level,
       const SurfaceDetectionBuffer::Vertex* oldVerts, const uint16_t* currentSurface);
-  __host__ __device__ int operator()(int const index) const;
+  __host__ __device__ int operator()(size_t const index) const;
 
  private:
   SurfaceDetectionBuffer const          mSurfaces;
@@ -76,7 +76,7 @@ struct GenerateStencil {
  public:
   GenerateStencil(SurfaceDetectionBuffer surfaces, int level,
       const SurfaceDetectionBuffer::Vertex* oldVerts, const uint16_t* currentSurface);
-  __host__ __device__ int operator()(int const index) const;
+  __host__ __device__ int operator()(size_t const index) const;
 
  private:
   SurfaceDetectionBuffer const          mSurfaces;

@@ -49,7 +49,7 @@ SurfaceDetectionBuffer::SurfaceDetectionBuffer(
 void SurfaceDetectionBuffer::print() const {
   for (unsigned int level = 0; level < mLevels; level++) {
     thrust::host_vector<uint16_t> output = mBuffers[level];
-    for (unsigned int i = 0; i < levelDim(level + 1).y; i++) {
+    for (int i = 0; i < levelDim(level + 1).y; i++) {
       thrust::host_vector<uint16_t> line(output.begin() + levelDim(level + 1).y * i,
           output.begin() + levelDim(level + 1).y * (i + 1));
       logger().trace("{}", line);
@@ -73,14 +73,15 @@ thrust::device_vector<SurfaceDetectionBuffer::Vertex> SurfaceDetectionBuffer::ge
     thrust::tabulate(thrust::device, dNewVertices.begin(), dNewVertices.end(),
         SplitVerts(*this, level, pOldVertices, pCurrentSurface, pFinerSurface));
 
-    thrust::device_vector<int> dStencil(dNewVertices.size());
+    /*thrust::device_vector<int> dStencil(dNewVertices.size());
     thrust::tabulate(thrust::device, dStencil.begin(), dStencil.end(),
         GenerateStencil(*this, level, pOldVertices, pCurrentSurface));
 
     dVertices.reserve(dNewVertices.size());
     auto iNewEnd = thrust::copy_if(thrust::device, dNewVertices.begin(), dNewVertices.end(),
         dStencil.begin(), dVertices.begin(), thrust::identity<int>());
-    dVertices.resize(thrust::distance(dVertices.begin(), iNewEnd));
+    dVertices.resize(thrust::distance(dVertices.begin(), iNewEnd));*/
+    dVertices = dNewVertices;
 
     /*thrust::device_vector<int> dVertexCounts(dVertices.size());
     thrust::tabulate(thrust::device, dVertexCounts.begin(), dVertexCounts.end(),
@@ -97,34 +98,38 @@ thrust::device_vector<SurfaceDetectionBuffer::Vertex> SurfaceDetectionBuffer::ge
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-__host__ __device__ int SurfaceDetectionBuffer::to1dIndex(Index2d index, int level) const {
+__host__ __device__ int SurfaceDetectionBuffer::to1dIndex(Vec2 index, Level level) const {
 #ifdef __CUDA_ARCH__
-  return min(max(index.y, 0u), levelDim(level).y) * levelDim(level).x +
-         min(max(index.x, 0u), levelDim(level).x);
+  return min(max(index.y, 0), levelDim(level).y) * levelDim(level).x +
+         min(max(index.x, 0), levelDim(level).x);
 #else
-  return std::clamp(index.y, 0u, levelDim(level).y) * levelDim(level).x +
-         std::clamp(index.x, 0u, levelDim(level).x);
+  return std::clamp(index.y, 0, levelDim(level).y) * levelDim(level).x +
+         std::clamp(index.x, 0, levelDim(level).x);
 #endif
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-__host__ __device__ SurfaceDetectionBuffer::Index2d SurfaceDetectionBuffer::to2dIndex(
-    int index, int level) const {
+__host__ __device__ SurfaceDetectionBuffer::Vec2 SurfaceDetectionBuffer::to2dIndex(
+    size_t index, Level level) const {
   int width = levelDim(level).x;
-  int x     = index % width;
-  int y     = index / width;
+  int x     = static_cast<int>(index) % width;
+  int y     = static_cast<int>(index) / width;
   return {x, y};
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-__host__ __device__ SurfaceDetectionBuffer::Index2d SurfaceDetectionBuffer::toLevel(
-    Index2d index, int from, int to) const {
-  if (to - from > 0) {
-    return index >> static_cast<unsigned int>(to - from);
+__host__ __device__ SurfaceDetectionBuffer::Vec2 SurfaceDetectionBuffer::toLevel(
+    Vec2 index, Level from, Level to) const {
+  if (to > from) {
+    Level dist = to - from;
+    Vec2  newIndex(index.x >> dist, index.y >> dist);
+    return newIndex;
   } else {
-    return index << static_cast<unsigned int>(from - to);
+    Level dist = from - to;
+    Vec2  newIndex(index.x << dist, index.y << dist);
+    return newIndex;
   }
 }
 
@@ -132,33 +137,36 @@ __host__ __device__ SurfaceDetectionBuffer::Index2d SurfaceDetectionBuffer::toLe
 
 /// Offset is applied after transformation to new level
 __host__ __device__ int SurfaceDetectionBuffer::toLevel(
-    int index, int from, int to, Index2d offset) const {
+    size_t index, Level from, Level to, Vec2 offset) const {
   return to1dIndex(toLevel(to2dIndex(index, from), from, to) + offset, to);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-__host__ __device__ int SurfaceDetectionBuffer::levelSize(int level) const {
+__host__ __device__ int SurfaceDetectionBuffer::levelSize(Level level) const {
   return (mWidth >> level) * (mHeight >> level);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-__host__ __device__ glm::uvec2 SurfaceDetectionBuffer::levelDim(unsigned int level) const {
-  return glm::uvec2(mWidth, mHeight) >> level;
+__host__ __device__ SurfaceDetectionBuffer::Vec2 SurfaceDetectionBuffer::levelDim(
+    Level level) const {
+  Vec2 dim(mWidth >> level, mHeight >> level);
+  return dim;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 __host__ __device__ SurfaceDetectionBuffer::Vertex SurfaceDetectionBuffer::emit(
-    Vertex pos, Index2d offset, unsigned int factor, int data) const {
-  Vertex out(pos.xy + offset * factor, data);
+    Vertex pos, Vec2 offset, unsigned int factor, unsigned int data) const {
+  Vertex out;
+  out.data = data;
 #ifdef __CUDA_ARCH__
-  out.x = min(out.x, mWidth);
-  out.y = min(out.y, mHeight);
+  out.x = min(pos.x + offset.x * factor, mWidth);
+  out.y = min(pos.y + offset.y * factor, mHeight);
 #else
-  out.x = std::min(out.x, mWidth);
-  out.y = std::min(out.y, mHeight);
+  out.x = std::min(pos.x + offset.x * factor, mWidth);
+  out.y = std::min(pos.y + offset.y * factor, mHeight);
 #endif
   return out;
 }

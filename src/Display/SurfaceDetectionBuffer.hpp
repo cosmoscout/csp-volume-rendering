@@ -9,9 +9,6 @@
 
 #include <thrust/device_vector.h>
 
-#include <glm/fwd.hpp>
-#include <glm/gtc/type_ptr.hpp>
-
 namespace csp::volumerendering {
 
 // Bit pattern for storing connectivity
@@ -34,9 +31,42 @@ static constexpr int ALL_DATA_BITS       = 4095;
 
 class SurfaceDetectionBuffer {
  public:
-  using Index2d = glm::uvec2;
-  using Vertex  = glm::uvec3;
-  using Buffer  = thrust::device_vector<uint16_t>;
+  struct Vec2 {
+    int x;
+    int y;
+
+    __host__ __device__ Vec2(int pX, int pY)
+        : x(pX)
+        , y(pY) {
+    }
+
+    __host__ __device__ inline Vec2 operator+(Vec2 const& other) const {
+      Vec2 res(x + other.x, y + other.y);
+      return res;
+    }
+  };
+
+  struct Vertex {
+    unsigned int x;
+    unsigned int y;
+    unsigned int data;
+
+    Vertex() = default;
+
+    __host__ __device__ Vertex(unsigned int pX, unsigned int pY, unsigned int pData)
+        : x(pX)
+        , y(pY)
+        , data(pData) {
+    }
+
+    __host__ __device__ inline Vec2 xy() const {
+      Vec2 xy(x, y);
+      return xy;
+    }
+  };
+
+  using Buffer = thrust::device_vector<uint16_t>;
+  using Level  = unsigned int;
 
   SurfaceDetectionBuffer(float* depthTexture, int width, int height, int cellSize = 16);
 
@@ -44,13 +74,14 @@ class SurfaceDetectionBuffer {
   thrust::device_vector<Vertex> generateVertices();
 
  private:
-  __host__ __device__ int        to1dIndex(Index2d index, int level) const;
-  __host__ __device__ Index2d    to2dIndex(int index, int level) const;
-  __host__ __device__ Index2d    toLevel(Index2d index, int from, int to) const;
-  __host__ __device__ int        toLevel(int index, int from, int to, Index2d offset) const;
-  __host__ __device__ int        levelSize(int level) const;
-  __host__ __device__ glm::uvec2 levelDim(unsigned int level) const;
-  __host__ __device__ Vertex     emit(Vertex pos, Index2d offset, unsigned int factor, int data) const;
+  __host__ __device__ int    to1dIndex(Vec2 index, Level level) const;
+  __host__ __device__ Vec2   to2dIndex(size_t index, Level level) const;
+  __host__ __device__ Vec2   toLevel(Vec2 index, Level from, Level to) const;
+  __host__ __device__ int    toLevel(size_t index, Level from, Level to, Vec2 offset) const;
+  __host__ __device__ int    levelSize(Level level) const;
+  __host__ __device__ Vec2   levelDim(Level level) const;
+  __host__ __device__ Vertex emit(
+      Vertex pos, Vec2 offset, unsigned int factor, unsigned int data) const;
 
   const unsigned int  mCellSize;
   const unsigned int  mWidth;

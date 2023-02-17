@@ -30,7 +30,7 @@ DetectSurfaceInBase::DetectSurfaceInBase(SurfaceDetectionBuffer surfaces, const 
     , mDepth(depth) {
 }
 
-__host__ __device__ uint16_t DetectSurfaceInBase::operator()(int const index) const {
+__host__ __device__ uint16_t DetectSurfaceInBase::operator()(size_t const index) const {
   // d0  d1   d2   d3
   //   \  |    |  /
   // d4--d5-- d6-- d7
@@ -39,25 +39,25 @@ __host__ __device__ uint16_t DetectSurfaceInBase::operator()(int const index) co
   //   /  |    |  \
   // d12 d13  d14 d15
 
-  const float d0 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Index2d(-1, 2))];
-  const float d1 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Index2d(0, 2))];
-  const float d2 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Index2d(1, 2))];
-  const float d3 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Index2d(2, 2))];
+  const float d0 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Vec2(-1, 2))];
+  const float d1 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Vec2(0, 2))];
+  const float d2 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Vec2(1, 2))];
+  const float d3 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Vec2(2, 2))];
 
-  const float d4 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Index2d(-1, 1))];
-  const float d5 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Index2d(0, 1))];
-  const float d6 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Index2d(1, 1))];
-  const float d7 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Index2d(2, 1))];
+  const float d4 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Vec2(-1, 1))];
+  const float d5 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Vec2(0, 1))];
+  const float d6 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Vec2(1, 1))];
+  const float d7 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Vec2(2, 1))];
 
-  const float d8  = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Index2d(-1, 0))];
-  const float d9  = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Index2d(0, 0))];
-  const float d10 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Index2d(1, 0))];
-  const float d11 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Index2d(2, 0))];
+  const float d8  = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Vec2(-1, 0))];
+  const float d9  = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Vec2(0, 0))];
+  const float d10 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Vec2(1, 0))];
+  const float d11 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Vec2(2, 0))];
 
-  const float d12 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Index2d(-1, -1))];
-  const float d13 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Index2d(0, -1))];
-  const float d14 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Index2d(1, -1))];
-  const float d15 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Index2d(2, -1))];
+  const float d12 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Vec2(-1, -1))];
+  const float d13 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Vec2(0, -1))];
+  const float d14 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Vec2(1, -1))];
+  const float d15 = mDepth[mSurfaces.toLevel(index, 1, 0, SurfaceDetectionBuffer::Vec2(2, -1))];
 
   // check for horizontal and vertical continuity
   const bool t = is_on_line(d1, d5, d9) && is_on_line(d2, d6, d10);
@@ -91,19 +91,19 @@ DetectSurfaceInHigherLevel::DetectSurfaceInHigherLevel(
     , mLevel(level) {
 }
 
-__host__ __device__ uint16_t DetectSurfaceInHigherLevel::operator()(int const index) const {
+__host__ __device__ uint16_t DetectSurfaceInHigherLevel::operator()(size_t const index) const {
   // s0-s1
   // |   |
   // s2-s3
 
   const uint16_t s0 = mSurfaceBuffer[mSurfaces.toLevel(
-      index, mLevel + 1, mLevel, SurfaceDetectionBuffer::Index2d(0, 1))];
+      index, mLevel + 1, mLevel, SurfaceDetectionBuffer::Vec2(0, 1))];
   const uint16_t s1 = mSurfaceBuffer[mSurfaces.toLevel(
-      index, mLevel + 1, mLevel, SurfaceDetectionBuffer::Index2d(1, 1))];
+      index, mLevel + 1, mLevel, SurfaceDetectionBuffer::Vec2(1, 1))];
   const uint16_t s2 = mSurfaceBuffer[mSurfaces.toLevel(
-      index, mLevel + 1, mLevel, SurfaceDetectionBuffer::Index2d(0, 0))];
+      index, mLevel + 1, mLevel, SurfaceDetectionBuffer::Vec2(0, 0))];
   const uint16_t s3 = mSurfaceBuffer[mSurfaces.toLevel(
-      index, mLevel + 1, mLevel, SurfaceDetectionBuffer::Index2d(1, 0))];
+      index, mLevel + 1, mLevel, SurfaceDetectionBuffer::Vec2(1, 0))];
 
   // check for internal continuity
   const uint16_t internal_continuity = (s0 >> BIT_CONTINUOUS_R) & (s0 >> BIT_CONTINUOUS_B) &
@@ -140,10 +140,11 @@ GenerateHighLevelVerts::GenerateHighLevelVerts(SurfaceDetectionBuffer surfaces)
 }
 
 __host__ __device__ SurfaceDetectionBuffer::Vertex GenerateHighLevelVerts::operator()(
-    int const index) const {
+    size_t const index) const {
   SurfaceDetectionBuffer::Vertex val;
-  val.xy = mSurfaces.to2dIndex(index, mSurfaces.mLastLevel) * mSurfaces.mCellSize;
-  val.z  = mSurfaces.mLastLevel << BIT_CURRENT_LEVEL;
+  val.x    = mSurfaces.to2dIndex(index, mSurfaces.mLastLevel).x * mSurfaces.mCellSize;
+  val.y    = mSurfaces.to2dIndex(index, mSurfaces.mLastLevel).y * mSurfaces.mCellSize;
+  val.data = mSurfaces.mLastLevel << BIT_CURRENT_LEVEL;
   return val;
 }
 
@@ -159,68 +160,70 @@ SplitVerts::SplitVerts(SurfaceDetectionBuffer surfaces, int level,
     , mFinerSurface(finerSurface) {
 }
 
-__host__ __device__ SurfaceDetectionBuffer::Vertex SplitVerts::operator()(int const index) const {
+__host__ __device__ SurfaceDetectionBuffer::Vertex SplitVerts::operator()(
+    size_t const index) const {
   SurfaceDetectionBuffer::Vertex oldVal      = mOldVerts[index >> 2];
   int                            quadSize    = 1 << (mLevel);
-  unsigned int                   vertexLevel = oldVal.z >> BIT_CURRENT_LEVEL;
-  unsigned int                   surfaceData =
-      mCurrentSurface[mSurfaces.to1dIndex(mSurfaces.toLevel(oldVal.xy, 0, mLevel + 1), mLevel + 1)];
+  unsigned int                   vertexLevel = oldVal.data >> BIT_CURRENT_LEVEL;
+  unsigned int                   surfaceData = mCurrentSurface[mSurfaces.to1dIndex(
+      mSurfaces.toLevel(oldVal.xy(), 0, mLevel + 1), mLevel + 1)];
 
   if (vertexLevel == mLevel) {
     if ((surfaceData & (1 << BIT_IS_SURFACE)) == 0) {
       if (mLevel == mSurfaces.mLastLevel) {
         const unsigned int s0 = mFinerSurface[mSurfaces.to1dIndex(
-            mSurfaces.toLevel(oldVal.xy, 0, mLevel) + SurfaceDetectionBuffer::Index2d(0, 1),
+            mSurfaces.toLevel(oldVal.xy(), 0, mLevel) + SurfaceDetectionBuffer::Vec2(0, 1),
             mLevel)];
         const unsigned int s1 = mFinerSurface[mSurfaces.to1dIndex(
-            mSurfaces.toLevel(oldVal.xy, 0, mLevel) + SurfaceDetectionBuffer::Index2d(1, 1),
+            mSurfaces.toLevel(oldVal.xy(), 0, mLevel) + SurfaceDetectionBuffer::Vec2(1, 1),
             mLevel)];
         const unsigned int s2 = mFinerSurface[mSurfaces.to1dIndex(
-            mSurfaces.toLevel(oldVal.xy, 0, mLevel) + SurfaceDetectionBuffer::Index2d(0, 0),
+            mSurfaces.toLevel(oldVal.xy(), 0, mLevel) + SurfaceDetectionBuffer::Vec2(0, 0),
             mLevel)];
         const unsigned int s3 = mFinerSurface[mSurfaces.to1dIndex(
-            mSurfaces.toLevel(oldVal.xy, 0, mLevel) + SurfaceDetectionBuffer::Index2d(1, 0),
+            mSurfaces.toLevel(oldVal.xy(), 0, mLevel) + SurfaceDetectionBuffer::Vec2(1, 0),
             mLevel)];
 
         switch (index % 4) {
         case 0:
-          return mSurfaces.emit(oldVal, SurfaceDetectionBuffer::Index2d(0, 1), quadSize,
+          return mSurfaces.emit(oldVal, SurfaceDetectionBuffer::Vec2(0, 1), quadSize,
               ((mLevel - 1) << BIT_CURRENT_LEVEL) | s0);
         case 1:
-          return mSurfaces.emit(oldVal, SurfaceDetectionBuffer::Index2d(1, 1), quadSize,
+          return mSurfaces.emit(oldVal, SurfaceDetectionBuffer::Vec2(1, 1), quadSize,
               ((mLevel - 1) << BIT_CURRENT_LEVEL) | s1);
         case 2:
-          return mSurfaces.emit(oldVal, SurfaceDetectionBuffer::Index2d(0, 0), quadSize,
+          return mSurfaces.emit(oldVal, SurfaceDetectionBuffer::Vec2(0, 0), quadSize,
               ((mLevel - 1) << BIT_CURRENT_LEVEL) | s2);
         case 3:
-          return mSurfaces.emit(oldVal, SurfaceDetectionBuffer::Index2d(1, 0), quadSize,
+          return mSurfaces.emit(oldVal, SurfaceDetectionBuffer::Vec2(1, 0), quadSize,
               ((mLevel - 1) << BIT_CURRENT_LEVEL) | s3);
         }
       } else {
         switch (index % 4) {
         case 0:
-          return mSurfaces.emit(oldVal, SurfaceDetectionBuffer::Index2d(0, 1), quadSize,
+          return mSurfaces.emit(oldVal, SurfaceDetectionBuffer::Vec2(0, 1), quadSize,
               ((mLevel - 1) << BIT_CURRENT_LEVEL));
         case 1:
-          return mSurfaces.emit(oldVal, SurfaceDetectionBuffer::Index2d(1, 1), quadSize,
+          return mSurfaces.emit(oldVal, SurfaceDetectionBuffer::Vec2(1, 1), quadSize,
               ((mLevel - 1) << BIT_CURRENT_LEVEL));
         case 2:
-          return mSurfaces.emit(oldVal, SurfaceDetectionBuffer::Index2d(0, 0), quadSize,
+          return mSurfaces.emit(oldVal, SurfaceDetectionBuffer::Vec2(0, 0), quadSize,
               ((mLevel - 1) << BIT_CURRENT_LEVEL));
         case 3:
-          return mSurfaces.emit(oldVal, SurfaceDetectionBuffer::Index2d(1, 0), quadSize,
+          return mSurfaces.emit(oldVal, SurfaceDetectionBuffer::Vec2(1, 0), quadSize,
               ((mLevel - 1) << BIT_CURRENT_LEVEL));
         }
       }
     } else {
       return index % 4 == 0
-                 ? mSurfaces.emit(oldVal, glm::u16vec2(0, 0), 1,
+                 ? mSurfaces.emit(oldVal, SurfaceDetectionBuffer::Vec2(0, 0), 1,
                        (mLevel << BIT_CURRENT_LEVEL | (ALL_CONTINUITY_BITS & surfaceData) | 1))
                  : NO_VERTEX;
     }
   } else {
     return index % 4 == 0 ? oldVal : NO_VERTEX;
   }
+  return NO_VERTEX;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -233,11 +236,11 @@ GetVertCount::GetVertCount(SurfaceDetectionBuffer surfaces, int level,
     , mCurrentSurface(currentSurface) {
 }
 
-__host__ __device__ int GetVertCount::operator()(int const index) const {
+__host__ __device__ int GetVertCount::operator()(size_t const index) const {
   SurfaceDetectionBuffer::Vertex oldVal      = mOldVerts[index >> 2];
-  unsigned int                   vertexLevel = oldVal.z >> BIT_CURRENT_LEVEL;
-  unsigned int                   surfaceData =
-      mCurrentSurface[mSurfaces.to1dIndex(mSurfaces.toLevel(oldVal.xy, 0, mLevel + 1), mLevel + 1)];
+  unsigned int                   vertexLevel = oldVal.data >> BIT_CURRENT_LEVEL;
+  unsigned int                   surfaceData = mCurrentSurface[mSurfaces.to1dIndex(
+      mSurfaces.toLevel(oldVal.xy(), 0, mLevel + 1), mLevel + 1)];
 
   if (vertexLevel == mLevel) {
     if ((surfaceData & (1 << BIT_IS_SURFACE)) == 0) {
@@ -260,11 +263,11 @@ GenerateStencil::GenerateStencil(SurfaceDetectionBuffer surfaces, int level,
     , mCurrentSurface(currentSurface) {
 }
 
-__host__ __device__ int GenerateStencil::operator()(int const index) const {
+__host__ __device__ int GenerateStencil::operator()(size_t const index) const {
   SurfaceDetectionBuffer::Vertex oldVal      = mOldVerts[index >> 2];
-  unsigned int                   vertexLevel = oldVal.z >> BIT_CURRENT_LEVEL;
-  unsigned int                   surfaceData =
-      mCurrentSurface[mSurfaces.to1dIndex(mSurfaces.toLevel(oldVal.xy, 0, mLevel + 1), mLevel + 1)];
+  unsigned int                   vertexLevel = oldVal.data >> BIT_CURRENT_LEVEL;
+  unsigned int                   surfaceData = mCurrentSurface[mSurfaces.to1dIndex(
+      mSurfaces.toLevel(oldVal.xy(), 0, mLevel + 1), mLevel + 1)];
 
   if (vertexLevel == mLevel) {
     if ((surfaceData & (1 << BIT_IS_SURFACE)) == 0) {

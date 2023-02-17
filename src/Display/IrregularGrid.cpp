@@ -124,14 +124,15 @@ bool IrregularGrid::DoImpl() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void IrregularGrid::createBuffers() {
-  thrust::device_vector<glm::uvec3> dVertices = mSurfaces->generateVertices();
-  thrust::host_vector<glm::uvec3>   hVertices = dVertices;
-  mVertexCount                                = hVertices.size();
+  thrust::device_vector<SurfaceDetectionBuffer::Vertex> dVertices = mSurfaces->generateVertices();
+  thrust::host_vector<SurfaceDetectionBuffer::Vertex>   hVertices = dVertices;
+  mVertexCount                                                    = hVertices.size();
 
   mVAO.Bind();
 
   mVBO.Bind(GL_ARRAY_BUFFER);
-  mVBO.BufferData(hVertices.size() * sizeof(glm::uvec3), hVertices.data(), GL_STATIC_DRAW);
+  mVBO.BufferData(
+      hVertices.size() * sizeof(SurfaceDetectionBuffer::Vertex), hVertices.data(), GL_STATIC_DRAW);
 
   mVAO.EnableAttributeArray(0);
   mVAO.SpecifyAttributeArrayInteger(0, 3, GL_UNSIGNED_INT, 3 * sizeof(unsigned int), 0, &mVBO);
