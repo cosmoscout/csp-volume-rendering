@@ -37,6 +37,11 @@ DisplayNode::DisplayNode(
   mVistaNode.reset(pSG->NewOpenGLNode(pSG->GetRoot(), this));
   VistaOpenSGMaterialTools::SetSortKeyOnSubtree(
       mVistaNode.get(), static_cast<int>(cs::utils::DrawOrder::eStars) + 1);
+
+  mTexture.SetWrapS(GL_CLAMP_TO_BORDER);
+  mTexture.SetWrapT(GL_CLAMP_TO_BORDER);
+  mDepthTexture.SetWrapS(GL_CLAMP_TO_BORDER);
+  mDepthTexture.SetWrapT(GL_CLAMP_TO_BORDER);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
