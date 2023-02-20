@@ -56,7 +56,7 @@ void SurfaceDetectionBuffer::print() const {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 thrust::device_vector<SurfaceDetectionBuffer::Vertex> SurfaceDetectionBuffer::generateVertices() {
-  thrust::device_vector<Vertex> dVertices(mGridParams.levelSize(mGridParams.mLastLevel));
+  thrust::device_vector<Vertex> dVertices(mGridParams.levelSize(mGridParams.mLastLevel + 1));
   thrust::tabulate(
       thrust::device, dVertices.begin(), dVertices.end(), GenerateHighLevelVerts(mGridParams));
 
@@ -69,26 +69,16 @@ thrust::device_vector<SurfaceDetectionBuffer::Vertex> SurfaceDetectionBuffer::ge
     thrust::tabulate(thrust::device, dNewVertices.begin(), dNewVertices.end(),
         SplitVerts(mGridParams, level, pOldVertices, pCurrentSurface, pFinerSurface));
 
-    /*thrust::device_vector<int> dStencil(dNewVertices.size());
+    thrust::device_vector<int> dStencil(dNewVertices.size());
     thrust::tabulate(thrust::device, dStencil.begin(), dStencil.end(),
-        GenerateStencil(*this, level, pOldVertices, pCurrentSurface));
+        GenerateStencil(mGridParams, level, pOldVertices, pCurrentSurface));
 
     dVertices.reserve(dNewVertices.size());
     auto iNewEnd = thrust::copy_if(thrust::device, dNewVertices.begin(), dNewVertices.end(),
         dStencil.begin(), dVertices.begin(), thrust::identity<int>());
-    dVertices.resize(thrust::distance(dVertices.begin(), iNewEnd));*/
-    dVertices = dNewVertices;
-
-    /*thrust::device_vector<int> dVertexCounts(dVertices.size());
-    thrust::tabulate(thrust::device, dVertexCounts.begin(), dVertexCounts.end(),
-        GetVertCount(*this, level, pOldVertices, pCurrentSurface));
-
-    thrust::device_vector<int> dVertexStartIndex(dVertices.size());
-    thrust::exclusive_scan(thrust::device, dVertexCounts.begin(), dVertexCounts.end(),
-    dVertexStartIndex.begin());*/
+    dVertices.assign(dVertices.begin(), iNewEnd);
   }
 
-  logger().trace("Got {} verts", dVertices.size());
   return dVertices;
 }
 

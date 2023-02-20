@@ -59,19 +59,6 @@ struct SplitVerts {
   const uint16_t*                          mFinerSurface;
 };
 
-struct GetVertCount {
- public:
-  GetVertCount(SurfaceDetectionBuffer::GridParams params, int level,
-      const SurfaceDetectionBuffer::Vertex* oldVerts, const uint16_t* currentSurface);
-  __host__ __device__ int operator()(size_t const index) const;
-
- private:
-  SurfaceDetectionBuffer::GridParams const mParams;
-  int                                      mLevel;
-  const SurfaceDetectionBuffer::Vertex*    mOldVerts;
-  const uint16_t*                          mCurrentSurface;
-};
-
 struct GenerateStencil {
  public:
   GenerateStencil(SurfaceDetectionBuffer::GridParams params, int level,
@@ -83,10 +70,6 @@ struct GenerateStencil {
   int                                      mLevel;
   const SurfaceDetectionBuffer::Vertex*    mOldVerts;
   const uint16_t*                          mCurrentSurface;
-};
-
-struct IsNoVertex {
-  __host__ __device__ bool operator()(SurfaceDetectionBuffer::Vertex vertex);
 };
 
 } // namespace csp::volumerendering

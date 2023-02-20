@@ -110,7 +110,6 @@ class SurfaceDetectionBuffer {
   friend struct GenerateHighLevelVerts;
   friend struct SplitVerts;
   friend struct GenerateStencil;
-  friend struct GetVertCount;
 };
 
 } // namespace csp::volumerendering

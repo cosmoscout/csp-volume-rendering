@@ -11,7 +11,7 @@ namespace {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 __host__ __device__ bool is_on_line(float a, float b, float c) {
-  float threshold = 0.1f;
+  float threshold = 0.03f;
   return abs(a - 2 * b + c) < threshold || (isinf(a) && isinf(b) && isinf(c));
 }
 
@@ -143,8 +143,8 @@ GenerateHighLevelVerts::GenerateHighLevelVerts(SurfaceDetectionBuffer::GridParam
 __host__ __device__ SurfaceDetectionBuffer::Vertex GenerateHighLevelVerts::operator()(
     size_t const index) const {
   SurfaceDetectionBuffer::Vertex val;
-  val.x    = mParams.to2dIndex(index, mParams.mLastLevel).x * mParams.mCellSize;
-  val.y    = mParams.to2dIndex(index, mParams.mLastLevel).y * mParams.mCellSize;
+  val.x    = mParams.to2dIndex(index, mParams.mLastLevel + 1).x * mParams.mCellSize;
+  val.y    = mParams.to2dIndex(index, mParams.mLastLevel + 1).y * mParams.mCellSize;
   val.data = mParams.mLastLevel << BIT_CURRENT_LEVEL;
   return val;
 }
@@ -229,33 +229,6 @@ __host__ __device__ SurfaceDetectionBuffer::Vertex SplitVerts::operator()(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-GetVertCount::GetVertCount(SurfaceDetectionBuffer::GridParams params, int level,
-    const SurfaceDetectionBuffer::Vertex* oldVerts, const uint16_t* currentSurface)
-    : mParams(params)
-    , mLevel(level)
-    , mOldVerts(oldVerts)
-    , mCurrentSurface(currentSurface) {
-}
-
-__host__ __device__ int GetVertCount::operator()(size_t const index) const {
-  SurfaceDetectionBuffer::Vertex oldVal      = mOldVerts[index >> 2];
-  unsigned int                   vertexLevel = oldVal.data >> BIT_CURRENT_LEVEL;
-  unsigned int                   surfaceData = mCurrentSurface[mParams.to1dIndex(
-      mParams.toLevel(oldVal.xy(), 0, mLevel + 1), mLevel + 1)];
-
-  if (vertexLevel == mLevel) {
-    if ((surfaceData & (1 << BIT_IS_SURFACE)) == 0) {
-      return 4;
-    } else {
-      return 1;
-    }
-  } else {
-    return 1;
-  }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 GenerateStencil::GenerateStencil(SurfaceDetectionBuffer::GridParams params, int level,
     const SurfaceDetectionBuffer::Vertex* oldVerts, const uint16_t* currentSurface)
     : mParams(params)
@@ -279,12 +252,6 @@ __host__ __device__ int GenerateStencil::operator()(size_t const index) const {
   } else {
     return index % 4 == 0 ? 1 : 0;
   }
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-__host__ __device__ bool IsNoVertex::operator()(SurfaceDetectionBuffer::Vertex vertex) {
-  return false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
