@@ -11,6 +11,8 @@
 #include "SurfaceDetectionBuffer.hpp"
 
 #include <VistaOGLExt/VistaBufferObject.h>
+#include <VistaOGLExt/VistaFramebufferObj.h>
+#include <VistaOGLExt/VistaRenderbuffer.h>
 #include <VistaOGLExt/VistaVertexArrayObject.h>
 
 #include <glm/gtc/type_ptr.hpp>
@@ -45,6 +47,11 @@ class IrregularGrid : public DisplayNode {
   VistaVertexArrayObject mVAO;
   VistaBufferObject      mVBO;
   size_t                 mVertexCount;
+
+  VistaGLSLShader        mFullscreenQuadShader;
+  VistaFramebufferObj    mFBO;
+  VistaTexture           mFBOColor;
+  VistaTexture           mFBODepth;
 };
 
 } // namespace csp::volumerendering

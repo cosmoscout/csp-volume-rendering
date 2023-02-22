@@ -12,6 +12,9 @@
 #include "../../../../src/cs-utils/FrameTimings.hpp"
 #include "../../../../src/cs-utils/utils.hpp"
 
+#include <VistaKernel/DisplayManager/VistaDisplayManager.h>
+#include <VistaKernel/DisplayManager/VistaViewport.h>
+#include <VistaKernel/VistaSystem.h>
 #include <VistaKernelOpenSGExt/VistaOpenSGMaterialTools.h>
 #include <VistaMath/VistaBoundingBox.h>
 #include <VistaOGLExt/VistaOGLUtils.h>
@@ -29,7 +32,14 @@ IrregularGrid::IrregularGrid(
     : DisplayNode(shape, settings, anchor)
     , mWidth(0)
     , mHeight(0)
-    , mVertexCount(0) {
+    , mVertexCount(0)
+    , mFBOColor(GL_TEXTURE_2D)
+    , mFBODepth(GL_TEXTURE_2D) {
+  mFullscreenQuadShader = VistaGLSLShader();
+  mFullscreenQuadShader.InitVertexShaderFromString(FULLSCREEN_QUAD_VERT);
+  mFullscreenQuadShader.InitGeometryShaderFromString(FULLSCREEN_QUAD_GEOM);
+  mFullscreenQuadShader.InitFragmentShaderFromString(FULLSCREEN_QUAD_FRAG);
+  mFullscreenQuadShader.Link();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -39,7 +49,7 @@ void IrregularGrid::setDepthTexture(float* texture, int width, int height) {
   mHeight = height;
   DisplayNode::setDepthTexture(texture, width, height);
   mSurfaces.emplace(texture, width, height);
-  //mSurfaces->print();
+  // mSurfaces->print();
   createBuffers();
 }
 
@@ -95,26 +105,69 @@ bool IrregularGrid::DoImpl() {
   mShader.SetUniform(mShader.GetUniformLocation("uInside"), mInside);
   glUniform2ui(mShader.GetUniformLocation("uResolution"), mWidth, mHeight);
 
+  int width, height;
+  GetVistaSystem()
+      ->GetDisplayManager()
+      ->GetCurrentRenderInfo()
+      ->m_pViewport->GetViewportProperties()
+      ->GetSize(width, height);
+
+  // TODO Only do this again, if width or height changed
+  mFBO.Bind();
+  mFBOColor.UploadTexture(width, height, 0, false, GL_RGBA, GL_UNSIGNED_BYTE);
+  mFBOColor.SetMagFilter(GL_LINEAR);
+  mFBOColor.SetMinFilter(GL_LINEAR);
+  mFBO.Attach(&mFBOColor, GL_COLOR_ATTACHMENT0);
+  mFBOColor.Unbind();
+  mFBODepth.Bind();
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, width, height, 0, GL_DEPTH_STENCIL,
+      GL_UNSIGNED_INT_24_8, 0);
+  mFBODepth.SetMagFilter(GL_LINEAR);
+  mFBODepth.SetMinFilter(GL_LINEAR);
+  mFBO.Attach(&mFBODepth, GL_DEPTH_STENCIL_ATTACHMENT);
+  mFBODepth.Unbind();
+  glClearColor(.0f, .0f, .0f, .0f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+
   mTexture.Bind(GL_TEXTURE0);
   mDepthTexture.Bind(GL_TEXTURE1);
 
+  // Draw first pass.
   glPushAttrib(GL_ENABLE_BIT);
   glEnable(GL_CULL_FACE);
   glCullFace(GL_BACK);
   glEnable(GL_BLEND);
-  glDisable(GL_DEPTH_TEST);
-  glEnable(GL_PROGRAM_POINT_SIZE);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glEnable(GL_DEPTH_TEST);
+  glBlendFunc(GL_SRC_ALPHA, GL_ZERO);
 
-  // Draw.
   mVAO.Bind();
   glDrawArrays(GL_POINTS, 0, mVertexCount);
   mVAO.Release();
 
-  // Clean up.
   mTexture.Unbind(GL_TEXTURE0);
-  mTexture.Unbind(GL_TEXTURE1);
+  mDepthTexture.Unbind(GL_TEXTURE1);
   mShader.Release();
+
+  glPopAttrib();
+
+  mFBO.Release();
+
+  // Draw second pass.
+  mFullscreenQuadShader.Bind();
+  mFullscreenQuadShader.SetUniform(mFullscreenQuadShader.GetUniformLocation("uTexColor"), 0);
+
+  mFBOColor.Bind(GL_TEXTURE0);
+
+  glPushAttrib(GL_ENABLE_BIT);
+  glDisable(GL_CULL_FACE);
+  glDisable(GL_DEPTH_TEST);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+  glDrawArrays(GL_POINTS, 0, 1);
+
+  mFBOColor.Unbind(GL_TEXTURE0);
+  mFullscreenQuadShader.Release();
 
   glPopAttrib();
 

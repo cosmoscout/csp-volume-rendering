@@ -11,6 +11,63 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const std::string FULLSCREEN_QUAD_VERT = R"(
+#version 330
+
+void main() {
+}
+)";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const std::string FULLSCREEN_QUAD_GEOM = R"(
+#version 330 core
+
+layout(points) in;
+layout(triangle_strip, max_vertices = 4) out;
+
+out vec2 vTexCoords;
+
+void main()
+{
+  gl_Position = vec4( 1.0, 1.0, 0.5, 1.0 );
+  vTexCoords = vec2( 1.0, 1.0 );
+  EmitVertex();
+
+  gl_Position = vec4(-1.0, 1.0, 0.5, 1.0 );
+  vTexCoords = vec2( 0.0, 1.0 );
+  EmitVertex();
+
+  gl_Position = vec4( 1.0,-1.0, 0.5, 1.0 );
+  vTexCoords = vec2( 1.0, 0.0 );
+  EmitVertex();
+
+  gl_Position = vec4(-1.0,-1.0, 0.5, 1.0 );
+  vTexCoords = vec2( 0.0, 0.0 );
+  EmitVertex();
+
+  EndPrimitive();
+}
+)";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+const std::string FULLSCREEN_QUAD_FRAG = R"(
+#version 330
+
+in vec2 vTexCoords;
+
+out vec4 oColor;
+
+uniform sampler2D uTexColor;
+
+void main() {
+  oColor = texture(uTexColor, vTexCoords);
+}
+)";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const std::string PASS_VERT = R"(
 #version 330
 
