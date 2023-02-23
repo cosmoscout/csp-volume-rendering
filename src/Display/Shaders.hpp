@@ -11,6 +11,88 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const std::string HOLE_FILLING_FRAG = R"(
+#version 330
+uniform int uCurrentLevel;
+uniform sampler2D uHoleFillingTexture;
+uniform sampler2D uColorBuffer;
+uniform sampler2D uDepthBuffer;
+
+in vec2 vTexCoords;
+
+layout(pixel_center_integer) in vec4 gl_FragCoord;
+
+// write output
+layout(location=0) out vec4 oColor;
+
+void main() {
+  vec4 samples[4*4];
+  oColor = vec4(0);
+
+  if (uCurrentLevel == 0) {
+    ivec2 max_res = textureSize(sampler2D(uColorBuffer), 0);
+    for (int x=0; x<4; ++x) {
+      for (int y=0; y<4; ++y) {
+        ivec2 pos = clamp(ivec2(gl_FragCoord.xy*2) + ivec2(x-4/2+1, y-4/2+1), ivec2(0), max_res-1);
+        samples[x+y*4].rgb = texelFetch(uColorBuffer, pos, 0).rgb;
+        samples[x+y*4].a = texelFetch(uDepthBuffer, pos, 0).r;
+      }
+    }
+  } else {
+    ivec2 max_res = textureSize(sampler2D(uHoleFillingTexture), uCurrentLevel-1);
+    for (int x=0; x<4; ++x) {
+      for (int y=0; y<4; ++y) {
+        ivec2 pos = clamp(ivec2(gl_FragCoord.xy*2) + ivec2(x-4/2+1, y-4/2+1), ivec2(0), max_res-1);
+        samples[x+y*4] = texelFetch(uHoleFillingTexture, pos, uCurrentLevel-1);
+      }
+    }
+  }
+
+  // count number of hole pixels
+  int hole_count = 0;
+
+  for (int i=0; i<4*4; ++i) {
+    if (samples[i].a == 1.0) ++hole_count;
+  }
+
+  // calculate average depth of none hole pixels
+  if (hole_count < 4*4) {
+    float average_depth = 0;
+    for (int i=0; i<4*4; ++i) {
+      average_depth += samples[i].a;
+    }
+
+    average_depth = (average_depth-hole_count) / (4*4-hole_count);
+
+    float max_depth = 1;
+    float weight = 0;
+    float weights[16] = float[16](0.4, 0.9, 0.9, 0.4,
+                         0.9, 1.8, 1.8, 0.9,
+                         0.9, 1.8, 1.8, 0.9,
+                         0.4, 0.9, 0.9, 0.4);
+    for (int i=0; i<4*4; ++i) {
+      // calculate average color of all none hole pixels with a depth larger or equal to average
+      if (samples[i].a != 1.0 && samples[i].a > average_depth-0.000001) {
+        max_depth = min(max_depth, samples[i].a);
+        oColor.rgb += samples[i].rgb * weights[i];
+        weight += weights[i];
+      }
+    }
+
+    // return color and average depth
+    if (weight > 0) {
+      oColor /= weight;
+    }
+
+    oColor.a = max_depth;
+  } else {
+    oColor = vec4(0, 0, 0, 0);
+  }
+}
+)";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const std::string FULLSCREEN_QUAD_VERT = R"(
 #version 330
 
@@ -60,9 +142,71 @@ in vec2 vTexCoords;
 out vec4 oColor;
 
 uniform sampler2D uTexColor;
+uniform sampler2D uTexDepth;
+uniform sampler2D uTexHoleFilling;
+
+vec2 get_epipolar_direction() {
+return normalize(vec2(1,1));
+  vec4 epipol = /*warp_matrix * */vec4(0, 0, -1, 0);
+  vec2 epi_dir = vec2(0);
+
+  if (abs(epipol.w) < 0.01) {
+    epipol.xy = 100*epipol.xy*0.5 + 0.5;
+    epi_dir = epipol.xy - vTexCoords;
+  } else if (epipol.w < 0) {
+    epipol /= epipol.w;
+    epipol.xy = epipol.xy*0.5 + 0.5;
+    epi_dir = epipol.xy - vTexCoords;
+  } else {
+    epipol /= epipol.w;
+    epipol.xy = epipol.xy*0.5 + 0.5;
+    epi_dir = vTexCoords - epipol.xy;
+  }
+
+  return normalize(epi_dir);
+}
+
+vec4 hole_filling_blur() {
+  const float step_size = 0.2;
+  const float max_level = 7;
+  vec2  epi_dir = get_epipolar_direction();
+  vec2  dirs[2] = vec2[2](
+    vec2( epi_dir.x,  epi_dir.y),
+    vec2(-epi_dir.x, -epi_dir.y)
+  );
+
+  float depth = 0.1;
+  float level = 6;
+
+  /*for (int i=0; i<dirs.length(); ++i) {
+    for (float l=0; l<=max_level; l+=step_size) {
+      vec2  p = vTexCoords - pow(2,l)*dirs[i]/uResolution;
+      float d = texelFetch(sampler2D(uDepthTexture), ivec2(p*uResolution), 0).x;
+
+      if (d < 1.0) {
+        if (d > depth+0.0001 || (abs(d-depth)<0.0001 && l<level)) {
+          level = l;
+          depth = d;
+        }
+        break;
+      }
+    }
+  }*/
+
+  if (depth == 0) {
+    return vec4(0.6, 0., 0.6, 1);
+  }
+
+  return vec4(textureLod(uTexHoleFilling, vTexCoords, level+1).rgb, 1);
+}
 
 void main() {
   oColor = texture(uTexColor, vTexCoords);
+    oColor = hole_filling_blur();
+
+  if (oColor.a == 0) {
+    oColor = hole_filling_blur();
+  }
 }
 )";
 

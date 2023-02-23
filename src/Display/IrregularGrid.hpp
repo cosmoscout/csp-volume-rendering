@@ -48,10 +48,15 @@ class IrregularGrid : public DisplayNode {
   VistaBufferObject      mVBO;
   size_t                 mVertexCount;
 
-  VistaGLSLShader        mFullscreenQuadShader;
-  VistaFramebufferObj    mFBO;
-  VistaTexture           mFBOColor;
-  VistaTexture           mFBODepth;
+  VistaGLSLShader     mFullscreenQuadShader;
+  VistaFramebufferObj mFBO;
+  VistaTexture        mFBOColor;
+  VistaTexture        mFBODepth;
+
+  VistaGLSLShader                  mHoleFillingShader;
+  const int                        mHoleFillingLevels = 6;
+  VistaTexture                     mHoleFillingTexture;
+  std::vector<VistaFramebufferObj> mHoleFillingFBOs;
 };
 
 } // namespace csp::volumerendering
