@@ -62,6 +62,8 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   /// Enables drawing the depth data as grayscale instead of the color image.
   void setDrawDepth(bool drawDepth);
 
+  void setHoleFillingLevel(int value);
+
   virtual glm::dvec3 getRadii() const;
 
   glm::mat4 getVistaModelView() const;
@@ -88,6 +90,8 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   bool      mInside;
   bool      mUseDepth  = true;
   bool      mDrawDepth = false;
+
+  int mHoleFillingLevel = -1;
 
   bool mShaderDirty;
 

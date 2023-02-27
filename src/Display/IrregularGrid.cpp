@@ -41,6 +41,7 @@ IrregularGrid::IrregularGrid(
   mFullscreenQuadShader.InitGeometryShaderFromString(FULLSCREEN_QUAD_GEOM);
   mFullscreenQuadShader.InitFragmentShaderFromString(FULLSCREEN_QUAD_FRAG);
   mFullscreenQuadShader.Link();
+
   mHoleFillingShader.InitVertexShaderFromString(FULLSCREEN_QUAD_VERT);
   mHoleFillingShader.InitGeometryShaderFromString(FULLSCREEN_QUAD_GEOM);
   mHoleFillingShader.InitFragmentShaderFromString(HOLE_FILLING_FRAG);
@@ -160,7 +161,9 @@ bool IrregularGrid::DoImpl() {
   // Hole filling.
   mHoleFillingTexture.UploadTexture(width / 2, height / 2, 0, false, GL_RGBA, GL_UNSIGNED_BYTE);
   mHoleFillingTexture.SetMagFilter(GL_LINEAR);
-  mHoleFillingTexture.SetMinFilter(GL_LINEAR);
+  mHoleFillingTexture.SetMinFilter(GL_LINEAR_MIPMAP_NEAREST);
+  mHoleFillingTexture.SetWrapS(GL_CLAMP_TO_BORDER);
+  mHoleFillingTexture.SetWrapT(GL_CLAMP_TO_BORDER);
   mHoleFillingTexture.GenerateMipmaps();
 
   for (int i = 0; i < mHoleFillingLevels; ++i) {
@@ -208,6 +211,7 @@ bool IrregularGrid::DoImpl() {
   mFullscreenQuadShader.SetUniform(mFullscreenQuadShader.GetUniformLocation("uTexColor"), 0);
   mFullscreenQuadShader.SetUniform(mFullscreenQuadShader.GetUniformLocation("uTexDepth"), 1);
   mFullscreenQuadShader.SetUniform(mFullscreenQuadShader.GetUniformLocation("uTexHoleFilling"), 2);
+  mFullscreenQuadShader.SetUniform(mFullscreenQuadShader.GetUniformLocation("uHoleFillingLevel"), mHoleFillingLevel);
 
   mFBOColor.Bind(GL_TEXTURE0);
   mFBODepth.Bind(GL_TEXTURE1);

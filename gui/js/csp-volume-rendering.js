@@ -27,6 +27,8 @@
       CosmoScout.gui.initSlider("volumeRendering.setSunStrength", 0, 10, 0.1, [1]);
       CosmoScout.gui.initSlider("volumeRendering.setAmbientStrength", 0, 1, 0.01, [0.5]);
 
+      CosmoScout.gui.initSlider("volumeRendering.setHoleFillingLevel", -2, 10, 1, [0]);
+
       CosmoScout.gui.initSlider("volumeRendering.setRotationYaw", 0, 360, 1, [0]);
       CosmoScout.gui.initSlider("volumeRendering.setRotationPitch", 0, 360, 1, [0]);
       CosmoScout.gui.initSlider("volumeRendering.setRotationRoll", 0, 360, 1, [0]);

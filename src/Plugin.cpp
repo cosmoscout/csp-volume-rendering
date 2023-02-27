@@ -508,6 +508,7 @@ constexpr std::array<Plugin::Setting<int>, SETTINGS_COUNT<int>> Plugin::Setting<
           pluginSettings.mRendering.mResolution, &Renderer::setResolution, &Plugin::setResolution},
       Setting<int>{"setAOSamples", "Sets the number of ambient occlusion samples to use.",
           pluginSettings.mRendering.mAOSamples, &Renderer::setAOSamples},
+      Setting<int>{"setHoleFillingLevel", "", pluginSettings.mDisplay.mHoleFilling, {},&Plugin::setHoleFillingLevel},
   };
   return settings;
 }
@@ -643,6 +644,14 @@ void csp::volumerendering::Plugin::setDepthData(bool value) {
 void csp::volumerendering::Plugin::setDrawDepth(bool value) {
   for (auto const& node : mDisplayNodes) {
     node.second->setDrawDepth(value);
+  }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void Plugin::setHoleFillingLevel(int value) {
+  for (auto const& node : mDisplayNodes) {
+    node.second->setHoleFillingLevel(value);
   }
 }
 

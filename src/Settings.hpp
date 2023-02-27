@@ -69,6 +69,7 @@ struct Settings {
     cs::utils::DefaultProperty<bool>        mReuseImages{false};
     cs::utils::DefaultProperty<bool>        mDepthData{true};
     cs::utils::DefaultProperty<bool>        mDrawDepth{false};
+    cs::utils::DefaultProperty<int>        mHoleFilling{0};
     cs::utils::DefaultProperty<DisplayMode> mDisplayMode{DisplayMode::eMesh};
   } mDisplay;
 

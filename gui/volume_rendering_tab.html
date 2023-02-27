@@ -223,23 +223,32 @@
     </div>
     <div class="section-body collapse container-fluid" id="collapseVolume-display"
          aria-labelledby="headingVolume-display" data-parent="#volumeRenderingTab-accordion">
-      <div class="row">
-        <div class="col-5">
-          Display method
+        <div class="row">
+            <div class="col-5">
+                Hole Filling Level
+            </div>
+            <div class="col-7">
+                <div data-callback="volumeRendering.setHoleFillingLevel">
+                </div>
+            </div>
         </div>
-        <div class="col-7">
-          <label class="radiolabel">
-            <input name="display_method" type="radio" data-callback="volumeRendering.setDisplayMode0" checked />
-            <span>Mesh</span>
-          </label>
+        <div class="row">
+            <div class="col-5">
+                Display method
+            </div>
+            <div class="col-7">
+                <label class="radiolabel">
+                    <input name="display_method" type="radio" data-callback="volumeRendering.setDisplayMode0" checked />
+                    <span>Mesh</span>
+                </label>
+            </div>
+            <div class="col-7 offset-5">
+                <label class="radiolabel">
+                    <input name="display_method" type="radio" data-callback="volumeRendering.setDisplayMode1" />
+                    <span>Points</span>
+                </label>
+            </div>
         </div>
-        <div class="col-7 offset-5">
-          <label class="radiolabel">
-            <input name="display_method" type="radio" data-callback="volumeRendering.setDisplayMode1" />
-            <span>Points</span>
-          </label>
-        </div>
-      </div>
     </div>
   </div>
 

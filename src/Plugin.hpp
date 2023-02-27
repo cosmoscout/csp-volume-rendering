@@ -65,7 +65,7 @@ constexpr int SETTINGS_COUNT = 0;
 template <>
 inline constexpr int SETTINGS_COUNT<bool> = 12;
 template <>
-inline constexpr int SETTINGS_COUNT<int> = 3;
+inline constexpr int SETTINGS_COUNT<int> = 4;
 template <>
 inline constexpr int SETTINGS_COUNT<float> = 7;
 template <>
@@ -258,6 +258,7 @@ class Plugin : public cs::core::PluginBase {
   void setUseMaxDepth(bool value);
   void setDepthData(bool value);
   void setDrawDepth(bool value);
+  void setHoleFillingLevel(int value);
   void setScalar(std::string const& value);
   void setDisplayMode(DisplayMode value);
 

@@ -52,7 +52,7 @@ void main() {
   int hole_count = 0;
 
   for (int i=0; i<4*4; ++i) {
-    if (samples[i].a == 1.0) ++hole_count;
+    if (samples[i].a >= 1.0) ++hole_count;
   }
 
   // calculate average depth of none hole pixels
@@ -86,7 +86,7 @@ void main() {
 
     oColor.a = max_depth;
   } else {
-    oColor = vec4(0, 0, 0, 0);
+    oColor = vec4(0, 0, 0, 1);
   }
 }
 )";
@@ -144,6 +144,7 @@ out vec4 oColor;
 uniform sampler2D uTexColor;
 uniform sampler2D uTexDepth;
 uniform sampler2D uTexHoleFilling;
+uniform int uHoleFillingLevel;
 
 vec2 get_epipolar_direction() {
 return normalize(vec2(1,1));
@@ -176,7 +177,7 @@ vec4 hole_filling_blur() {
   );
 
   float depth = 0.1;
-  float level = 6;
+  float level = uHoleFillingLevel >= 0 ? uHoleFillingLevel - 1 : 2;
 
   /*for (int i=0; i<dirs.length(); ++i) {
     for (float l=0; l<=max_level; l+=step_size) {
@@ -196,16 +197,22 @@ vec4 hole_filling_blur() {
   if (depth == 0) {
     return vec4(0.6, 0., 0.6, 1);
   }
+  vec4 holeData = textureLod(uTexHoleFilling, vTexCoords, level+1);
 
-  return vec4(textureLod(uTexHoleFilling, vTexCoords, level+1).rgb, 1);
+  return vec4(holeData.rgb, holeData.a >= 1 ? 0 : 1);
 }
 
 void main() {
-  oColor = texture(uTexColor, vTexCoords);
+  if (uHoleFillingLevel < 0) {
+    oColor = texture(uTexColor, vTexCoords);
+  } else {
     oColor = hole_filling_blur();
+  }
 
-  if (oColor.a == 0) {
-    oColor = hole_filling_blur();
+  if (uHoleFillingLevel < -1) {
+    if (oColor.a == 0) {
+      oColor = hole_filling_blur();
+    }
   }
 }
 )";
