@@ -39,10 +39,14 @@ class IrregularGrid : public DisplayNode {
 
  private:
   void createBuffers();
+  void createFBOs(int width, int height);
 
   std::optional<SurfaceDetectionBuffer> mSurfaces;
   unsigned int                          mWidth;
   unsigned int                          mHeight;
+
+  int mScreenWidth  = 0;
+  int mScreenHeight = 0;
 
   VistaVertexArrayObject mVAO;
   VistaBufferObject      mVBO;
@@ -56,6 +60,7 @@ class IrregularGrid : public DisplayNode {
   VistaGLSLShader                  mHoleFillingShader;
   const int                        mHoleFillingLevels = 6;
   VistaTexture                     mHoleFillingTexture;
+  VistaTexture                     mHoleFillingDepth;
   std::vector<VistaFramebufferObj> mHoleFillingFBOs;
 };
 

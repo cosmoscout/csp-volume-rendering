@@ -15,6 +15,7 @@ const std::string HOLE_FILLING_FRAG = R"(
 #version 330
 uniform int uCurrentLevel;
 uniform sampler2D uHoleFillingTexture;
+uniform sampler2D uHoleFillingDepth;
 uniform sampler2D uColorBuffer;
 uniform sampler2D uDepthBuffer;
 
@@ -24,9 +25,11 @@ layout(pixel_center_integer) in vec4 gl_FragCoord;
 
 // write output
 layout(location=0) out vec4 oColor;
+out float gl_FragDepth;
 
 void main() {
   vec4 samples[4*4];
+  float dSamples[4*4];
   oColor = vec4(0);
 
   if (uCurrentLevel == 0) {
@@ -34,8 +37,8 @@ void main() {
     for (int x=0; x<4; ++x) {
       for (int y=0; y<4; ++y) {
         ivec2 pos = clamp(ivec2(gl_FragCoord.xy*2) + ivec2(x-4/2+1, y-4/2+1), ivec2(0), max_res-1);
-        samples[x+y*4].rgb = texelFetch(uColorBuffer, pos, 0).rgb;
-        samples[x+y*4].a = texelFetch(uDepthBuffer, pos, 0).r;
+        samples[x+y*4] = texelFetch(uColorBuffer, pos, 0);
+        dSamples[x+y*4] = texelFetch(uDepthBuffer, pos, 0).r;
       }
     }
   } else {
@@ -44,6 +47,7 @@ void main() {
       for (int y=0; y<4; ++y) {
         ivec2 pos = clamp(ivec2(gl_FragCoord.xy*2) + ivec2(x-4/2+1, y-4/2+1), ivec2(0), max_res-1);
         samples[x+y*4] = texelFetch(uHoleFillingTexture, pos, uCurrentLevel-1);
+        dSamples[x+y*4] = texelFetch(uHoleFillingDepth, pos, uCurrentLevel-1).r;
       }
     }
   }
@@ -52,14 +56,14 @@ void main() {
   int hole_count = 0;
 
   for (int i=0; i<4*4; ++i) {
-    if (samples[i].a >= 1.0) ++hole_count;
+    if (dSamples[i] >= 1.0) ++hole_count;
   }
 
   // calculate average depth of none hole pixels
-  if (hole_count < 4*4) {
+  if (hole_count < 16) {
     float average_depth = 0;
     for (int i=0; i<4*4; ++i) {
-      average_depth += samples[i].a;
+      average_depth += dSamples[i];
     }
 
     average_depth = (average_depth-hole_count) / (4*4-hole_count);
@@ -72,9 +76,9 @@ void main() {
                          0.4, 0.9, 0.9, 0.4);
     for (int i=0; i<4*4; ++i) {
       // calculate average color of all none hole pixels with a depth larger or equal to average
-      if (samples[i].a != 1.0 && samples[i].a > average_depth-0.000001) {
-        max_depth = min(max_depth, samples[i].a);
-        oColor.rgb += samples[i].rgb * weights[i];
+      if (dSamples[i] != 1.0 && dSamples[i] > average_depth-0.000001) {
+        max_depth = min(max_depth, dSamples[i]);
+        oColor += samples[i] * weights[i];
         weight += weights[i];
       }
     }
@@ -84,9 +88,10 @@ void main() {
       oColor /= weight;
     }
 
-    oColor.a = max_depth;
+    gl_FragDepth = max_depth;
   } else {
-    oColor = vec4(0, 0, 0, 1);
+    oColor = vec4(0, 0, 0, 0);
+    gl_FragDepth = 1;
   }
 }
 )";
@@ -177,7 +182,7 @@ vec4 hole_filling_blur() {
   );
 
   float depth = 0.1;
-  float level = uHoleFillingLevel >= 0 ? uHoleFillingLevel - 1 : 2;
+  float level = uHoleFillingLevel >= 0 ? uHoleFillingLevel - 1 : 1;
 
   /*for (int i=0; i<dirs.length(); ++i) {
     for (float l=0; l<=max_level; l+=step_size) {
@@ -199,7 +204,7 @@ vec4 hole_filling_blur() {
   }
   vec4 holeData = textureLod(uTexHoleFilling, vTexCoords, level+1);
 
-  return vec4(holeData.rgb, holeData.a >= 1 ? 0 : 1);
+  return holeData;
 }
 
 void main() {

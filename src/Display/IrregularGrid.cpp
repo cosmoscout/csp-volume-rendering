@@ -36,6 +36,7 @@ IrregularGrid::IrregularGrid(
     , mFBOColor(GL_TEXTURE_2D)
     , mFBODepth(GL_TEXTURE_2D)
     , mHoleFillingTexture(GL_TEXTURE_2D)
+    , mHoleFillingDepth(GL_TEXTURE_2D)
     , mHoleFillingFBOs(mHoleFillingLevels) {
   mFullscreenQuadShader.InitVertexShaderFromString(FULLSCREEN_QUAD_VERT);
   mFullscreenQuadShader.InitGeometryShaderFromString(FULLSCREEN_QUAD_GEOM);
@@ -118,20 +119,14 @@ bool IrregularGrid::DoImpl() {
       ->m_pViewport->GetViewportProperties()
       ->GetSize(width, height);
 
+  if (width != mScreenWidth || height != mScreenHeight) {
+    createFBOs(width, height);
+    mScreenWidth  = width;
+    mScreenHeight = height;
+  }
+
   // TODO Only do this again, if width or height changed
   mFBO.Bind();
-  mFBOColor.UploadTexture(width, height, 0, false, GL_RGBA, GL_UNSIGNED_BYTE);
-  mFBOColor.SetMagFilter(GL_LINEAR);
-  mFBOColor.SetMinFilter(GL_LINEAR);
-  mFBO.Attach(&mFBOColor, GL_COLOR_ATTACHMENT0);
-  mFBOColor.Unbind();
-  mFBODepth.Bind();
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, width, height, 0, GL_DEPTH_STENCIL,
-      GL_UNSIGNED_INT_24_8, 0);
-  mFBODepth.SetMagFilter(GL_LINEAR);
-  mFBODepth.SetMinFilter(GL_LINEAR);
-  mFBO.Attach(&mFBODepth, GL_DEPTH_STENCIL_ATTACHMENT);
-  mFBODepth.Unbind();
   glClearColor(.0f, .0f, .0f, .0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
@@ -159,32 +154,21 @@ bool IrregularGrid::DoImpl() {
   mFBO.Release();
 
   // Hole filling.
-  mHoleFillingTexture.UploadTexture(width / 2, height / 2, 0, false, GL_RGBA, GL_UNSIGNED_BYTE);
-  mHoleFillingTexture.SetMagFilter(GL_LINEAR);
-  mHoleFillingTexture.SetMinFilter(GL_LINEAR_MIPMAP_NEAREST);
-  mHoleFillingTexture.SetWrapS(GL_CLAMP_TO_BORDER);
-  mHoleFillingTexture.SetWrapT(GL_CLAMP_TO_BORDER);
-  mHoleFillingTexture.GenerateMipmaps();
-
-  for (int i = 0; i < mHoleFillingLevels; ++i) {
-    mHoleFillingFBOs[i].Bind();
-    mHoleFillingFBOs[i].Attach(&mHoleFillingTexture, GL_COLOR_ATTACHMENT0, i);
-    mHoleFillingFBOs[i].Release();
-  }
-  mHoleFillingTexture.Unbind();
-
   mHoleFillingShader.Bind();
   mHoleFillingShader.SetUniform(mHoleFillingShader.GetUniformLocation("uColorBuffer"), 0);
   mHoleFillingShader.SetUniform(mHoleFillingShader.GetUniformLocation("uDepthBuffer"), 1);
   mHoleFillingShader.SetUniform(mHoleFillingShader.GetUniformLocation("uHoleFillingTexture"), 2);
+  mHoleFillingShader.SetUniform(mHoleFillingShader.GetUniformLocation("uHoleFillingDepth"), 3);
 
   mFBOColor.Bind(GL_TEXTURE0);
   mFBODepth.Bind(GL_TEXTURE1);
   mHoleFillingTexture.Bind(GL_TEXTURE2);
+  mHoleFillingDepth.Bind(GL_TEXTURE3);
 
-  glPushAttrib(GL_ENABLE_BIT | GL_VIEWPORT_BIT);
+  glPushAttrib(GL_ENABLE_BIT | GL_VIEWPORT_BIT | GL_DEPTH_BUFFER_BIT);
   glDisable(GL_CULL_FACE);
-  glDisable(GL_DEPTH_TEST);
+  glEnable(GL_DEPTH_TEST);
+  glDepthFunc(GL_ALWAYS);
 
   int mipWidth  = width / 2;
   int mipHeight = height / 2;
@@ -194,7 +178,7 @@ bool IrregularGrid::DoImpl() {
     mHoleFillingFBOs[i].Bind();
     glViewport(0, 0, mipWidth, mipHeight);
     glClearColor(.0f, .0f, .0f, .0f);
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glDrawArrays(GL_POINTS, 0, 1);
     mHoleFillingFBOs[i].Release();
 
@@ -211,13 +195,14 @@ bool IrregularGrid::DoImpl() {
   mFullscreenQuadShader.SetUniform(mFullscreenQuadShader.GetUniformLocation("uTexColor"), 0);
   mFullscreenQuadShader.SetUniform(mFullscreenQuadShader.GetUniformLocation("uTexDepth"), 1);
   mFullscreenQuadShader.SetUniform(mFullscreenQuadShader.GetUniformLocation("uTexHoleFilling"), 2);
-  mFullscreenQuadShader.SetUniform(mFullscreenQuadShader.GetUniformLocation("uHoleFillingLevel"), mHoleFillingLevel);
+  mFullscreenQuadShader.SetUniform(
+      mFullscreenQuadShader.GetUniformLocation("uHoleFillingLevel"), mHoleFillingLevel);
 
   mFBOColor.Bind(GL_TEXTURE0);
   mFBODepth.Bind(GL_TEXTURE1);
   mHoleFillingTexture.Bind(GL_TEXTURE2);
 
-  glPushAttrib(GL_ENABLE_BIT);
+  glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT);
   glDisable(GL_CULL_FACE);
   glDisable(GL_DEPTH_TEST);
   glEnable(GL_BLEND);
@@ -253,6 +238,50 @@ void IrregularGrid::createBuffers() {
 
   mVAO.Release();
   mVBO.Release();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void IrregularGrid::createFBOs(int width, int height) {
+  mFBO.Bind();
+  mFBOColor.UploadTexture(width, height, 0, false, GL_RGBA, GL_UNSIGNED_BYTE);
+  mFBOColor.SetMagFilter(GL_LINEAR);
+  mFBOColor.SetMinFilter(GL_LINEAR);
+  mFBO.Attach(&mFBOColor, GL_COLOR_ATTACHMENT0);
+  mFBOColor.Unbind();
+  mFBODepth.Bind();
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, width, height, 0, GL_DEPTH_STENCIL,
+      GL_UNSIGNED_INT_24_8, 0);
+  mFBODepth.SetMagFilter(GL_LINEAR);
+  mFBODepth.SetMinFilter(GL_LINEAR);
+  mFBO.Attach(&mFBODepth, GL_DEPTH_STENCIL_ATTACHMENT);
+  mFBODepth.Unbind();
+  mFBO.Release();
+
+  mHoleFillingTexture.UploadTexture(width / 2, height / 2, 0, false, GL_RGBA, GL_UNSIGNED_BYTE);
+  mHoleFillingTexture.SetMagFilter(GL_LINEAR);
+  mHoleFillingTexture.SetMinFilter(GL_LINEAR_MIPMAP_NEAREST);
+  mHoleFillingTexture.SetWrapS(GL_CLAMP_TO_BORDER);
+  mHoleFillingTexture.SetWrapT(GL_CLAMP_TO_BORDER);
+  mHoleFillingTexture.GenerateMipmaps();
+
+  mHoleFillingDepth.Bind();
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, width / 2, height / 2, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+  VistaOGLUtils::CheckForOGLError(__FILE__, __LINE__);
+  mHoleFillingDepth.SetMagFilter(GL_LINEAR);
+  mHoleFillingDepth.SetMinFilter(GL_LINEAR_MIPMAP_NEAREST);
+  mHoleFillingTexture.SetWrapS(GL_CLAMP_TO_BORDER);
+  mHoleFillingTexture.SetWrapT(GL_CLAMP_TO_BORDER);
+  mHoleFillingDepth.GenerateMipmaps();
+  mHoleFillingDepth.Unbind();
+
+  for (int i = 0; i < mHoleFillingLevels; ++i) {
+    mHoleFillingFBOs[i].Bind();
+    mHoleFillingFBOs[i].Attach(&mHoleFillingTexture, GL_COLOR_ATTACHMENT0, i);
+    mHoleFillingFBOs[i].Attach(&mHoleFillingDepth, GL_DEPTH_ATTACHMENT, i);
+    mHoleFillingFBOs[i].Release();
+  }
+  mHoleFillingTexture.Unbind();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
