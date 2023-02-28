@@ -153,6 +153,15 @@ uniform int uMaxLevel;
 uniform int uHoleFillingLevel;
 uniform vec2 uResolution;
 
+vec3 heat(float v) {
+  float value = 1.0-v;
+  return (0.5+0.5*smoothstep(0.0, 0.1, value))*vec3(
+    smoothstep(0.5, 0.3, value),
+    value < 0.3 ? smoothstep(0.0, 0.3, value) : smoothstep(1.0, 0.6, value),
+    smoothstep(0.4, 0.6, value)
+  );
+}
+
 vec2 get_epipolar_direction() {
   vec4 epipol = /*warp_matrix * */vec4(0, 0, -1, 0);
   vec2 epi_dir = vec2(0);
@@ -202,6 +211,10 @@ vec4 hole_filling_blur() {
         break;
       }
     }
+  }
+
+  if (uHoleFillingLevel == -3) {
+    return vec4(heat(level / uMaxLevel), 1);
   }
 
   if (depth == 0) {
