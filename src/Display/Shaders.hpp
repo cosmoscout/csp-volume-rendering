@@ -149,10 +149,11 @@ out vec4 oColor;
 uniform sampler2D uTexColor;
 uniform sampler2D uTexDepth;
 uniform sampler2D uTexHoleFilling;
+uniform int uMaxLevel;
 uniform int uHoleFillingLevel;
+uniform vec2 uResolution;
 
 vec2 get_epipolar_direction() {
-return normalize(vec2(1,1));
   vec4 epipol = /*warp_matrix * */vec4(0, 0, -1, 0);
   vec2 epi_dir = vec2(0);
 
@@ -169,40 +170,44 @@ return normalize(vec2(1,1));
     epi_dir = vTexCoords - epipol.xy;
   }
 
+  epi_dir = vec2(1, 0);
   return normalize(epi_dir);
 }
 
 vec4 hole_filling_blur() {
   const float step_size = 0.2;
-  const float max_level = 7;
   vec2  epi_dir = get_epipolar_direction();
   vec2  dirs[2] = vec2[2](
     vec2( epi_dir.x,  epi_dir.y),
     vec2(-epi_dir.x, -epi_dir.y)
   );
 
-  float depth = 0.1;
-  float level = uHoleFillingLevel >= 0 ? uHoleFillingLevel - 1 : 1;
+  if (uHoleFillingLevel >= 0) {
+    return textureLod(uTexHoleFilling, vTexCoords, uHoleFillingLevel);
+  }
 
-  /*for (int i=0; i<dirs.length(); ++i) {
-    for (float l=0; l<=max_level; l+=step_size) {
+  float depth = 0;
+  float level = uMaxLevel;
+
+  for (int i=0; i<dirs.length(); ++i) {
+    for (float l=0; l<uMaxLevel; l+=step_size) {
       vec2  p = vTexCoords - pow(2,l)*dirs[i]/uResolution;
-      float d = texelFetch(sampler2D(uDepthTexture), ivec2(p*uResolution), 0).x;
+      float d = texelFetch(uTexDepth, ivec2(p*uResolution), 0).x;
 
       if (d < 1.0) {
         if (d > depth+0.0001 || (abs(d-depth)<0.0001 && l<level)) {
-          level = l;
+          level = l + 1;
           depth = d;
         }
         break;
       }
     }
-  }*/
+  }
 
   if (depth == 0) {
-    return vec4(0.6, 0., 0.6, 1);
+    return textureLod(uTexHoleFilling, vTexCoords, uMaxLevel);
   }
-  vec4 holeData = textureLod(uTexHoleFilling, vTexCoords, level+1);
+  vec4 holeData = textureLod(uTexHoleFilling, vTexCoords, min(level, uMaxLevel));
 
   return holeData;
 }

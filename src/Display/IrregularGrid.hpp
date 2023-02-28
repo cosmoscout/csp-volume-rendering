@@ -58,7 +58,7 @@ class IrregularGrid : public DisplayNode {
   VistaTexture        mFBODepth;
 
   VistaGLSLShader                  mHoleFillingShader;
-  const int                        mHoleFillingLevels = 6;
+  const int                        mHoleFillingLevels = 4;
   VistaTexture                     mHoleFillingTexture;
   VistaTexture                     mHoleFillingDepth;
   std::vector<VistaFramebufferObj> mHoleFillingFBOs;

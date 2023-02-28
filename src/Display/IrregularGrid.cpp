@@ -188,6 +188,10 @@ bool IrregularGrid::DoImpl() {
 
   glPopAttrib();
 
+  mFBOColor.Unbind(GL_TEXTURE0);
+  mFBODepth.Unbind(GL_TEXTURE1);
+  mHoleFillingTexture.Unbind(GL_TEXTURE2);
+  mHoleFillingDepth.Unbind(GL_TEXTURE3);
   mHoleFillingShader.Release();
 
   // Draw second pass.
@@ -196,7 +200,11 @@ bool IrregularGrid::DoImpl() {
   mFullscreenQuadShader.SetUniform(mFullscreenQuadShader.GetUniformLocation("uTexDepth"), 1);
   mFullscreenQuadShader.SetUniform(mFullscreenQuadShader.GetUniformLocation("uTexHoleFilling"), 2);
   mFullscreenQuadShader.SetUniform(
+      mFullscreenQuadShader.GetUniformLocation("uMaxLevel"), mHoleFillingLevels - 1);
+  mFullscreenQuadShader.SetUniform(
       mFullscreenQuadShader.GetUniformLocation("uHoleFillingLevel"), mHoleFillingLevel);
+  mFullscreenQuadShader.SetUniform(mFullscreenQuadShader.GetUniformLocation("uResolution"),
+      static_cast<float>(width), static_cast<float>(height));
 
   mFBOColor.Bind(GL_TEXTURE0);
   mFBODepth.Bind(GL_TEXTURE1);
@@ -260,16 +268,17 @@ void IrregularGrid::createFBOs(int width, int height) {
 
   mHoleFillingTexture.UploadTexture(width / 2, height / 2, 0, false, GL_RGBA, GL_UNSIGNED_BYTE);
   mHoleFillingTexture.SetMagFilter(GL_LINEAR);
-  mHoleFillingTexture.SetMinFilter(GL_LINEAR_MIPMAP_NEAREST);
+  mHoleFillingTexture.SetMinFilter(GL_LINEAR_MIPMAP_LINEAR);
   mHoleFillingTexture.SetWrapS(GL_CLAMP_TO_BORDER);
   mHoleFillingTexture.SetWrapT(GL_CLAMP_TO_BORDER);
   mHoleFillingTexture.GenerateMipmaps();
 
   mHoleFillingDepth.Bind();
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, width / 2, height / 2, 0, GL_DEPTH_COMPONENT, GL_FLOAT, 0);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, width / 2, height / 2, 0,
+      GL_DEPTH_COMPONENT, GL_FLOAT, 0);
   VistaOGLUtils::CheckForOGLError(__FILE__, __LINE__);
   mHoleFillingDepth.SetMagFilter(GL_LINEAR);
-  mHoleFillingDepth.SetMinFilter(GL_LINEAR_MIPMAP_NEAREST);
+  mHoleFillingDepth.SetMinFilter(GL_LINEAR_MIPMAP_LINEAR);
   mHoleFillingTexture.SetWrapS(GL_CLAMP_TO_BORDER);
   mHoleFillingTexture.SetWrapT(GL_CLAMP_TO_BORDER);
   mHoleFillingDepth.GenerateMipmaps();
