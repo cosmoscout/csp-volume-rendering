@@ -36,7 +36,8 @@ void VolumeDepth::commit() {
   ispc::VolumeDepth_set(getIE(), getParam<int>("depthMode", 0), getParam<bool>("shadows", false),
       getParam<int>("aoSamples", 0),
       getParam<float>("aoDistance", getParam<float>("aoRadius", 1e20f)),
-      getParam<float>("volumeSamplingRate", 1.f), filters.data(), (int32_t)filters.size());
+      getParam<float>("volumeSamplingRate", 1.f), filters.data(), (int32_t)filters.size(),
+      getParam<float>("minDepth", 0), getParam<float>("maxDepth", inf));
 }
 
 void* VolumeDepth::beginFrame(FrameBuffer*, World* world) {

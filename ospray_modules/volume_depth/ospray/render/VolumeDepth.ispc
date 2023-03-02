@@ -17,6 +17,9 @@ void VolumeDepth_renderSample(Renderer* uniform _self, FrameBuffer* uniform fb,
   varying LDSampler* uniform ldSampler = &ldSamplerObj;
   LDSampler_init(ldSampler, sample.sampleID.x + fb->size.x * sample.sampleID.y, sample.sampleID.z);
 
+  sample.ray.t = min(self->maxDepth, sample.ray.t);
+  sample.ray.t0 = max(self->minDepth, sample.ray.t0);
+
   uniform bool firstHit        = true;
   const float  originalRayTFar = sample.ray.t;
 
@@ -137,7 +140,8 @@ export void* uniform VolumeDepth_create(void* uniform cppE) {
 
 export void VolumeDepth_set(void* uniform _self, uniform int depthMode, uniform bool shadowsEnabled,
     uniform int aoSamples, uniform float aoRadius, uniform float volumeSamplingRate,
-    void* uniform scalarFilters, uniform int numScalarFilters) {
+    void* uniform scalarFilters, uniform int numScalarFilters, uniform float minDepth,
+    uniform float maxDepth) {
   uniform VolumeDepth* uniform self = (uniform VolumeDepth * uniform) _self;
 
   self->depthMode          = depthMode;
@@ -147,6 +151,8 @@ export void VolumeDepth_set(void* uniform _self, uniform int depthMode, uniform 
   self->volumeSamplingRate = volumeSamplingRate;
   self->scalarFilters      = (ScalarFilter*)scalarFilters;
   self->numScalarFilters   = numScalarFilters;
+  self->minDepth           = minDepth;
+  self->maxDepth           = maxDepth;
 }
 
 vec3f VolumeDepth_computeAO(const uniform VolumeDepth* uniform self, const FrameBuffer* uniform fb,
