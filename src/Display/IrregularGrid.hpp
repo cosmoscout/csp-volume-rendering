@@ -8,6 +8,7 @@
 #define CSP_VOLUME_RENDERING_IRREGULAR_GRID_HPP
 
 #include "DisplayNode.hpp"
+#include "RegularGridBuffers.hpp"
 #include "SurfaceDetectionBuffer.hpp"
 
 #include <VistaOGLExt/VistaBufferObject.h>
@@ -56,6 +57,9 @@ class IrregularGrid : public DisplayNode {
   VistaFramebufferObj mFBO;
   VistaTexture        mFBOColor;
   VistaTexture        mFBODepth;
+
+  VistaGLSLShader    mRegularGridShader;
+  RegularGridBuffers mRegularGrid;
 
   VistaGLSLShader                  mHoleFillingShader;
   const int                        mHoleFillingLevels = 4;

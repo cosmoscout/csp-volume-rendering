@@ -35,6 +35,7 @@ IrregularGrid::IrregularGrid(
     , mVertexCount(0)
     , mFBOColor(GL_TEXTURE_2D)
     , mFBODepth(GL_TEXTURE_2D)
+    , mRegularGrid(128)
     , mHoleFillingTexture(GL_TEXTURE_2D)
     , mHoleFillingDepth(GL_TEXTURE_2D)
     , mHoleFillingFBOs(mHoleFillingLevels) {
@@ -47,6 +48,10 @@ IrregularGrid::IrregularGrid(
   mHoleFillingShader.InitGeometryShaderFromString(FULLSCREEN_QUAD_GEOM);
   mHoleFillingShader.InitFragmentShaderFromString(HOLE_FILLING_FRAG);
   mHoleFillingShader.Link();
+
+  mRegularGridShader.InitVertexShaderFromString(BILLBOARD_VERT);
+  mRegularGridShader.InitFragmentShaderFromString(REGULAR_GRID_FRAG);
+  mRegularGridShader.Link();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -125,7 +130,6 @@ bool IrregularGrid::DoImpl() {
     mScreenHeight = height;
   }
 
-  // TODO Only do this again, if width or height changed
   mFBO.Bind();
   glClearColor(.0f, .0f, .0f, .0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -195,6 +199,52 @@ bool IrregularGrid::DoImpl() {
   mHoleFillingShader.Release();
 
   // Draw second pass.
+  glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+  glDisable(GL_CULL_FACE);
+  glDisable(GL_DEPTH_TEST);
+  glEnable(GL_BLEND);
+  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+  glEnable(GL_STENCIL_TEST);
+  glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+  glStencilFunc(GL_ALWAYS, 1, 0xFF);
+  glStencilMask(0xFF);
+  glClear(GL_STENCIL_BUFFER_BIT);
+
+  mRegularGridShader.Bind();
+  glUniformMatrix4fv(
+      mRegularGridShader.GetUniformLocation("uMatModelView"), 1, GL_FALSE, glm::value_ptr(matMV));
+  glUniformMatrix4fv(mRegularGridShader.GetUniformLocation("uMatProjection"), 1, GL_FALSE, glMatP.data());
+  glUniformMatrix4fv(
+      mRegularGridShader.GetUniformLocation("uMatTransform"), 1, GL_FALSE, glm::value_ptr(mTransform));
+  glUniformMatrix4fv(mRegularGridShader.GetUniformLocation("uMatRendererProjection"), 1, GL_FALSE,
+      glm::value_ptr(mRendererProjection));
+  glUniformMatrix4fv(mRegularGridShader.GetUniformLocation("uMatRendererProjectionInv"), 1, GL_FALSE,
+      glm::value_ptr(glm::inverse(mRendererProjection)));
+  glUniformMatrix4fv(
+      mRegularGridShader.GetUniformLocation("uMatRendererMVP"), 1, GL_FALSE, glm::value_ptr(mRendererMVP));
+  glUniformMatrix4fv(mRegularGridShader.GetUniformLocation("uMatRendererMVPInv"), 1, GL_FALSE,
+      glm::value_ptr(glm::inverse(mRendererMVP)));
+
+  mRegularGridShader.SetUniform(mRegularGridShader.GetUniformLocation("uTexture"), 0);
+  mRegularGridShader.SetUniform(mRegularGridShader.GetUniformLocation("uDepthTexture"), 1);
+  mRegularGridShader.SetUniform(mRegularGridShader.GetUniformLocation("uRadii"), static_cast<float>(mRadii[0]),
+      static_cast<float>(mRadii[0]), static_cast<float>(mRadii[0]));
+  mRegularGridShader.SetUniform(
+      mRegularGridShader.GetUniformLocation("uFarClip"), cs::utils::getCurrentFarClipDistance());
+  mRegularGridShader.SetUniform(mRegularGridShader.GetUniformLocation("uUseDepth"), mUseDepth);
+  mRegularGridShader.SetUniform(mRegularGridShader.GetUniformLocation("uDrawDepth"), mDrawDepth);
+  mRegularGridShader.SetUniform(mRegularGridShader.GetUniformLocation("uInside"), mInside);
+  glUniform2ui(mRegularGridShader.GetUniformLocation("uResolution"), mWidth, mHeight);
+
+  mTexture.Bind(GL_TEXTURE0);
+  mDepthTexture.Bind(GL_TEXTURE1);
+
+  mRegularGrid.Draw();
+  mRegularGridShader.Release();
+
+  glStencilFunc(mHoleFillingLevel == -3 ? GL_ALWAYS : GL_EQUAL, 1, 0xFF);
+  glStencilMask(0x00);
+
   mFullscreenQuadShader.Bind();
   mFullscreenQuadShader.SetUniform(mFullscreenQuadShader.GetUniformLocation("uTexColor"), 0);
   mFullscreenQuadShader.SetUniform(mFullscreenQuadShader.GetUniformLocation("uTexDepth"), 1);
@@ -209,12 +259,6 @@ bool IrregularGrid::DoImpl() {
   mFBOColor.Bind(GL_TEXTURE0);
   mFBODepth.Bind(GL_TEXTURE1);
   mHoleFillingTexture.Bind(GL_TEXTURE2);
-
-  glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT);
-  glDisable(GL_CULL_FACE);
-  glDisable(GL_DEPTH_TEST);
-  glEnable(GL_BLEND);
-  glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
   glDrawArrays(GL_POINTS, 0, 1);
 

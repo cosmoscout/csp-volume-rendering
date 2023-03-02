@@ -496,6 +496,28 @@ void main()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+const std::string REGULAR_GRID_FRAG = R"(
+#version 330
+
+uniform sampler2D uTexture;
+
+// inputs
+in vec2 vTexCoords;
+in vec3 vPosition;
+in float vDepth;
+
+layout(location = 0) out vec4 oColor;
+
+void main() {
+    vec4 color = texture(uTexture, vTexCoords);
+    if(color.a <= 0 || vDepth < 0) {
+      discard;
+    }
+}
+)";
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 const std::string BILLBOARD_VERT = R"(
 #version 330
 
