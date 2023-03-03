@@ -30,6 +30,12 @@
 #include <cmath>
 #include <exception>
 
+namespace {
+
+constexpr int LAYER_COUNT = 2;
+
+}
+
 namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -37,24 +43,34 @@ namespace csp::volumerendering {
 OSPRayRenderer::OSPRayRenderer(
     std::shared_ptr<DataManager> dataManager, VolumeStructure structure, VolumeShape shape)
     : Renderer(dataManager, structure, shape) {
+  mRenderFuture.resize(LAYER_COUNT);
+  mCache.mFrameBuffer.resize(LAYER_COUNT);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 OSPRayRenderer::~OSPRayRenderer() {
   mCache.mVolumes.clear();
-  mRenderFuture.reset();
+  mRenderFuture.clear();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 float OSPRayRenderer::getProgress() {
+  // Layers are rendered sequentially, so all layers with index lower than the currently rendering
+  // one are finished (1) and all layers with larger index have not started yet (0). This is why we
+  // can break after querying the one future, that is currently rendering.
   std::scoped_lock lock(mRenderFutureMutex);
-  if (mRenderFuture.has_value()) {
-    return mRenderFuture->progress();
-  } else {
-    return 1.f;
+  float            total = 0.f;
+  for (int i = 0; i < LAYER_COUNT; i++) {
+    if (mRenderFuture[i].has_value()) {
+      total += mRenderFuture[i]->progress();
+      break;
+    } else {
+      total += 1.f;
+    }
   }
+  return total / LAYER_COUNT;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -76,9 +92,11 @@ void OSPRayRenderer::preloadData(
 
 void OSPRayRenderer::cancelRendering() {
   std::scoped_lock lock(mRenderFutureMutex);
-  if (mRenderFuture.has_value()) {
-    mRenderFuture->cancel();
-    mRenderingCancelled = true;
+  for (int i = 0; i < LAYER_COUNT; i++) {
+    if (mRenderFuture[i].has_value()) {
+      mRenderFuture[i]->cancel();
+      mRenderingCancelled = true;
+    }
   }
 }
 
@@ -114,13 +132,13 @@ std::unique_ptr<Renderer::RenderedImage> OSPRayRenderer::getFrameImpl(
             dataState == mCache.mState.mDataState && volume.mLod == mCache.mState.mVolumeLod)) {
       mCache.mCamera = getCamera(1, cameraTransform);
     }
-    renderFrame(mCache.mWorld, mCache.mCamera.mOsprayCamera, std::move(maxDepth), parameters,
-        !(mCache.mState == state));
-    RenderedImage renderedImage(
-        mCache.mFrameBuffer, mCache.mCamera, volume.mHeight, parameters, cameraTransform);
-    renderedImage.setValid(!mRenderingCancelled);
+    std::unique_ptr<RenderedImage> renderedImage = std::make_unique<RenderedImage>(
+        mCache.mCamera, volume.mHeight, parameters, cameraTransform);
+    renderedImage = renderFrame(std::move(renderedImage), mCache.mWorld, mCache.mCamera,
+        std::move(maxDepth), parameters, !(mCache.mState == state));
+    renderedImage->setValid(!mRenderingCancelled);
     mCache.mState = state;
-    return std::make_unique<RenderedImage>(std::move(renderedImage));
+    return renderedImage;
   } catch (const std::exception&) { return {}; }
 }
 
@@ -157,7 +175,7 @@ OSPRayRenderer::Volume OSPRayRenderer::loadVolume(DataManager::State const& stat
   Volume                      volume;
   vtkSmartPointer<vtkDataSet> volumeData = mDataManager->getData(state, lod);
 
-  std::vector<Scalar>         scalars    = mDataManager->pScalars.get();
+  std::vector<Scalar> scalars = mDataManager->pScalars.get();
   scalars.insert(scalars.begin(), state.mScalar);
 
   switch (mStructure) {
@@ -199,7 +217,7 @@ OSPRayRenderer::Volume OSPRayRenderer::loadVolume(DataManager::State const& stat
   case VolumeStructure::eInvalid:
     throw std::runtime_error("Trying to load volume with unknown/invalid structure!");
   }
-  volume.mLod    = lod;
+  volume.mLod = lod;
   return volume;
 }
 
@@ -462,9 +480,26 @@ OSPRayRenderer::Camera OSPRayRenderer::getCamera(float volumeHeight, glm::mat4 o
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void OSPRayRenderer::renderFrame(ospray::cpp::World const& world, ospray::cpp::Camera const& camera,
-    std::optional<std::vector<float>>&& maxDepth, Parameters const& parameters,
-    bool resetAccumulation) {
+std::unique_ptr<OSPRayRenderer::RenderedImage> OSPRayRenderer::renderFrame(
+    std::unique_ptr<OSPRayRenderer::RenderedImage> image, ospray::cpp::World const& world,
+    OSPRayRenderer::Camera const& camera, std::optional<std::vector<float>>&& maxDepth,
+    Parameters const& parameters, bool resetAccumulation) {
+  if (resetAccumulation) {
+    mFrameBufferAccumulationPasses = 0;
+  }
+  for (int i = 0; i < LAYER_COUNT; i++) {
+    renderLayer(world, camera, maxDepth, parameters, resetAccumulation, i);
+    image->addLayer(mCache.mFrameBuffer[i]);
+  }
+  mFrameBufferAccumulationPasses++;
+  return image;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void OSPRayRenderer::renderLayer(ospray::cpp::World const& world,
+    OSPRayRenderer::Camera const& camera, std::optional<std::vector<float>>& maxDepth,
+    Parameters const& parameters, bool resetAccumulation, int layer) {
 
   // cs::gui::detail::ScopedTimer timer("myVolumeRendering");
   ospray::cpp::Renderer renderer("volume_depth");
@@ -480,6 +515,9 @@ void OSPRayRenderer::renderFrame(ospray::cpp::World const& world, ospray::cpp::C
     renderer.setParam("map_maxDepth", maxDepthTex);
   }
 
+  float center = glm::length(camera.mModelView[3]);
+  float front  = center - 1;
+
   const void* filtersPtr = parameters.mScalarFilters.data();
   renderer.setParam("scalarFilters", OSP_VOID_PTR, &filtersPtr);
   renderer.setParam("aoSamples", parameters.mAOSamples);
@@ -487,27 +525,28 @@ void OSPRayRenderer::renderFrame(ospray::cpp::World const& world, ospray::cpp::C
   renderer.setParam("volumeSamplingRate", parameters.mSamplingRate);
   renderer.setParam("depthMode", (int)parameters.mWorld.mDepthMode);
   renderer.setParam("numScalarFilters", (int)parameters.mScalarFilters.size());
+  renderer.setParam("minDepth", front + 2 / LAYER_COUNT * (layer));
+  renderer.setParam("maxDepth", front + 2 / LAYER_COUNT * (layer + 1));
   renderer.commit();
 
   if (resetAccumulation) {
     int channels = OSP_FB_COLOR | OSP_FB_DEPTH | OSP_FB_ACCUM;
 
-    mCache.mFrameBuffer = ospray::cpp::FrameBuffer(
+    mCache.mFrameBuffer[layer] = ospray::cpp::FrameBuffer(
         parameters.mResolution, parameters.mResolution, OSP_FB_RGBA32F, channels);
-    mCache.mFrameBuffer.clear();
-    mCache.mFrameBuffer.commit();
-    mFrameBufferAccumulationPasses = 0;
+    mCache.mFrameBuffer[layer].clear();
+    mCache.mFrameBuffer[layer].commit();
   }
 
   {
     std::scoped_lock lock(mRenderFutureMutex);
-    mRenderFuture = mCache.mFrameBuffer.renderFrame(renderer, camera, world);
-    mFrameBufferAccumulationPasses++;
+    mRenderFuture[layer] =
+        mCache.mFrameBuffer[layer].renderFrame(renderer, camera.mOsprayCamera, world);
   }
-  mRenderFuture->wait();
+  mRenderFuture[layer]->wait();
   {
     std::scoped_lock lock(mRenderFutureMutex);
-    mRenderFuture.reset();
+    mRenderFuture[layer].reset();
   }
 }
 
@@ -552,43 +591,30 @@ OSPRayRenderer::Cache::Cache()
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+OSPRayRenderer::RenderedImage::RenderedImage(Camera const& camera, float volumeHeight,
+    Parameters const& parameters, glm::mat4 const& cameraTransform)
+    : Renderer::RenderedImage(false, parameters.mResolution, cameraTransform, camera.mModelView,
+          camera.mProjection, camera.mInside, 0)
+    , mDenoiseColor(parameters.mDenoiseColor)
+    , mDenoiseDepth(parameters.mWorld.mDepthMode != DepthMode::eNone && parameters.mDenoiseDepth) {
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 OSPRayRenderer::RenderedImage::RenderedImage(ospray::cpp::FrameBuffer frame, Camera const& camera,
     float volumeHeight, Parameters const& parameters, glm::mat4 const& cameraTransform)
-    : Renderer::RenderedImage(true, parameters.mResolution, cameraTransform, camera.mModelView,
-          camera.mProjection, camera.mInside)
-    , mFrame(std::move(frame)) {
-  mColorData = (float*)mFrame.map(OSP_FB_COLOR);
-  mDepthData = (float*)mFrame.map(OSP_FB_DEPTH);
-
-  std::thread colorDenoising;
-  std::thread depthDenoising;
-  if (parameters.mDenoiseColor) {
-    colorDenoising = std::thread([this, parameters]() {
-      OSPRayUtility::denoiseImage(mColorData, 4, parameters.mResolution);
-    });
-  }
-  if (parameters.mWorld.mDepthMode != DepthMode::eNone && parameters.mDenoiseDepth) {
-    depthDenoising = std::thread([this, parameters]() {
-      std::vector<float> depthGrayscale = OSPRayUtility::depthToGrayscale(mDepthData, mResolution);
-      OSPRayUtility::denoiseImage(depthGrayscale.data(), 3, parameters.mResolution);
-      OSPRayUtility::grayscaleToDepth(depthGrayscale, mDepthData);
-    });
-  }
-
-  if (parameters.mDenoiseColor) {
-    colorDenoising.join();
-  }
-  if (parameters.mWorld.mDepthMode != DepthMode::eNone && parameters.mDenoiseDepth) {
-    depthDenoising.join();
-  }
+    : OSPRayRenderer::RenderedImage(camera, volumeHeight, parameters, cameraTransform) {
+  addLayer(frame);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 OSPRayRenderer::RenderedImage::~RenderedImage() {
-  if (mFrame.handle() != nullptr) {
-    mFrame.unmap(mColorData);
-    mFrame.unmap(mDepthData);
+  for (int i = 0; i < mLayerCount; i++) {
+    if (mFrame[i].handle() != nullptr) {
+      mFrame[i].unmap(mColorData[i]);
+      mFrame[i].unmap(mDepthData[i]);
+    }
   }
 }
 
@@ -599,18 +625,53 @@ OSPRayRenderer::RenderedImage::RenderedImage(RenderedImage&& other)
   std::swap(other.mFrame, mFrame);
   std::swap(other.mColorData, mColorData);
   std::swap(other.mDepthData, mDepthData);
+  other.mLayerCount = 0;
+  mDenoiseColor     = other.mDenoiseColor;
+  mDenoiseDepth     = other.mDenoiseDepth;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-float* OSPRayRenderer::RenderedImage::getColorData() {
-  return mColorData;
+float* OSPRayRenderer::RenderedImage::getColorData(int layer) {
+  return mColorData[layer];
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-float* OSPRayRenderer::RenderedImage::getDepthData() {
-  return mDepthData;
+float* OSPRayRenderer::RenderedImage::getDepthData(int layer) {
+  return mDepthData[layer];
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void OSPRayRenderer::RenderedImage::addLayer(ospray::cpp::FrameBuffer frame) {
+  mFrame.emplace_back(std::move(frame));
+  auto colorData = mColorData.emplace_back((float*)mFrame.back().map(OSP_FB_COLOR));
+  auto depthData = mDepthData.emplace_back((float*)mFrame.back().map(OSP_FB_DEPTH));
+
+  std::thread colorDenoising;
+  std::thread depthDenoising;
+  if (mDenoiseColor) {
+    colorDenoising = std::thread(
+        [this, colorData]() { OSPRayUtility::denoiseImage(colorData, 4, mResolution); });
+  }
+  if (mDenoiseDepth) {
+    depthDenoising = std::thread([this, depthData]() {
+      std::vector<float> depthGrayscale = OSPRayUtility::depthToGrayscale(depthData, mResolution);
+      OSPRayUtility::denoiseImage(depthGrayscale.data(), 3, mResolution);
+      OSPRayUtility::grayscaleToDepth(depthGrayscale, depthData);
+    });
+  }
+
+  if (mDenoiseColor) {
+    colorDenoising.join();
+  }
+  if (mDenoiseDepth) {
+    depthDenoising.join();
+  }
+
+  mLayerCount++;
+  mValid = true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

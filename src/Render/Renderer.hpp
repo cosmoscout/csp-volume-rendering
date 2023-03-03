@@ -41,6 +41,8 @@ class Renderer {
     void setValid(bool value);
     /// Returns the resolution of the image.
     int getResolution() const;
+    /// Returns the number of layers in the image.
+    int getLayerCount() const;
     /// Returns the camera transform used by the renderer.
     glm::mat4 const& getCameraTransform() const;
     /// Returns the view matrix used by the renderer.
@@ -52,9 +54,9 @@ class Renderer {
     bool isInside() const;
 
     /// Returns the color values of the image as RGBA values.
-    virtual float* getColorData() = 0;
+    virtual float* getColorData(int layer = 0) = 0;
     /// Returns the depth values of the image as float values in the range [-1,1].
-    virtual float* getDepthData() = 0;
+    virtual float* getDepthData(int layer = 0) = 0;
 
     /// Assumes, that images from roughly the same camera perspective with the same resolution are
     /// identical.
@@ -62,7 +64,7 @@ class Renderer {
 
    protected:
     RenderedImage(bool valid, int resolution, glm::mat4 cameraTransform, glm::mat4 modelView,
-        glm::mat4 projection, bool inside);
+        glm::mat4 projection, bool inside, int layerCount = 1);
     RenderedImage(RenderedImage const& other) = default;
     RenderedImage& operator=(RenderedImage const& other) = default;
 
@@ -71,6 +73,7 @@ class Renderer {
 
     bool      mValid = false;
     int       mResolution;
+    int       mLayerCount;
     glm::mat4 mCameraTransform;
     glm::mat4 mModelView;
     glm::mat4 mProjection;
@@ -91,8 +94,8 @@ class Renderer {
     CopiedImage(CopiedImage&& other) = delete;
     CopiedImage& operator=(CopiedImage&& other) = delete;
 
-    float* getColorData() override;
-    float* getDepthData() override;
+    float* getColorData(int layer = 0) override;
+    float* getDepthData(int layer = 0) override;
 
    private:
     std::vector<float> mColorData;

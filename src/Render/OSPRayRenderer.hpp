@@ -66,6 +66,8 @@ class OSPRayRenderer : public Renderer {
 
   class RenderedImage : public Renderer::RenderedImage {
    public:
+    RenderedImage(Camera const& camera, float volumeHeight, Parameters const& parameters,
+        glm::mat4 const& cameraTransform);
     RenderedImage(ospray::cpp::FrameBuffer frame, Camera const& camera, float volumeHeight,
         Parameters const& parameters, glm::mat4 const& cameraTransform);
     ~RenderedImage() override;
@@ -76,39 +78,44 @@ class OSPRayRenderer : public Renderer {
     RenderedImage(RenderedImage&& other);
     RenderedImage& operator=(RenderedImage&& other) = delete;
 
-    float* getColorData() override;
-    float* getDepthData() override;
+    float* getColorData(int layer = 0) override;
+    float* getDepthData(int layer = 0) override;
+
+    void addLayer(ospray::cpp::FrameBuffer frame);
 
    private:
-    float* mColorData;
-    float* mDepthData;
+    std::vector<float*> mColorData;
+    std::vector<float*> mDepthData;
 
-    ospray::cpp::FrameBuffer mFrame;
+    std::vector<ospray::cpp::FrameBuffer> mFrame;
+
+    bool mDenoiseColor;
+    bool mDenoiseDepth;
   };
 
-  int mFrameBufferAccumulationPasses;
+  int mFrameBufferAccumulationPasses = 0;
 
   struct Cache {
     std::map<DataManager::State, std::map<int, std::shared_future<Volume>>> mVolumes;
     std::shared_future<Volume>                                              mCurrentVolume;
     DataManager::State                                                      mCurrentVolumeState;
 
-    Camera                        mCamera;
-    ospray::cpp::FrameBuffer      mFrameBuffer;
-    ospray::cpp::World            mWorld;
-    ospray::cpp::Geometry         mPathlines;
-    ospray::cpp::GeometricModel   mPathlinesModel;
-    ospray::cpp::Volume           mVolume;
-    ospray::cpp::VolumetricModel  mVolumeModel;
-    ospray::cpp::Geometry         mCore;
-    ospray::cpp::GeometricModel   mCoreModel;
-    ospray::cpp::Texture          mCoreTexture;
-    ospray::cpp::Material         mCoreMaterial;
-    ospray::cpp::TransferFunction mCoreTransferFunction;
-    ospray::cpp::Group            mGroup;
-    ospray::cpp::Instance         mInstance;
-    ospray::cpp::Light            mAmbientLight;
-    ospray::cpp::Light            mSunLight;
+    Camera                                mCamera;
+    std::vector<ospray::cpp::FrameBuffer> mFrameBuffer;
+    ospray::cpp::World                    mWorld;
+    ospray::cpp::Geometry                 mPathlines;
+    ospray::cpp::GeometricModel           mPathlinesModel;
+    ospray::cpp::Volume                   mVolume;
+    ospray::cpp::VolumetricModel          mVolumeModel;
+    ospray::cpp::Geometry                 mCore;
+    ospray::cpp::GeometricModel           mCoreModel;
+    ospray::cpp::Texture                  mCoreTexture;
+    ospray::cpp::Material                 mCoreMaterial;
+    ospray::cpp::TransferFunction         mCoreTransferFunction;
+    ospray::cpp::Group                    mGroup;
+    ospray::cpp::Instance                 mInstance;
+    ospray::cpp::Light                    mAmbientLight;
+    ospray::cpp::Light                    mSunLight;
 
     struct State {
       glm::mat4          mCameraTransform;
@@ -125,9 +132,9 @@ class OSPRayRenderer : public Renderer {
     Cache();
   } mCache;
 
-  std::optional<ospray::cpp::Future> mRenderFuture;
-  bool                               mRenderingCancelled;
-  std::mutex                         mRenderFutureMutex;
+  std::vector<std::optional<ospray::cpp::Future>> mRenderFuture;
+  bool                                            mRenderingCancelled = false;
+  std::mutex                                      mRenderFutureMutex;
 
   std::unique_ptr<Renderer::RenderedImage> getFrameImpl(glm::mat4 const& cameraTransform,
       std::optional<std::vector<float>>&& maxDepth, Parameters parameters,
@@ -140,10 +147,14 @@ class OSPRayRenderer : public Renderer {
       DataManager::State const& state, Parameters const& parameters);
   void updateWorld(
       Volume const& volume, Parameters const& parameters, DataManager::State const& dataState);
-  OSPRayRenderer::Camera getCamera(float volumeHeight, glm::mat4 observerTransform);
-  void renderFrame(ospray::cpp::World const& world, ospray::cpp::Camera const& camera,
+  OSPRayRenderer::Camera         getCamera(float volumeHeight, glm::mat4 observerTransform);
+  std::unique_ptr<RenderedImage> renderFrame(std::unique_ptr<RenderedImage> image,
+      ospray::cpp::World const& world, OSPRayRenderer::Camera const& camera,
       std::optional<std::vector<float>>&& maxDepth, Parameters const& parameters,
       bool resetAccumulation);
+  void renderLayer(ospray::cpp::World const& world, OSPRayRenderer::Camera const& camera,
+      std::optional<std::vector<float>>& maxDepth, Parameters const& parameters,
+      bool resetAccumulation, int layer);
 };
 
 } // namespace csp::volumerendering

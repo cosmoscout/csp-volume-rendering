@@ -198,7 +198,7 @@ std::future<std::unique_ptr<Renderer::RenderedImage>> Renderer::getFrame(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool Renderer::RenderedImage::operator==(const RenderedImage& other) const {
-  return mResolution == other.mResolution &&
+  return mResolution == other.mResolution && mLayerCount == other.mLayerCount &&
          glm::all(glm::epsilonEqual(mCameraTransform[0], other.mCameraTransform[0], 0.0001f)) &&
          glm::all(glm::epsilonEqual(mCameraTransform[1], other.mCameraTransform[1], 0.0001f)) &&
          glm::all(glm::epsilonEqual(mCameraTransform[2], other.mCameraTransform[2], 0.0001f)) &&
@@ -208,9 +208,10 @@ bool Renderer::RenderedImage::operator==(const RenderedImage& other) const {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Renderer::RenderedImage::RenderedImage(bool valid, int resolution, glm::mat4 cameraTransform,
-    glm::mat4 modelView, glm::mat4 projection, bool inside)
+    glm::mat4 modelView, glm::mat4 projection, bool inside, int layerCount)
     : mValid(valid)
     , mResolution(resolution)
+    , mLayerCount(layerCount)
     , mCameraTransform(cameraTransform)
     , mModelView(modelView)
     , mProjection(projection)
@@ -233,6 +234,12 @@ void Renderer::RenderedImage::setValid(bool value) {
 
 int Renderer::RenderedImage::getResolution() const {
   return mResolution;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+int Renderer::RenderedImage::getLayerCount() const {
+  return mLayerCount;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -267,6 +274,7 @@ Renderer::CopiedImage::CopiedImage(RenderedImage& other)
           other.getColorData() + other.getResolution() * other.getResolution() * 4)
     , mDepthData(other.getDepthData(),
           other.getDepthData() + other.getResolution() * other.getResolution()) {
+    //TODO Copy all layers
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -282,13 +290,13 @@ Renderer::CopiedImage& Renderer::CopiedImage::operator=(RenderedImage& other) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-float* Renderer::CopiedImage::getColorData() {
+float* Renderer::CopiedImage::getColorData(int layer) {
   return mColorData.data();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-float* Renderer::CopiedImage::getDepthData() {
+float* Renderer::CopiedImage::getDepthData(int layer) {
   return mDepthData.data();
 }
 
