@@ -39,6 +39,10 @@ class IrregularGrid : public DisplayNode {
   bool DoImpl() override;
 
  private:
+  void drawIrregularGrid(glm::mat4 matMV, glm::mat4 matP);
+  void generateHoleFillingTex();
+  void drawFullscreenQuad(glm::mat4 matMV, glm::mat4 matP);
+
   void createBuffers();
   void createFBOs(int width, int height);
 

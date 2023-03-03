@@ -52,6 +52,13 @@ IrregularGrid::IrregularGrid(
   mRegularGridShader.InitVertexShaderFromString(BILLBOARD_VERT);
   mRegularGridShader.InitFragmentShaderFromString(REGULAR_GRID_FRAG);
   mRegularGridShader.Link();
+
+  mShader.InitVertexShaderFromString(PASS_VERT);
+  mShader.InitGeometryShaderFromString(IRREGULAR_GRID_GEOM);
+  mShader.InitFragmentShaderFromString(IRREGULAR_GRID_FRAG);
+  mShader.Link();
+
+  mShaderDirty = false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -74,27 +81,45 @@ bool IrregularGrid::DoImpl() {
 
   cs::utils::FrameTimings::ScopedTimer timer("Volume Rendering");
 
-  if (mShaderDirty) {
-    mShader = VistaGLSLShader();
-    mShader.InitVertexShaderFromString(PASS_VERT);
-    mShader.InitGeometryShaderFromString(IRREGULAR_GRID_GEOM);
-    mShader.InitFragmentShaderFromString(IRREGULAR_GRID_FRAG);
-    mShader.Link();
+  // Get viewport size
+  int width, height;
+  GetVistaSystem()
+      ->GetDisplayManager()
+      ->GetCurrentRenderInfo()
+      ->m_pViewport->GetViewportProperties()
+      ->GetSize(width, height);
 
-    mShaderDirty = false;
+  if (width != mScreenWidth || height != mScreenHeight) {
+    createFBOs(width, height);
+    mScreenWidth  = width;
+    mScreenHeight = height;
   }
-
-  mShader.Bind();
 
   // Get modelview and projection matrices.
   std::array<GLfloat, 16> glMatMV{};
   std::array<GLfloat, 16> glMatP{};
   glGetFloatv(GL_MODELVIEW_MATRIX, glMatMV.data());
   glGetFloatv(GL_PROJECTION_MATRIX, glMatP.data());
-  auto matMV = glm::make_mat4x4(glMatMV.data()) * glm::mat4(getWorldTransform());
+  glm::mat4 matMV = glm::make_mat4x4(glMatMV.data()) * glm::mat4(getWorldTransform());
+  glm::mat4 matP  = glm::make_mat4x4(glMatP.data());
+
+  // Do renderpasses
+  drawIrregularGrid(matMV, matP);
+  generateHoleFillingTex();
+  drawFullscreenQuad(matMV, matP);
+
+  return true;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void IrregularGrid::drawIrregularGrid(glm::mat4 matMV, glm::mat4 matP) {
+  mShader.Bind();
+
   glUniformMatrix4fv(
       mShader.GetUniformLocation("uMatModelView"), 1, GL_FALSE, glm::value_ptr(matMV));
-  glUniformMatrix4fv(mShader.GetUniformLocation("uMatProjection"), 1, GL_FALSE, glMatP.data());
+  glUniformMatrix4fv(
+      mShader.GetUniformLocation("uMatProjection"), 1, GL_FALSE, glm::value_ptr(matP));
   glUniformMatrix4fv(
       mShader.GetUniformLocation("uMatTransform"), 1, GL_FALSE, glm::value_ptr(mTransform));
   glUniformMatrix4fv(mShader.GetUniformLocation("uMatRendererProjection"), 1, GL_FALSE,
@@ -117,19 +142,6 @@ bool IrregularGrid::DoImpl() {
   mShader.SetUniform(mShader.GetUniformLocation("uInside"), mInside);
   glUniform2ui(mShader.GetUniformLocation("uResolution"), mWidth, mHeight);
 
-  int width, height;
-  GetVistaSystem()
-      ->GetDisplayManager()
-      ->GetCurrentRenderInfo()
-      ->m_pViewport->GetViewportProperties()
-      ->GetSize(width, height);
-
-  if (width != mScreenWidth || height != mScreenHeight) {
-    createFBOs(width, height);
-    mScreenWidth  = width;
-    mScreenHeight = height;
-  }
-
   mFBO.Bind();
   glClearColor(.0f, .0f, .0f, .0f);
   glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
@@ -149,14 +161,19 @@ bool IrregularGrid::DoImpl() {
   glDrawArrays(GL_POINTS, 0, mVertexCount);
   mVAO.Release();
 
+  glPopAttrib();
+
   mTexture.Unbind(GL_TEXTURE0);
   mDepthTexture.Unbind(GL_TEXTURE1);
-  mShader.Release();
-
-  glPopAttrib();
 
   mFBO.Release();
 
+  mShader.Release();
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void IrregularGrid::generateHoleFillingTex() {
   // Hole filling.
   mHoleFillingShader.Bind();
   mHoleFillingShader.SetUniform(mHoleFillingShader.GetUniformLocation("uColorBuffer"), 0);
@@ -174,8 +191,8 @@ bool IrregularGrid::DoImpl() {
   glEnable(GL_DEPTH_TEST);
   glDepthFunc(GL_ALWAYS);
 
-  int mipWidth  = width / 2;
-  int mipHeight = height / 2;
+  int mipWidth  = mScreenWidth / 2;
+  int mipHeight = mScreenHeight / 2;
   for (int i = 0; i < mHoleFillingLevels; ++i) {
     mHoleFillingShader.SetUniform(mHoleFillingShader.GetUniformLocation("uCurrentLevel"), i);
 
@@ -197,7 +214,11 @@ bool IrregularGrid::DoImpl() {
   mHoleFillingTexture.Unbind(GL_TEXTURE2);
   mHoleFillingDepth.Unbind(GL_TEXTURE3);
   mHoleFillingShader.Release();
+}
 
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void IrregularGrid::drawFullscreenQuad(glm::mat4 matMV, glm::mat4 matP) {
   // Draw second pass.
   glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
   glDisable(GL_CULL_FACE);
@@ -213,22 +234,23 @@ bool IrregularGrid::DoImpl() {
   mRegularGridShader.Bind();
   glUniformMatrix4fv(
       mRegularGridShader.GetUniformLocation("uMatModelView"), 1, GL_FALSE, glm::value_ptr(matMV));
-  glUniformMatrix4fv(mRegularGridShader.GetUniformLocation("uMatProjection"), 1, GL_FALSE, glMatP.data());
   glUniformMatrix4fv(
-      mRegularGridShader.GetUniformLocation("uMatTransform"), 1, GL_FALSE, glm::value_ptr(mTransform));
+      mRegularGridShader.GetUniformLocation("uMatProjection"), 1, GL_FALSE, glm::value_ptr(matP));
+  glUniformMatrix4fv(mRegularGridShader.GetUniformLocation("uMatTransform"), 1, GL_FALSE,
+      glm::value_ptr(mTransform));
   glUniformMatrix4fv(mRegularGridShader.GetUniformLocation("uMatRendererProjection"), 1, GL_FALSE,
       glm::value_ptr(mRendererProjection));
-  glUniformMatrix4fv(mRegularGridShader.GetUniformLocation("uMatRendererProjectionInv"), 1, GL_FALSE,
-      glm::value_ptr(glm::inverse(mRendererProjection)));
-  glUniformMatrix4fv(
-      mRegularGridShader.GetUniformLocation("uMatRendererMVP"), 1, GL_FALSE, glm::value_ptr(mRendererMVP));
+  glUniformMatrix4fv(mRegularGridShader.GetUniformLocation("uMatRendererProjectionInv"), 1,
+      GL_FALSE, glm::value_ptr(glm::inverse(mRendererProjection)));
+  glUniformMatrix4fv(mRegularGridShader.GetUniformLocation("uMatRendererMVP"), 1, GL_FALSE,
+      glm::value_ptr(mRendererMVP));
   glUniformMatrix4fv(mRegularGridShader.GetUniformLocation("uMatRendererMVPInv"), 1, GL_FALSE,
       glm::value_ptr(glm::inverse(mRendererMVP)));
 
   mRegularGridShader.SetUniform(mRegularGridShader.GetUniformLocation("uTexture"), 0);
   mRegularGridShader.SetUniform(mRegularGridShader.GetUniformLocation("uDepthTexture"), 1);
-  mRegularGridShader.SetUniform(mRegularGridShader.GetUniformLocation("uRadii"), static_cast<float>(mRadii[0]),
-      static_cast<float>(mRadii[0]), static_cast<float>(mRadii[0]));
+  mRegularGridShader.SetUniform(mRegularGridShader.GetUniformLocation("uRadii"),
+      static_cast<float>(mRadii[0]), static_cast<float>(mRadii[0]), static_cast<float>(mRadii[0]));
   mRegularGridShader.SetUniform(
       mRegularGridShader.GetUniformLocation("uFarClip"), cs::utils::getCurrentFarClipDistance());
   mRegularGridShader.SetUniform(mRegularGridShader.GetUniformLocation("uUseDepth"), mUseDepth);
@@ -254,7 +276,7 @@ bool IrregularGrid::DoImpl() {
   mFullscreenQuadShader.SetUniform(
       mFullscreenQuadShader.GetUniformLocation("uHoleFillingLevel"), mHoleFillingLevel);
   mFullscreenQuadShader.SetUniform(mFullscreenQuadShader.GetUniformLocation("uResolution"),
-      static_cast<float>(width), static_cast<float>(height));
+      static_cast<float>(mScreenWidth), static_cast<float>(mScreenHeight));
 
   mFBOColor.Bind(GL_TEXTURE0);
   mFBODepth.Bind(GL_TEXTURE1);
@@ -268,8 +290,6 @@ bool IrregularGrid::DoImpl() {
   mFullscreenQuadShader.Release();
 
   glPopAttrib();
-
-  return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
