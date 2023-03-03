@@ -869,12 +869,7 @@ void Plugin::displayFrame(std::unique_ptr<Renderer::RenderedImage> frame, Displa
   cs::utils::FrameTimings::ScopedTimer timer("Display volume frame");
 
   std::shared_ptr<DisplayNode> displayNode = mDisplayNodes.find(displayMode)->second;
-  displayNode->setTexture(frame->getColorData(), frame->getResolution(), frame->getResolution());
-  displayNode->setDepthTexture(
-      frame->getDepthData(), frame->getResolution(), frame->getResolution());
-  displayNode->setTransform(glm::toMat4(glm::toQuat(frame->getCameraTransform())));
-  displayNode->setRendererMatrices(
-      frame->getModelView(), frame->getProjection(), frame->isInside());
+  displayNode->setImage(*frame.get());
 
   if (mDisplayedImage) {
     mRenderedImages.insert(std::move(mDisplayedImage));

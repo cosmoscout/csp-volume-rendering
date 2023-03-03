@@ -32,7 +32,7 @@ class IrregularGrid : public DisplayNode {
   IrregularGrid& operator=(IrregularGrid const& other) = delete;
   IrregularGrid& operator=(IrregularGrid&& other) = default;
 
-  void setDepthTexture(float* texture, int width, int height) override;
+  void setImage(Renderer::RenderedImage& image) override;
 
  protected:
   /// Interface implementation of IVistaOpenGLDraw.

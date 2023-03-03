@@ -8,6 +8,7 @@
 #define CSP_VOLUME_RENDERING_DISPLAYNODE_HPP
 
 #include "../Enums.hpp"
+#include "../Render/Renderer.hpp"
 
 #include <VistaKernel/GraphicsManager/VistaOpenGLDraw.h>
 #include <VistaKernel/GraphicsManager/VistaOpenGLNode.h>
@@ -43,19 +44,11 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   /// Enable rendering of the display node.
   void setEnabled(bool enabled);
 
-  /// Set the color image that should be displayed.
+  /// Sets the image that should be displayed.
+  /// Includes color, depth, multiple layers, matrices etc.
   /// The color data should be given as an array of rgba values (8 bit per channel).
-  void setTexture(uint8_t* texture, int width, int height);
-  void setTexture(float* texture, int width, int height);
-  /// Set the depth information for displaying the image.
   /// The depth data should be given as an array of z-positions in clip space per pixel.
-  virtual void setDepthTexture(float* texture, int width, int height);
-  /// Sets the base transform of the display node.
-  /// This should correspond to the perspective, from which the image was rendered.
-  void setTransform(glm::mat4 transform);
-  /// Sets the model view and projection matrices used in rendering the color image.
-  /// Also sets, whether the camera was inside the volume while rendering.
-  void setRendererMatrices(glm::mat4 modelView, glm::mat4 projection, bool inside);
+  virtual void setImage(Renderer::RenderedImage& image);
 
   /// Enables using the depth information for image based rendering.
   void setUseDepth(bool useDepth);

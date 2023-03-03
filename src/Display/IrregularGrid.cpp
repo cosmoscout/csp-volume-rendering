@@ -56,11 +56,11 @@ IrregularGrid::IrregularGrid(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void IrregularGrid::setDepthTexture(float* texture, int width, int height) {
-  mWidth  = width;
-  mHeight = height;
-  DisplayNode::setDepthTexture(texture, width, height);
-  mSurfaces.emplace(texture, width, height);
+void IrregularGrid::setImage(Renderer::RenderedImage& image) {
+  DisplayNode::setImage(image);
+  mWidth  = image.getResolution();
+  mHeight = image.getResolution();
+  mSurfaces.emplace(image.getDepthData(), mWidth, mHeight);
   // mSurfaces->print();
   createBuffers();
 }

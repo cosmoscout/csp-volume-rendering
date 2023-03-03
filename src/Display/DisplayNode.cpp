@@ -21,6 +21,9 @@
 
 #include <utility>
 
+#include "glm/gtc/epsilon.hpp"
+#include "glm/gtx/quaternion.hpp"
+
 namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -59,40 +62,24 @@ void DisplayNode::setEnabled(bool enabled) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void DisplayNode::setTexture(uint8_t* texture, int width, int height) {
-  mTexture.UploadTexture(width, height, texture, false, GL_RGBA);
-}
+void DisplayNode::setImage(Renderer::RenderedImage& image) {
+  mTexture.UploadTexture(
+      image.getResolution(), image.getResolution(), image.getColorData(), false, GL_RGBA, GL_FLOAT);
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void DisplayNode::setTexture(float* texture, int width, int height) {
-  mTexture.UploadTexture(width, height, texture, false, GL_RGBA, GL_FLOAT);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void DisplayNode::setDepthTexture(float* texture, int width, int height) {
   // VistaTexture does not support upload with different internal format than GL_RGBA8, so we upload
   // the texture manually.
   mDepthTexture.Bind();
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, width, height, 0, GL_RED, GL_FLOAT, texture);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, image.getResolution(), image.getResolution(), 0, GL_RED,
+      GL_FLOAT, image.getDepthData());
   glTexParameteri(mDepthTexture.GetTarget(), GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   mDepthTexture.Unbind();
-}
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
+  mTransform = glm::toMat4(glm::toQuat(image.getCameraTransform()));
 
-void DisplayNode::setTransform(glm::mat4 transform) {
-  mTransform = std::move(transform);
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void DisplayNode::setRendererMatrices(glm::mat4 modelView, glm::mat4 projection, bool inside) {
-  mRendererModelView  = std::move(modelView);
-  mRendererProjection = std::move(projection);
+  mRendererModelView  = image.getModelView();
+  mRendererProjection = image.getProjection();
   mRendererMVP        = mRendererProjection * mRendererModelView;
-  mInside             = inside;
+  mInside             = image.isInside();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
