@@ -32,7 +32,7 @@
 
 namespace {
 
-constexpr int LAYER_COUNT = 2;
+constexpr int LAYER_COUNT = 5;
 
 }
 
@@ -525,8 +525,8 @@ void OSPRayRenderer::renderLayer(ospray::cpp::World const& world,
   renderer.setParam("volumeSamplingRate", parameters.mSamplingRate);
   renderer.setParam("depthMode", (int)parameters.mWorld.mDepthMode);
   renderer.setParam("numScalarFilters", (int)parameters.mScalarFilters.size());
-  renderer.setParam("minDepth", front + 2 / LAYER_COUNT * (layer));
-  renderer.setParam("maxDepth", front + 2 / LAYER_COUNT * (layer + 1));
+  renderer.setParam("minDepth", front + 2.f / LAYER_COUNT * (layer));
+  renderer.setParam("maxDepth", front + 2.f / LAYER_COUNT * (layer + 1));
   renderer.commit();
 
   if (resetAccumulation) {
