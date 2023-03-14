@@ -79,8 +79,8 @@ bool Billboard::DoImpl() {
   mShader.SetUniform(mShader.GetUniformLocation("uDrawDepth"), mDrawDepth);
   mShader.SetUniform(mShader.GetUniformLocation("uInside"), mInside);
 
-  mTexture.Bind(GL_TEXTURE0);
-  mDepthTexture.Bind(GL_TEXTURE1);
+  mTexture[0].Bind(GL_TEXTURE0);
+  mDepthTexture[0].Bind(GL_TEXTURE1);
 
   glPushAttrib(GL_ENABLE_BIT);
   glEnable(GL_CULL_FACE);
@@ -96,8 +96,8 @@ bool Billboard::DoImpl() {
   mVAO.Release();
 
   // Clean up.
-  mTexture.Unbind(GL_TEXTURE0);
-  mTexture.Unbind(GL_TEXTURE1);
+  mTexture[0].Unbind(GL_TEXTURE0);
+  mTexture[0].Unbind(GL_TEXTURE1);
   mShader.Release();
   glPopAttrib();
 

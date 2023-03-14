@@ -39,6 +39,38 @@ class IrregularGrid : public DisplayNode {
   bool DoImpl() override;
 
  private:
+  struct LayerBuffers {
+    std::optional<SurfaceDetectionBuffer> mSurfaces;
+
+    struct Grid {
+      VistaVertexArrayObject mVAO;
+      VistaBufferObject      mVBO;
+      size_t                 mVertexCount = 0;
+    } mGrid;
+
+    struct HoleHilling {
+      HoleHilling()
+          : mTexture(GL_TEXTURE_2D)
+          , mDepth(GL_TEXTURE_2D) {
+      }
+
+      std::vector<VistaFramebufferObj> mFBOs;
+      VistaTexture                     mTexture;
+      VistaTexture                     mDepth;
+    } mHoleFilling;
+
+    struct FullscreenQuad {
+      FullscreenQuad()
+          : mTexture(GL_TEXTURE_2D)
+          , mDepth(GL_TEXTURE_2D) {
+      }
+
+      VistaFramebufferObj mFBO;
+      VistaTexture        mTexture;
+      VistaTexture        mDepth;
+    } mFullscreenQuad;
+  };
+
   void drawIrregularGrid(glm::mat4 matMV, glm::mat4 matP);
   void generateHoleFillingTex();
   void drawFullscreenQuad(glm::mat4 matMV, glm::mat4 matP);
@@ -46,30 +78,21 @@ class IrregularGrid : public DisplayNode {
   void createBuffers();
   void createFBOs(int width, int height);
 
-  std::optional<SurfaceDetectionBuffer> mSurfaces;
-  unsigned int                          mWidth;
-  unsigned int                          mHeight;
+  unsigned int mWidth;
+  unsigned int mHeight;
 
   int mScreenWidth  = 0;
   int mScreenHeight = 0;
 
-  VistaVertexArrayObject mVAO;
-  VistaBufferObject      mVBO;
-  size_t                 mVertexCount;
+  std::vector<LayerBuffers> mLayerBuffers;
 
-  VistaGLSLShader     mFullscreenQuadShader;
-  VistaFramebufferObj mFBO;
-  VistaTexture        mFBOColor;
-  VistaTexture        mFBODepth;
-
-  VistaGLSLShader    mRegularGridShader;
   RegularGridBuffers mRegularGrid;
 
-  VistaGLSLShader                  mHoleFillingShader;
-  const int                        mHoleFillingLevels = 4;
-  VistaTexture                     mHoleFillingTexture;
-  VistaTexture                     mHoleFillingDepth;
-  std::vector<VistaFramebufferObj> mHoleFillingFBOs;
+  const int mHoleFillingLevels = 4;
+
+  VistaGLSLShader mFullscreenQuadShader;
+  VistaGLSLShader mRegularGridShader;
+  VistaGLSLShader mHoleFillingShader;
 };
 
 } // namespace csp::volumerendering
