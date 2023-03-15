@@ -316,7 +316,7 @@ float get_depth_raw(vec2 pos) {
     }
   }
 
-  vec4 normalizedPos = vec4(pos / uResolution, 0, 1);
+  vec4 normalizedPos = vec4((pos / uResolution) * 2 - vec2(1, 1), 0, 1);
   normalizedPos = uMatRendererProjectionInv * normalizedPos;
   normalizedPos /= normalizedPos.w;
   normalizedPos = vec4(normalize(normalizedPos.xyz) * cameraDistance, 1);
