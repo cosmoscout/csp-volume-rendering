@@ -64,6 +64,7 @@ void IrregularGrid::setImage(Renderer::RenderedImage& image) {
 
   if (image.getLayerCount() != mLayerBuffers.size()) {
     mLayerBuffers.resize(image.getLayerCount());
+    mLayerCountChanged = true;
   }
 
   for (int i = 0; i < image.getLayerCount(); ++i) {
@@ -91,10 +92,11 @@ bool IrregularGrid::DoImpl() {
       ->m_pViewport->GetViewportProperties()
       ->GetSize(width, height);
 
-  if (width != mScreenWidth || height != mScreenHeight) {
+  if (width != mScreenWidth || height != mScreenHeight || mLayerCountChanged) {
     createFBOs(width, height);
     mScreenWidth  = width;
     mScreenHeight = height;
+    mLayerCountChanged = false;
   }
 
   // Get modelview and projection matrices.

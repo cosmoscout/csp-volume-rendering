@@ -30,12 +30,6 @@
 #include <cmath>
 #include <exception>
 
-namespace {
-
-constexpr int LAYER_COUNT = 5;
-
-}
-
 namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -43,8 +37,6 @@ namespace csp::volumerendering {
 OSPRayRenderer::OSPRayRenderer(
     std::shared_ptr<DataManager> dataManager, VolumeStructure structure, VolumeShape shape)
     : Renderer(dataManager, structure, shape) {
-  mRenderFuture.resize(LAYER_COUNT);
-  mCache.mFrameBuffer.resize(LAYER_COUNT);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -62,15 +54,15 @@ float OSPRayRenderer::getProgress() {
   // can break after querying the one future, that is currently rendering.
   std::scoped_lock lock(mRenderFutureMutex);
   float            total = 0.f;
-  for (int i = 0; i < LAYER_COUNT; i++) {
-    if (mRenderFuture[i].has_value()) {
-      total += mRenderFuture[i]->progress();
+  for (auto& future : mRenderFuture) {
+    if (future.has_value()) {
+      total += future->progress();
       break;
     } else {
       total += 1.f;
     }
   }
-  return total / LAYER_COUNT;
+  return mRenderFuture.empty() ? 1.f : total / mRenderFuture.size();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -92,9 +84,9 @@ void OSPRayRenderer::preloadData(
 
 void OSPRayRenderer::cancelRendering() {
   std::scoped_lock lock(mRenderFutureMutex);
-  for (int i = 0; i < LAYER_COUNT; i++) {
-    if (mRenderFuture[i].has_value()) {
-      mRenderFuture[i]->cancel();
+  for (auto& future : mRenderFuture) {
+    if (future.has_value()) {
+      future->cancel();
       mRenderingCancelled = true;
     }
   }
@@ -115,6 +107,12 @@ std::unique_ptr<Renderer::RenderedImage> OSPRayRenderer::getFrameImpl(
   // by one so that the active scalar can be placed at index 0.
   for (ScalarFilter& filter : parameters.mScalarFilters) {
     filter.mAttrIndex += 1;
+  }
+
+  {
+    std::scoped_lock lock(mRenderFutureMutex);
+    mRenderFuture.resize(parameters.mLayers);
+    mCache.mFrameBuffer.resize(parameters.mLayers);
   }
 
   mRenderingCancelled = false;
@@ -487,7 +485,7 @@ std::unique_ptr<OSPRayRenderer::RenderedImage> OSPRayRenderer::renderFrame(
   if (resetAccumulation) {
     mFrameBufferAccumulationPasses = 0;
   }
-  for (int i = 0; i < LAYER_COUNT; i++) {
+  for (int i = 0; i < parameters.mLayers; i++) {
     renderLayer(world, camera, maxDepth, parameters, resetAccumulation, i);
     image->addLayer(mCache.mFrameBuffer[i]);
   }
@@ -525,8 +523,8 @@ void OSPRayRenderer::renderLayer(ospray::cpp::World const& world,
   renderer.setParam("volumeSamplingRate", parameters.mSamplingRate);
   renderer.setParam("depthMode", (int)parameters.mWorld.mDepthMode);
   renderer.setParam("numScalarFilters", (int)parameters.mScalarFilters.size());
-  renderer.setParam("minDepth", front + 2.f / LAYER_COUNT * (layer));
-  renderer.setParam("maxDepth", front + 2.f / LAYER_COUNT * (layer + 1));
+  renderer.setParam("minDepth", front + 2.f / parameters.mLayers * (layer));
+  renderer.setParam("maxDepth", front + 2.f / parameters.mLayers * (layer + 1));
   renderer.commit();
 
   if (resetAccumulation) {

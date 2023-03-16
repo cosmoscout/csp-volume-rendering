@@ -151,6 +151,8 @@ class Renderer {
   /// Sets the number of ambient occlusion samples to use.
   void setAOSamples(int value);
 
+  void setLayers(int value);
+
   void setCoreEnabled(bool value);
   void setCoreScalar(std::string value);
   void setCoreRadius(float value);
@@ -246,6 +248,8 @@ class Renderer {
     float mSamplingRate;
     int   mAOSamples;
 
+    int mLayers;
+
     bool mDenoiseColor;
     bool mDenoiseDepth;
 
@@ -254,9 +258,9 @@ class Renderer {
     bool operator==(const Parameters& other) const {
       return mMaxRenderPasses == other.mMaxRenderPasses && mMaxLod == other.mMaxLod &&
              mResolution == other.mResolution && mSamplingRate == other.mSamplingRate &&
-             mAOSamples == other.mAOSamples && mDenoiseColor == other.mDenoiseColor &&
-             mDenoiseDepth == other.mDenoiseDepth && mScalarFilters == other.mScalarFilters &&
-             mWorld == other.mWorld;
+             mAOSamples == other.mAOSamples && mLayers == other.mLayers &&
+             mDenoiseColor == other.mDenoiseColor && mDenoiseDepth == other.mDenoiseDepth &&
+             mScalarFilters == other.mScalarFilters && mWorld == other.mWorld;
     }
   };
 

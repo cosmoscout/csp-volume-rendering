@@ -50,6 +50,7 @@ struct Settings {
     cs::utils::DefaultProperty<float>       mSamplingRate{0.05f};
     cs::utils::DefaultProperty<int>         mAOSamples{4};
     cs::utils::DefaultProperty<int>         mMaxPasses{1};
+    cs::utils::DefaultProperty<int>         mLayers{5};
     cs::utils::DefaultProperty<float>       mDensityScale{10.f};
     cs::utils::DefaultProperty<bool>        mUseMaxDepth{false};
     cs::utils::DefaultProperty<bool>        mDenoiseColor{true};

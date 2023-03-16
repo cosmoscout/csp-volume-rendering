@@ -84,6 +84,8 @@ class IrregularGrid : public DisplayNode {
   int mScreenWidth  = 0;
   int mScreenHeight = 0;
 
+  bool mLayerCountChanged = false;
+
   std::vector<LayerBuffers> mLayerBuffers;
 
   RegularGridBuffers mRegularGrid;

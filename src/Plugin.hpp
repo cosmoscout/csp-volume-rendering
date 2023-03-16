@@ -65,7 +65,7 @@ constexpr int SETTINGS_COUNT = 0;
 template <>
 inline constexpr int SETTINGS_COUNT<bool> = 12;
 template <>
-inline constexpr int SETTINGS_COUNT<int> = 4;
+inline constexpr int SETTINGS_COUNT<int> = 5;
 template <>
 inline constexpr int SETTINGS_COUNT<float> = 7;
 template <>

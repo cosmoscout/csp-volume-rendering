@@ -146,6 +146,13 @@ void Renderer::setAOSamples(int value) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+void Renderer::setLayers(int value) {
+  std::scoped_lock lock(mParameterMutex);
+  mParameters.mLayers = value;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void Renderer::setCoreEnabled(bool value) {
   std::scoped_lock lock(mParameterMutex);
   mParameters.mWorld.mCore.mEnable = value;
