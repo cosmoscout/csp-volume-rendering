@@ -8,6 +8,7 @@
 
 #include "Display/IrregularGrid.hpp"
 #include "Display/PointsForwardWarped.hpp"
+#include "Display/Billboard.hpp"
 #include "Render/OSPRayRenderer.hpp"
 #include "logger.hpp"
 
@@ -215,7 +216,9 @@ void Plugin::onLoad() {
   }
 
   auto existence                    = anchor->second.mExistence;
-  mDisplayNodes[DisplayMode::eMesh] = std::make_shared<IrregularGrid>(
+  mDisplayNodes[DisplayMode::eMultilayer] = std::make_shared<IrregularGrid>(
+      mPluginSettings.mData.mShape.get(), mAllSettings, mPluginSettings.mTransform.mAnchor.get());
+  mDisplayNodes[DisplayMode::eMesh] = std::make_shared<Billboard>(
       mPluginSettings.mData.mShape.get(), mAllSettings, mPluginSettings.mTransform.mAnchor.get());
   mDisplayNodes[DisplayMode::ePoints] = std::make_shared<PointsForwardWarped>(
       mPluginSettings.mData.mShape.get(), mAllSettings, mPluginSettings.mTransform.mAnchor.get());

@@ -12,7 +12,7 @@ namespace csp::volumerendering {
 enum class VolumeShape { eInvalid = -1, eCubic, eSpherical };
 enum class VolumeStructure { eInvalid = -1, eStructured, eRectilinear, eUnstructured, eStructuredSpherical, eRectilinearSpherical, eImageSpherical };
 enum class VolumeFileType { eInvalid = -1, eVtk, eNetCdf};
-enum class DisplayMode { eMesh = 0, ePoints = 1, First = eMesh, Last = ePoints };
+enum class DisplayMode { eMultilayer = 0, eMesh = 1, ePoints = 2, First = eMultilayer, Last = ePoints };
 enum class DepthMode {
   eNone           = 0,
   eIsosurface     = 1,

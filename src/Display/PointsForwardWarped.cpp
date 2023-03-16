@@ -35,6 +35,10 @@ PointsForwardWarped::PointsForwardWarped(
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool PointsForwardWarped::DoImpl() {
+  if (mTexture.empty() || mDepthTexture.empty()) {
+    return false;
+  }
+
   cs::utils::FrameTimings::ScopedTimer timer("Volume Rendering");
 
   if (mShaderDirty) {

@@ -36,6 +36,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(VolumeShape, {
                                           })
 
 NLOHMANN_JSON_SERIALIZE_ENUM(DisplayMode, {
+                                              {DisplayMode::eMultilayer, "multilayer"},
                                               {DisplayMode::ePoints, "points"},
                                               {DisplayMode::eMesh, "mesh"},
                                           })
