@@ -237,6 +237,9 @@ void main() {
       oColor = hole_filling_blur();
     }
   }
+  if (oColor.a > 0) {
+    oColor.rgb /= oColor.a;
+  }
 }
 )";
 
