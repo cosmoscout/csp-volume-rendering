@@ -86,7 +86,9 @@ class IrregularGrid : public DisplayNode {
 
   bool mLayerCountChanged = false;
 
-  std::vector<LayerBuffers> mLayerBuffers;
+  // Using unique_ptrs here, because otherwise resizing the vector would release and break all
+  // contained Vista objects.
+  std::vector<std::unique_ptr<LayerBuffers>> mLayerBuffers;
 
   RegularGridBuffers mRegularGrid;
 

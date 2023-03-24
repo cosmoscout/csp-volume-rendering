@@ -72,10 +72,10 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
 
   bool mEnabled = false;
 
-  glm::mat4                 mTransform;
-  std::vector<VistaTexture> mTexture;
-  std::vector<VistaTexture> mDepthTexture;
-  VistaGLSLShader           mShader;
+  glm::mat4                                  mTransform;
+  std::vector<std::unique_ptr<VistaTexture>> mTexture;
+  std::vector<std::unique_ptr<VistaTexture>> mDepthTexture;
+  VistaGLSLShader                            mShader;
 
   glm::mat4 mRendererModelView;
   glm::mat4 mRendererProjection;

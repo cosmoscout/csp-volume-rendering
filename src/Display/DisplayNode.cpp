@@ -56,37 +56,35 @@ void DisplayNode::setEnabled(bool enabled) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void DisplayNode::setImage(Renderer::RenderedImage& image) {
-  if (mTexture.size() > image.getLayerCount()) {
-    mTexture.resize(image.getLayerCount(), VistaTexture(GL_TEXTURE_2D));
-  }
-  mTexture.reserve(image.getLayerCount());
-  for (int i = mTexture.size(); i < image.getLayerCount(); ++i) {
-    mTexture.emplace_back(GL_TEXTURE_2D);
-    mTexture.back().SetWrapS(GL_CLAMP_TO_BORDER);
-    mTexture.back().SetWrapT(GL_CLAMP_TO_BORDER);
+  if (mTexture.size() != image.getLayerCount()) {
+    mTexture.resize(image.getLayerCount());
   }
   for (int i = 0; i < image.getLayerCount(); ++i) {
-    mTexture[i].UploadTexture(image.getResolution(), image.getResolution(), image.getColorData(i),
+    if (!mTexture[i]) {
+      mTexture[i] = std::make_unique<VistaTexture>(GL_TEXTURE_2D);
+      mTexture[i]->SetWrapS(GL_CLAMP_TO_BORDER);
+      mTexture[i]->SetWrapT(GL_CLAMP_TO_BORDER);
+    }
+    mTexture[i]->UploadTexture(image.getResolution(), image.getResolution(), image.getColorData(i),
         false, GL_RGBA, GL_FLOAT);
   }
 
-  if (mDepthTexture.size() > image.getLayerCount()) {
-    mDepthTexture.resize(image.getLayerCount(), VistaTexture(GL_TEXTURE_2D));
-  }
-  mDepthTexture.reserve(image.getLayerCount());
-  for (int i = mDepthTexture.size(); i < image.getLayerCount(); ++i) {
-    mDepthTexture.emplace_back(GL_TEXTURE_2D);
-    mDepthTexture.back().SetWrapS(GL_CLAMP_TO_BORDER);
-    mDepthTexture.back().SetWrapT(GL_CLAMP_TO_BORDER);
+  if (mDepthTexture.size() != image.getLayerCount()) {
+    mDepthTexture.resize(image.getLayerCount());
   }
   for (int i = 0; i < image.getLayerCount(); ++i) {
+    if (!mDepthTexture[i]) {
+      mDepthTexture[i] = std::make_unique<VistaTexture>(GL_TEXTURE_2D);
+      mDepthTexture[i]->SetWrapS(GL_CLAMP_TO_BORDER);
+      mDepthTexture[i]->SetWrapT(GL_CLAMP_TO_BORDER);
+    }
     // VistaTexture does not support upload with different internal format than GL_RGBA8, so we
     // upload the texture manually.
-    mDepthTexture[i].Bind();
+    mDepthTexture[i]->Bind();
     glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, image.getResolution(), image.getResolution(), 0, GL_RED,
         GL_FLOAT, image.getDepthData(i));
-    glTexParameteri(mDepthTexture[i].GetTarget(), GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    mDepthTexture[i].Unbind();
+    glTexParameteri(mDepthTexture[i]->GetTarget(), GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    mDepthTexture[i]->Unbind();
   }
 
   mTransform = glm::toMat4(glm::toQuat(image.getCameraTransform()));

@@ -68,8 +68,11 @@ void IrregularGrid::setImage(Renderer::RenderedImage& image) {
   }
 
   for (int i = 0; i < image.getLayerCount(); ++i) {
-    mLayerBuffers[i].mSurfaces.emplace(image.getDepthData(i), mWidth, mHeight);
-    mLayerBuffers[i].mHoleFilling.mFBOs.resize(mHoleFillingLevels);
+    if (!mLayerBuffers[i]) {
+      mLayerBuffers[i] = std::make_unique<LayerBuffers>();
+    }
+    mLayerBuffers[i]->mSurfaces.emplace(image.getDepthData(i), mWidth, mHeight);
+    mLayerBuffers[i]->mHoleFilling.mFBOs.resize(mHoleFillingLevels);
   }
 
   createBuffers();
@@ -94,8 +97,8 @@ bool IrregularGrid::DoImpl() {
 
   if (width != mScreenWidth || height != mScreenHeight || mLayerCountChanged) {
     createFBOs(width, height);
-    mScreenWidth  = width;
-    mScreenHeight = height;
+    mScreenWidth       = width;
+    mScreenHeight      = height;
     mLayerCountChanged = false;
   }
 
@@ -148,12 +151,12 @@ void IrregularGrid::drawIrregularGrid(glm::mat4 matMV, glm::mat4 matP) {
 
   int layer = 0;
   for (auto& layerBuffers : mLayerBuffers) {
-    layerBuffers.mFullscreenQuad.mFBO.Bind();
+    layerBuffers->mFullscreenQuad.mFBO.Bind();
     glClearColor(.0f, .0f, .0f, .0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
-    mTexture[layer].Bind(GL_TEXTURE0);
-    mDepthTexture[layer].Bind(GL_TEXTURE1);
+    mTexture[layer]->Bind(GL_TEXTURE0);
+    mDepthTexture[layer]->Bind(GL_TEXTURE1);
 
     // Draw first pass.
     glPushAttrib(GL_ENABLE_BIT);
@@ -163,16 +166,16 @@ void IrregularGrid::drawIrregularGrid(glm::mat4 matMV, glm::mat4 matP) {
     glEnable(GL_DEPTH_TEST);
     glBlendFunc(GL_SRC_ALPHA, GL_ZERO);
 
-    layerBuffers.mGrid.mVAO.Bind();
-    glDrawArrays(GL_POINTS, 0, layerBuffers.mGrid.mVertexCount);
-    layerBuffers.mGrid.mVAO.Release();
+    layerBuffers->mGrid.mVAO.Bind();
+    glDrawArrays(GL_POINTS, 0, layerBuffers->mGrid.mVertexCount);
+    layerBuffers->mGrid.mVAO.Release();
 
     glPopAttrib();
 
-    mTexture[layer].Unbind(GL_TEXTURE0);
-    mDepthTexture[layer].Unbind(GL_TEXTURE1);
+    mTexture[layer]->Unbind(GL_TEXTURE0);
+    mDepthTexture[layer]->Unbind(GL_TEXTURE1);
 
-    layerBuffers.mFullscreenQuad.mFBO.Release();
+    layerBuffers->mFullscreenQuad.mFBO.Release();
     layer++;
   }
 
@@ -195,31 +198,31 @@ void IrregularGrid::generateHoleFillingTex() {
   glDepthFunc(GL_ALWAYS);
 
   for (auto& layerBuffers : mLayerBuffers) {
-    layerBuffers.mFullscreenQuad.mTexture.Bind(GL_TEXTURE0);
-    layerBuffers.mFullscreenQuad.mDepth.Bind(GL_TEXTURE1);
-    layerBuffers.mHoleFilling.mTexture.Bind(GL_TEXTURE2);
-    layerBuffers.mHoleFilling.mDepth.Bind(GL_TEXTURE3);
+    layerBuffers->mFullscreenQuad.mTexture.Bind(GL_TEXTURE0);
+    layerBuffers->mFullscreenQuad.mDepth.Bind(GL_TEXTURE1);
+    layerBuffers->mHoleFilling.mTexture.Bind(GL_TEXTURE2);
+    layerBuffers->mHoleFilling.mDepth.Bind(GL_TEXTURE3);
 
     int mipWidth  = mScreenWidth / 2;
     int mipHeight = mScreenHeight / 2;
     for (int i = 0; i < mHoleFillingLevels; ++i) {
       mHoleFillingShader.SetUniform(mHoleFillingShader.GetUniformLocation("uCurrentLevel"), i);
 
-      layerBuffers.mHoleFilling.mFBOs[i].Bind();
+      layerBuffers->mHoleFilling.mFBOs[i].Bind();
       glViewport(0, 0, mipWidth, mipHeight);
       glClearColor(.0f, .0f, .0f, .0f);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       glDrawArrays(GL_POINTS, 0, 1);
-      layerBuffers.mHoleFilling.mFBOs[i].Release();
+      layerBuffers->mHoleFilling.mFBOs[i].Release();
 
       mipWidth /= 2;
       mipHeight /= 2;
     }
 
-    layerBuffers.mFullscreenQuad.mTexture.Unbind(GL_TEXTURE0);
-    layerBuffers.mFullscreenQuad.mDepth.Unbind(GL_TEXTURE1);
-    layerBuffers.mHoleFilling.mTexture.Unbind(GL_TEXTURE2);
-    layerBuffers.mHoleFilling.mDepth.Unbind(GL_TEXTURE3);
+    layerBuffers->mFullscreenQuad.mTexture.Unbind(GL_TEXTURE0);
+    layerBuffers->mFullscreenQuad.mDepth.Unbind(GL_TEXTURE1);
+    layerBuffers->mHoleFilling.mTexture.Unbind(GL_TEXTURE2);
+    layerBuffers->mHoleFilling.mDepth.Unbind(GL_TEXTURE3);
   }
 
   glPopAttrib();
@@ -270,8 +273,8 @@ void IrregularGrid::drawFullscreenQuad(glm::mat4 matMV, glm::mat4 matP) {
   glUniform2ui(mRegularGridShader.GetUniformLocation("uResolution"), mWidth, mHeight);
 
   for (int i = 0; i < mTexture.size(); ++i) {
-    mTexture[i].Bind(GL_TEXTURE0);
-    mDepthTexture[i].Bind(GL_TEXTURE1);
+    mTexture[i]->Bind(GL_TEXTURE0);
+    mDepthTexture[i]->Bind(GL_TEXTURE1);
 
     mRegularGrid.Draw();
   }
@@ -294,15 +297,18 @@ void IrregularGrid::drawFullscreenQuad(glm::mat4 matMV, glm::mat4 matP) {
 
   for (auto layerBuffers = mLayerBuffers.rbegin(); layerBuffers != mLayerBuffers.rend();
        layerBuffers++) {
-    layerBuffers->mFullscreenQuad.mTexture.Bind(GL_TEXTURE0);
-    layerBuffers->mFullscreenQuad.mDepth.Bind(GL_TEXTURE1);
-    layerBuffers->mHoleFilling.mTexture.Bind(GL_TEXTURE2);
+    int index = std::distance(layerBuffers, mLayerBuffers.rend()) - 1;
 
-    glDrawArrays(GL_POINTS, 0, 1);
+    (*layerBuffers)->mFullscreenQuad.mTexture.Bind(GL_TEXTURE0);
+    (*layerBuffers)->mFullscreenQuad.mDepth.Bind(GL_TEXTURE1);
+    (*layerBuffers)->mHoleFilling.mTexture.Bind(GL_TEXTURE2);
 
-    layerBuffers->mFullscreenQuad.mTexture.Unbind(GL_TEXTURE0);
-    layerBuffers->mFullscreenQuad.mDepth.Unbind(GL_TEXTURE1);
-    layerBuffers->mHoleFilling.mTexture.Unbind(GL_TEXTURE2);
+    if (mHoleFillingLevel == index || mHoleFillingLevel < 0)
+      glDrawArrays(GL_POINTS, 0, 1);
+
+    (*layerBuffers)->mFullscreenQuad.mTexture.Unbind(GL_TEXTURE0);
+    (*layerBuffers)->mFullscreenQuad.mDepth.Unbind(GL_TEXTURE1);
+    (*layerBuffers)->mHoleFilling.mTexture.Unbind(GL_TEXTURE2);
   }
 
   mFullscreenQuadShader.Release();
@@ -315,22 +321,22 @@ void IrregularGrid::drawFullscreenQuad(glm::mat4 matMV, glm::mat4 matP) {
 void IrregularGrid::createBuffers() {
   for (auto& layerBuffers : mLayerBuffers) {
     thrust::device_vector<SurfaceDetectionBuffer::Vertex> dVertices =
-        layerBuffers.mSurfaces->generateVertices();
+        layerBuffers->mSurfaces->generateVertices();
     thrust::host_vector<SurfaceDetectionBuffer::Vertex> hVertices = dVertices;
-    layerBuffers.mGrid.mVertexCount                               = hVertices.size();
+    layerBuffers->mGrid.mVertexCount                              = hVertices.size();
 
-    layerBuffers.mGrid.mVAO.Bind();
+    layerBuffers->mGrid.mVAO.Bind();
 
-    layerBuffers.mGrid.mVBO.Bind(GL_ARRAY_BUFFER);
-    layerBuffers.mGrid.mVBO.BufferData(hVertices.size() * sizeof(SurfaceDetectionBuffer::Vertex),
+    layerBuffers->mGrid.mVBO.Bind(GL_ARRAY_BUFFER);
+    layerBuffers->mGrid.mVBO.BufferData(hVertices.size() * sizeof(SurfaceDetectionBuffer::Vertex),
         hVertices.data(), GL_STATIC_DRAW);
 
-    layerBuffers.mGrid.mVAO.EnableAttributeArray(0);
-    layerBuffers.mGrid.mVAO.SpecifyAttributeArrayInteger(
-        0, 3, GL_UNSIGNED_INT, 3 * sizeof(unsigned int), 0, &layerBuffers.mGrid.mVBO);
+    layerBuffers->mGrid.mVAO.EnableAttributeArray(0);
+    layerBuffers->mGrid.mVAO.SpecifyAttributeArrayInteger(
+        0, 3, GL_UNSIGNED_INT, 3 * sizeof(unsigned int), 0, &layerBuffers->mGrid.mVBO);
 
-    layerBuffers.mGrid.mVAO.Release();
-    layerBuffers.mGrid.mVBO.Release();
+    layerBuffers->mGrid.mVAO.Release();
+    layerBuffers->mGrid.mVBO.Release();
   }
 }
 
@@ -338,52 +344,52 @@ void IrregularGrid::createBuffers() {
 
 void IrregularGrid::createFBOs(int width, int height) {
   for (auto& layerBuffers : mLayerBuffers) {
-    layerBuffers.mFullscreenQuad.mFBO.Bind();
-    layerBuffers.mFullscreenQuad.mTexture.UploadTexture(
+    layerBuffers->mFullscreenQuad.mFBO.Bind();
+    layerBuffers->mFullscreenQuad.mTexture.UploadTexture(
         width, height, 0, false, GL_RGBA, GL_UNSIGNED_BYTE);
-    layerBuffers.mFullscreenQuad.mTexture.SetMagFilter(GL_LINEAR);
-    layerBuffers.mFullscreenQuad.mTexture.SetMinFilter(GL_LINEAR);
-    layerBuffers.mFullscreenQuad.mFBO.Attach(
-        &layerBuffers.mFullscreenQuad.mTexture, GL_COLOR_ATTACHMENT0);
-    layerBuffers.mFullscreenQuad.mTexture.Unbind();
-    layerBuffers.mFullscreenQuad.mDepth.Bind();
+    layerBuffers->mFullscreenQuad.mTexture.SetMagFilter(GL_LINEAR);
+    layerBuffers->mFullscreenQuad.mTexture.SetMinFilter(GL_LINEAR);
+    layerBuffers->mFullscreenQuad.mFBO.Attach(
+        &layerBuffers->mFullscreenQuad.mTexture, GL_COLOR_ATTACHMENT0);
+    layerBuffers->mFullscreenQuad.mTexture.Unbind();
+    layerBuffers->mFullscreenQuad.mDepth.Bind();
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH24_STENCIL8, width, height, 0, GL_DEPTH_STENCIL,
         GL_UNSIGNED_INT_24_8, 0);
-    layerBuffers.mFullscreenQuad.mDepth.SetMagFilter(GL_LINEAR);
-    layerBuffers.mFullscreenQuad.mDepth.SetMinFilter(GL_LINEAR);
-    layerBuffers.mFullscreenQuad.mFBO.Attach(
-        &layerBuffers.mFullscreenQuad.mDepth, GL_DEPTH_STENCIL_ATTACHMENT);
-    layerBuffers.mFullscreenQuad.mDepth.Unbind();
-    layerBuffers.mFullscreenQuad.mFBO.Release();
+    layerBuffers->mFullscreenQuad.mDepth.SetMagFilter(GL_LINEAR);
+    layerBuffers->mFullscreenQuad.mDepth.SetMinFilter(GL_LINEAR);
+    layerBuffers->mFullscreenQuad.mFBO.Attach(
+        &layerBuffers->mFullscreenQuad.mDepth, GL_DEPTH_STENCIL_ATTACHMENT);
+    layerBuffers->mFullscreenQuad.mDepth.Unbind();
+    layerBuffers->mFullscreenQuad.mFBO.Release();
 
-    layerBuffers.mHoleFilling.mTexture.UploadTexture(
+    layerBuffers->mHoleFilling.mTexture.UploadTexture(
         width / 2, height / 2, 0, false, GL_RGBA, GL_UNSIGNED_BYTE);
-    layerBuffers.mHoleFilling.mTexture.SetMagFilter(GL_LINEAR);
-    layerBuffers.mHoleFilling.mTexture.SetMinFilter(GL_LINEAR_MIPMAP_LINEAR);
-    layerBuffers.mHoleFilling.mTexture.SetWrapS(GL_CLAMP_TO_BORDER);
-    layerBuffers.mHoleFilling.mTexture.SetWrapT(GL_CLAMP_TO_BORDER);
-    layerBuffers.mHoleFilling.mTexture.GenerateMipmaps();
+    layerBuffers->mHoleFilling.mTexture.SetMagFilter(GL_LINEAR);
+    layerBuffers->mHoleFilling.mTexture.SetMinFilter(GL_LINEAR_MIPMAP_LINEAR);
+    layerBuffers->mHoleFilling.mTexture.SetWrapS(GL_CLAMP_TO_BORDER);
+    layerBuffers->mHoleFilling.mTexture.SetWrapT(GL_CLAMP_TO_BORDER);
+    layerBuffers->mHoleFilling.mTexture.GenerateMipmaps();
 
-    layerBuffers.mHoleFilling.mDepth.Bind();
+    layerBuffers->mHoleFilling.mDepth.Bind();
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, width / 2, height / 2, 0,
         GL_DEPTH_COMPONENT, GL_FLOAT, 0);
-    layerBuffers.mHoleFilling.mDepth.SetMagFilter(GL_LINEAR);
-    layerBuffers.mHoleFilling.mDepth.SetMinFilter(GL_LINEAR_MIPMAP_LINEAR);
-    layerBuffers.mHoleFilling.mDepth.SetWrapS(GL_CLAMP_TO_BORDER);
-    layerBuffers.mHoleFilling.mDepth.SetWrapT(GL_CLAMP_TO_BORDER);
-    layerBuffers.mHoleFilling.mDepth.GenerateMipmaps();
-    layerBuffers.mHoleFilling.mDepth.Unbind();
+    layerBuffers->mHoleFilling.mDepth.SetMagFilter(GL_LINEAR);
+    layerBuffers->mHoleFilling.mDepth.SetMinFilter(GL_LINEAR_MIPMAP_LINEAR);
+    layerBuffers->mHoleFilling.mDepth.SetWrapS(GL_CLAMP_TO_BORDER);
+    layerBuffers->mHoleFilling.mDepth.SetWrapT(GL_CLAMP_TO_BORDER);
+    layerBuffers->mHoleFilling.mDepth.GenerateMipmaps();
+    layerBuffers->mHoleFilling.mDepth.Unbind();
 
     for (int i = 0; i < mHoleFillingLevels; ++i) {
-      layerBuffers.mHoleFilling.mFBOs[i].Bind();
-      layerBuffers.mHoleFilling.mFBOs[i].Attach(
-          &layerBuffers.mHoleFilling.mTexture, GL_COLOR_ATTACHMENT0, i);
-      layerBuffers.mHoleFilling.mFBOs[i].Attach(
-          &layerBuffers.mHoleFilling.mDepth, GL_DEPTH_ATTACHMENT, i);
-      layerBuffers.mHoleFilling.mFBOs[i].Release();
+      layerBuffers->mHoleFilling.mFBOs[i].Bind();
+      layerBuffers->mHoleFilling.mFBOs[i].Attach(
+          &layerBuffers->mHoleFilling.mTexture, GL_COLOR_ATTACHMENT0, i);
+      layerBuffers->mHoleFilling.mFBOs[i].Attach(
+          &layerBuffers->mHoleFilling.mDepth, GL_DEPTH_ATTACHMENT, i);
+      layerBuffers->mHoleFilling.mFBOs[i].Release();
     }
-    layerBuffers.mHoleFilling.mTexture.Unbind();
-    layerBuffers.mHoleFilling.mDepth.Unbind();
+    layerBuffers->mHoleFilling.mTexture.Unbind();
+    layerBuffers->mHoleFilling.mDepth.Unbind();
   }
 }
 
