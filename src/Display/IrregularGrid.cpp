@@ -285,6 +285,9 @@ void IrregularGrid::drawFullscreenQuad(glm::mat4 matMV, glm::mat4 matP) {
   glStencilMask(0x00);
 
   mFullscreenQuadShader.Bind();
+  glm::mat4 warp = mRendererMVP * glm::inverse(matP * matMV * mTransform);
+  glUniformMatrix4fv(mFullscreenQuadShader.GetUniformLocation("uMatWarp"), 1, GL_FALSE, glm::value_ptr(warp));
+
   mFullscreenQuadShader.SetUniform(mFullscreenQuadShader.GetUniformLocation("uTexColor"), 0);
   mFullscreenQuadShader.SetUniform(mFullscreenQuadShader.GetUniformLocation("uTexDepth"), 1);
   mFullscreenQuadShader.SetUniform(mFullscreenQuadShader.GetUniformLocation("uTexHoleFilling"), 2);

@@ -152,6 +152,7 @@ uniform sampler2D uTexHoleFilling;
 uniform int uMaxLevel;
 uniform int uHoleFillingLevel;
 uniform vec2 uResolution;
+uniform mat4 uMatWarp;
 
 vec3 heat(float v) {
   float value = 1.0-v;
@@ -163,7 +164,7 @@ vec3 heat(float v) {
 }
 
 vec2 get_epipolar_direction() {
-  vec4 epipol = /*warp_matrix * */vec4(0, 0, -1, 0);
+  vec4 epipol = uMatWarp * vec4(0, 0, -1, 0);
   vec2 epi_dir = vec2(0);
 
   if (abs(epipol.w) < 0.01) {
@@ -179,7 +180,6 @@ vec2 get_epipolar_direction() {
     epi_dir = vTexCoords - epipol.xy;
   }
 
-  epi_dir = vec2(1, 0);
   return normalize(epi_dir);
 }
 
