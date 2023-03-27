@@ -218,7 +218,7 @@ vec4 hole_filling_blur() {
   }
 
   if (depth == 0) {
-    return textureLod(uTexHoleFilling, vTexCoords, uMaxLevel);
+    return vec4(0, 0, 0, 0);
   }
   vec4 holeData = textureLod(uTexHoleFilling, vTexCoords, min(level, uMaxLevel));
 
