@@ -513,8 +513,9 @@ void OSPRayRenderer::renderLayer(ospray::cpp::World const& world,
     renderer.setParam("map_maxDepth", maxDepthTex);
   }
 
-  float center = glm::length(camera.mModelView[3]);
-  float front  = center - 1;
+  constexpr float radius = 1.5f;
+  float           center = glm::length(camera.mModelView[3]);
+  float           front  = center - radius;
 
   const void* filtersPtr = parameters.mScalarFilters.data();
   renderer.setParam("scalarFilters", OSP_VOID_PTR, &filtersPtr);
@@ -523,8 +524,8 @@ void OSPRayRenderer::renderLayer(ospray::cpp::World const& world,
   renderer.setParam("volumeSamplingRate", parameters.mSamplingRate);
   renderer.setParam("depthMode", (int)parameters.mWorld.mDepthMode);
   renderer.setParam("numScalarFilters", (int)parameters.mScalarFilters.size());
-  renderer.setParam("minDepth", front + 2.f / parameters.mLayers * (layer));
-  renderer.setParam("maxDepth", front + 2.f / parameters.mLayers * (layer + 1));
+  renderer.setParam("minDepth", front + 2.f * radius / parameters.mLayers * (layer)-0.05f);
+  renderer.setParam("maxDepth", front + 2.f * radius / parameters.mLayers * (layer + 1) + 0.05f);
   renderer.commit();
 
   if (resetAccumulation) {
