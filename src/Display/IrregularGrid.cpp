@@ -149,8 +149,17 @@ void IrregularGrid::drawIrregularGrid(glm::mat4 matMV, glm::mat4 matP) {
   mShader.SetUniform(mShader.GetUniformLocation("uInside"), mInside);
   glUniform2ui(mShader.GetUniformLocation("uResolution"), mWidth, mHeight);
 
-  int layer = 0;
+  int   layer              = 0;
+  float halfLayerThickness = 1.f / mLayerBuffers.size();
   for (auto& layerBuffers : mLayerBuffers) {
+    glm::vec4 depthCenter(0, 0, 1.f - (halfLayerThickness * (layer * 2 + 1.f)), 1);
+    glm::vec4 depthFar(0, 0, 1.f - (halfLayerThickness * (layer * 2 + 2.f)), 1);
+    depthCenter = mRendererMVP * depthCenter;
+    depthFar    = mRendererMVP * depthFar;
+    mShader.SetUniform(
+        mShader.GetUniformLocation("uDefaultDepthCenter"), depthCenter.z / depthCenter.w);
+    mShader.SetUniform(mShader.GetUniformLocation("uDefaultDepthFar"), depthFar.z / depthFar.w);
+
     layerBuffers->mFullscreenQuad.mFBO.Bind();
     glClearColor(.0f, .0f, .0f, .0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);

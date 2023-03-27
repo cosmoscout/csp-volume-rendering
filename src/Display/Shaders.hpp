@@ -293,6 +293,8 @@ uniform mat4 uMatRendererMVPInv;
 uniform bool uUseDepth;
 uniform bool uInside;
 uniform uvec2 uResolution;
+uniform float uDefaultDepthCenter;
+uniform float uDefaultDepthFar;
 
 layout(points) in;
 layout(triangle_strip, max_vertices = 16) out;
@@ -313,9 +315,9 @@ float get_depth_raw(vec2 pos) {
 
   if (isinf(cameraDistance)) {
     if (-uMatRendererMVP[3][2] / uMatRendererMVP[2][2] < 0.7) {
-      return uInside ? 1 : 0;
+      return uInside ? uDefaultDepthFar : uDefaultDepthCenter;
     } else {
-      return 1;
+      return uDefaultDepthFar;
     }
   }
 
