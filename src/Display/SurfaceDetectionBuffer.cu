@@ -87,11 +87,11 @@ thrust::device_vector<SurfaceDetectionBuffer::Vertex> SurfaceDetectionBuffer::ge
 __host__ __device__ int SurfaceDetectionBuffer::GridParams::to1dIndex(
     Vec2 index, Level level) const {
 #ifdef __CUDA_ARCH__
-  return min(max(index.y, 0), levelDim(level).y) * levelDim(level).x +
-         min(max(index.x, 0), levelDim(level).x);
+  return min(max(index.y, 0), levelDim(level).y - 1) * levelDim(level).x +
+         min(max(index.x, 0), levelDim(level).x - 1);
 #else
-  return std::clamp(index.y, 0, levelDim(level).y) * levelDim(level).x +
-         std::clamp(index.x, 0, levelDim(level).x);
+  return std::clamp(index.y, 0, levelDim(level).y - 1) * levelDim(level).x +
+         std::clamp(index.x, 0, levelDim(level).x - 1);
 #endif
 }
 
