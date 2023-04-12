@@ -59,7 +59,7 @@ void DisplayNode::setImage(Renderer::RenderedImage& image) {
   if (mTexture.size() != image.getLayerCount()) {
     mTexture.resize(image.getLayerCount());
   }
-  for (int i = 0; i < image.getLayerCount(); ++i) {
+  for (auto i = 0u; i < image.getLayerCount(); ++i) {
     if (!mTexture[i]) {
       mTexture[i] = std::make_unique<VistaTexture>(GL_TEXTURE_2D);
       mTexture[i]->SetWrapS(GL_CLAMP_TO_BORDER);
@@ -72,7 +72,7 @@ void DisplayNode::setImage(Renderer::RenderedImage& image) {
   if (mDepthTexture.size() != image.getLayerCount()) {
     mDepthTexture.resize(image.getLayerCount());
   }
-  for (int i = 0; i < image.getLayerCount(); ++i) {
+  for (auto i = 0u; i < image.getLayerCount(); ++i) {
     if (!mDepthTexture[i]) {
       mDepthTexture[i] = std::make_unique<VistaTexture>(GL_TEXTURE_2D);
       mDepthTexture[i]->SetWrapS(GL_CLAMP_TO_BORDER);

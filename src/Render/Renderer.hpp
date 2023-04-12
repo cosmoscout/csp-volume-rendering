@@ -42,7 +42,7 @@ class Renderer {
     /// Returns the resolution of the image.
     int getResolution() const;
     /// Returns the number of layers in the image.
-    int getLayerCount() const;
+    unsigned int getLayerCount() const;
     /// Returns the camera transform used by the renderer.
     glm::mat4 const& getCameraTransform() const;
     /// Returns the view matrix used by the renderer.
@@ -64,20 +64,20 @@ class Renderer {
 
    protected:
     RenderedImage(bool valid, int resolution, glm::mat4 cameraTransform, glm::mat4 modelView,
-        glm::mat4 projection, bool inside, int layerCount = 1);
+        glm::mat4 projection, bool inside, unsigned int layerCount = 1);
     RenderedImage(RenderedImage const& other) = default;
     RenderedImage& operator=(RenderedImage const& other) = default;
 
     RenderedImage(RenderedImage&& other) = default;
     RenderedImage& operator=(RenderedImage&& other) = default;
 
-    bool      mValid = false;
-    int       mResolution;
-    int       mLayerCount;
-    glm::mat4 mCameraTransform;
-    glm::mat4 mModelView;
-    glm::mat4 mProjection;
-    bool      mInside;
+    bool         mValid = false;
+    int          mResolution;
+    unsigned int mLayerCount;
+    glm::mat4    mCameraTransform;
+    glm::mat4    mModelView;
+    glm::mat4    mProjection;
+    bool         mInside;
   };
 
   class CopiedImage : public RenderedImage {

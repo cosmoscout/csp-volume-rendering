@@ -609,7 +609,7 @@ OSPRayRenderer::RenderedImage::RenderedImage(ospray::cpp::FrameBuffer frame, Cam
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 OSPRayRenderer::RenderedImage::~RenderedImage() {
-  for (int i = 0; i < mLayerCount; i++) {
+  for (auto i = 0u; i < mLayerCount; i++) {
     if (mFrame[i].handle() != nullptr) {
       mFrame[i].unmap(mColorData[i]);
       mFrame[i].unmap(mDepthData[i]);

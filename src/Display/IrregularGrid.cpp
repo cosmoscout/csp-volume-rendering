@@ -67,7 +67,7 @@ void IrregularGrid::setImage(Renderer::RenderedImage& image) {
     mLayerCountChanged = true;
   }
 
-  for (int i = 0; i < image.getLayerCount(); ++i) {
+  for (auto i = 0u; i < image.getLayerCount(); ++i) {
     if (!mLayerBuffers[i]) {
       mLayerBuffers[i] = std::make_unique<LayerBuffers>();
     }
@@ -281,7 +281,7 @@ void IrregularGrid::drawFullscreenQuad(glm::mat4 matMV, glm::mat4 matP) {
   mRegularGridShader.SetUniform(mRegularGridShader.GetUniformLocation("uInside"), mInside);
   glUniform2ui(mRegularGridShader.GetUniformLocation("uResolution"), mWidth, mHeight);
 
-  for (int i = 0; i < mTexture.size(); ++i) {
+  for (auto i = 0u; i < mTexture.size(); ++i) {
     mTexture[i]->Bind(GL_TEXTURE0);
     mDepthTexture[i]->Bind(GL_TEXTURE1);
 

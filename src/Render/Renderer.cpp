@@ -215,7 +215,7 @@ bool Renderer::RenderedImage::operator==(const RenderedImage& other) const {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Renderer::RenderedImage::RenderedImage(bool valid, int resolution, glm::mat4 cameraTransform,
-    glm::mat4 modelView, glm::mat4 projection, bool inside, int layerCount)
+    glm::mat4 modelView, glm::mat4 projection, bool inside, unsigned int layerCount)
     : mValid(valid)
     , mResolution(resolution)
     , mLayerCount(layerCount)
@@ -245,7 +245,7 @@ int Renderer::RenderedImage::getResolution() const {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-int Renderer::RenderedImage::getLayerCount() const {
+unsigned int Renderer::RenderedImage::getLayerCount() const {
   return mLayerCount;
 }
 
