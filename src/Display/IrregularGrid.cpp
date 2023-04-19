@@ -70,6 +70,7 @@ bool IrregularGrid::DoImpl() {
       cs::utils::FrameTimings::ScopedTimer timer("Buffer");
       std::this_thread::sleep_for(std::chrono::milliseconds(10 * mImage->getLayerCount()));
     }
+    cs::utils::FrameTimings::ScopedTimer timer("IrregularGrid::setImage");
     mWidth  = mImage->getResolution();
     mHeight = mImage->getResolution();
 
@@ -82,7 +83,10 @@ bool IrregularGrid::DoImpl() {
       if (!mLayerBuffers[i]) {
         mLayerBuffers[i] = std::make_unique<LayerBuffers>();
       }
-      mLayerBuffers[i]->mSurfaces.emplace(mImage->getDepthData(i), mWidth, mHeight);
+      {
+        cs::utils::FrameTimings::ScopedTimer timer("Surface detection");
+        mLayerBuffers[i]->mSurfaces.emplace(mImage->getDepthData(i), mWidth, mHeight);
+      }
       mLayerBuffers[i]->mHoleFilling.mFBOs.resize(mHoleFillingLevels);
     }
 
@@ -129,6 +133,7 @@ bool IrregularGrid::DoImpl() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void IrregularGrid::drawIrregularGrid(glm::mat4 matMV, glm::mat4 matP) {
+  cs::utils::FrameTimings::ScopedTimer timer("IrregularGrid::drawIrregularGrid");
   mShader.Bind();
 
   glUniformMatrix4fv(
@@ -205,6 +210,7 @@ void IrregularGrid::drawIrregularGrid(glm::mat4 matMV, glm::mat4 matP) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void IrregularGrid::generateHoleFillingTex() {
+  cs::utils::FrameTimings::ScopedTimer timer("IrregularGrid::generateHoleFillingTex");
   // Hole filling.
   mHoleFillingShader.Bind();
   mHoleFillingShader.SetUniform(mHoleFillingShader.GetUniformLocation("uColorBuffer"), 0);
@@ -253,6 +259,7 @@ void IrregularGrid::generateHoleFillingTex() {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void IrregularGrid::drawFullscreenQuad(glm::mat4 matMV, glm::mat4 matP) {
+  cs::utils::FrameTimings::ScopedTimer timer("IrregularGrid::drawFullscreenQuad");
   // Draw second pass.
   glPushAttrib(GL_ENABLE_BIT | GL_COLOR_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
   glDisable(GL_CULL_FACE);
@@ -342,6 +349,7 @@ void IrregularGrid::drawFullscreenQuad(glm::mat4 matMV, glm::mat4 matP) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void IrregularGrid::createBuffers() {
+  cs::utils::FrameTimings::ScopedTimer timer("Create buffers");
   for (auto& layerBuffers : mLayerBuffers) {
     thrust::device_vector<SurfaceDetectionBuffer::Vertex> dVertices =
         layerBuffers->mSurfaces->generateVertices();

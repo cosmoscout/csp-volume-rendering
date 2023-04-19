@@ -39,7 +39,7 @@ bool Billboard::DoImpl() {
     return false;
   }
 
-  cs::utils::FrameTimings::ScopedTimer timer("Volume Rendering");
+  cs::utils::FrameTimings::ScopedTimer timer("Volume Rendering: Billboard");
 
   if (mShaderDirty) {
     mShader = VistaGLSLShader();

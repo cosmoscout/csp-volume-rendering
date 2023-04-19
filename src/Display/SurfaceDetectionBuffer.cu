@@ -6,6 +6,7 @@
 
 #include "SurfaceDetectionBuffer.hpp"
 
+#include "../../../../src/cs-utils/FrameTimings.hpp"
 #include "../logger.hpp"
 #include "Functors.hpp"
 

@@ -56,6 +56,7 @@ void DisplayNode::setEnabled(bool enabled) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void DisplayNode::setImage(std::unique_ptr<Renderer::RenderedImage> image) {
+  cs::utils::FrameTimings::ScopedTimer timer("DisplayNode::setImage");
   mImage = std::move(image);
   if (mTexture.size() != mImage->getLayerCount()) {
     mTexture.resize(mImage->getLayerCount());
@@ -66,6 +67,7 @@ void DisplayNode::setImage(std::unique_ptr<Renderer::RenderedImage> image) {
       mTexture[i]->SetWrapS(GL_CLAMP_TO_BORDER);
       mTexture[i]->SetWrapT(GL_CLAMP_TO_BORDER);
     }
+    cs::utils::FrameTimings::ScopedTimer timer("Upload color");
     /*mTexture[i]->UploadTexture(mImage->getResolution(), mImage->getResolution(),
        mImage->getColorData(i), false, GL_RGBA, GL_FLOAT);*/
     mTexture[i]->Bind();
@@ -86,6 +88,7 @@ void DisplayNode::setImage(std::unique_ptr<Renderer::RenderedImage> image) {
     }
     // VistaTexture does not support upload with different internal format than GL_RGBA8, so we
     // upload the texture manually.
+    cs::utils::FrameTimings::ScopedTimer timer("Upload depth");
     mDepthTexture[i]->Bind();
     glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, mImage->getResolution(), mImage->getResolution(), 0, GL_RED,
         GL_FLOAT, mImage->getDepthData(i));
