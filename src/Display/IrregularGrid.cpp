@@ -192,7 +192,7 @@ void IrregularGrid::drawIrregularGrid(glm::mat4 matMV, glm::mat4 matP) {
     glBlendFunc(GL_SRC_ALPHA, GL_ZERO);
 
     layerBuffers->mGrid.mVAO.Bind();
-    glDrawArrays(GL_POINTS, 0, layerBuffers->mGrid.mVertexCount);
+    glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(layerBuffers->mGrid.mVertexCount));
     layerBuffers->mGrid.mVAO.Release();
 
     glPopAttrib();
@@ -327,7 +327,7 @@ void IrregularGrid::drawFullscreenQuad(glm::mat4 matMV, glm::mat4 matP) {
 
   for (auto layerBuffers = mLayerBuffers.rbegin(); layerBuffers != mLayerBuffers.rend();
        layerBuffers++) {
-    int index = std::distance(layerBuffers, mLayerBuffers.rend()) - 1;
+    size_t index = std::distance(layerBuffers, mLayerBuffers.rend()) - 1;
 
     (*layerBuffers)->mFullscreenQuad.mTexture.Bind(GL_TEXTURE0);
     (*layerBuffers)->mFullscreenQuad.mDepth.Bind(GL_TEXTURE1);
