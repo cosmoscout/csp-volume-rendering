@@ -872,11 +872,6 @@ void Plugin::displayFrame(std::unique_ptr<Renderer::RenderedImage> frame) {
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void Plugin::displayFrame(std::unique_ptr<Renderer::RenderedImage> frame, DisplayMode displayMode) {
-  cs::utils::FrameTimings::ScopedTimer timer("Display volume frame");
-
-  std::shared_ptr<DisplayNode> displayNode = mDisplayNodes.find(displayMode)->second;
-  displayNode->setImage(*frame.get());
-
   if (mDisplayedImage) {
     mRenderedImages.insert(std::move(mDisplayedImage));
   }
@@ -885,6 +880,9 @@ void Plugin::displayFrame(std::unique_ptr<Renderer::RenderedImage> frame, Displa
   } else {
     mDisplayedImage.reset();
   }
+
+  std::shared_ptr<DisplayNode> displayNode = mDisplayNodes.find(displayMode)->second;
+  displayNode->setImage(std::move(frame));
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

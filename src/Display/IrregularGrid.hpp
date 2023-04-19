@@ -32,7 +32,7 @@ class IrregularGrid : public DisplayNode {
   IrregularGrid& operator=(IrregularGrid const& other) = delete;
   IrregularGrid& operator=(IrregularGrid&& other) = default;
 
-  void setImage(Renderer::RenderedImage& image) override;
+  void setImage(std::unique_ptr<Renderer::RenderedImage> image) override;
 
  protected:
   /// Interface implementation of IVistaOpenGLDraw.
@@ -84,6 +84,7 @@ class IrregularGrid : public DisplayNode {
   int mScreenWidth  = 0;
   int mScreenHeight = 0;
 
+  int  mNewImage          = 0;
   bool mLayerCountChanged = false;
 
   // Using unique_ptrs here, because otherwise resizing the vector would release and break all

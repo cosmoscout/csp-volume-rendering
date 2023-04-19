@@ -55,44 +55,50 @@ void DisplayNode::setEnabled(bool enabled) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void DisplayNode::setImage(Renderer::RenderedImage& image) {
-  if (mTexture.size() != image.getLayerCount()) {
-    mTexture.resize(image.getLayerCount());
+void DisplayNode::setImage(std::unique_ptr<Renderer::RenderedImage> image) {
+  mImage = std::move(image);
+  if (mTexture.size() != mImage->getLayerCount()) {
+    mTexture.resize(mImage->getLayerCount());
   }
-  for (auto i = 0u; i < image.getLayerCount(); ++i) {
+  for (auto i = 0u; i < mImage->getLayerCount(); ++i) {
     if (!mTexture[i]) {
       mTexture[i] = std::make_unique<VistaTexture>(GL_TEXTURE_2D);
       mTexture[i]->SetWrapS(GL_CLAMP_TO_BORDER);
       mTexture[i]->SetWrapT(GL_CLAMP_TO_BORDER);
     }
-    mTexture[i]->UploadTexture(image.getResolution(), image.getResolution(), image.getColorData(i),
-        false, GL_RGBA, GL_FLOAT);
+    /*mTexture[i]->UploadTexture(mImage->getResolution(), mImage->getResolution(),
+       mImage->getColorData(i), false, GL_RGBA, GL_FLOAT);*/
+    mTexture[i]->Bind();
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, mImage->getResolution(), mImage->getResolution(), 0,
+        GL_RGBA, GL_FLOAT, mImage->getColorData(i));
+    glTexParameteri(mTexture[i]->GetTarget(), GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    mTexture[i]->Unbind();
   }
 
-  if (mDepthTexture.size() != image.getLayerCount()) {
-    mDepthTexture.resize(image.getLayerCount());
+  if (mDepthTexture.size() != mImage->getLayerCount()) {
+    mDepthTexture.resize(mImage->getLayerCount());
   }
-  for (auto i = 0u; i < image.getLayerCount(); ++i) {
+  for (auto i = 0u; i < mImage->getLayerCount(); ++i) {
     if (!mDepthTexture[i]) {
       mDepthTexture[i] = std::make_unique<VistaTexture>(GL_TEXTURE_2D);
-      mDepthTexture[i]->SetWrapS(GL_CLAMP_TO_BORDER);
-      mDepthTexture[i]->SetWrapT(GL_CLAMP_TO_BORDER);
+      // mDepthTexture[i]->SetWrapS(GL_CLAMP_TO_BORDER);
+      // mDepthTexture[i]->SetWrapT(GL_CLAMP_TO_BORDER);
     }
     // VistaTexture does not support upload with different internal format than GL_RGBA8, so we
     // upload the texture manually.
     mDepthTexture[i]->Bind();
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, image.getResolution(), image.getResolution(), 0, GL_RED,
-        GL_FLOAT, image.getDepthData(i));
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, mImage->getResolution(), mImage->getResolution(), 0, GL_RED,
+        GL_FLOAT, mImage->getDepthData(i));
     glTexParameteri(mDepthTexture[i]->GetTarget(), GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     mDepthTexture[i]->Unbind();
   }
 
-  mTransform = glm::toMat4(glm::toQuat(image.getCameraTransform()));
+  mTransform = glm::toMat4(glm::toQuat(mImage->getCameraTransform()));
 
-  mRendererModelView  = image.getModelView();
-  mRendererProjection = image.getProjection();
+  mRendererModelView  = mImage->getModelView();
+  mRendererProjection = mImage->getProjection();
   mRendererMVP        = mRendererProjection * mRendererModelView;
-  mInside             = image.isInside();
+  mInside             = mImage->isInside();
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

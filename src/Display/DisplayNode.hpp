@@ -48,7 +48,7 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   /// Includes color, depth, multiple layers, matrices etc.
   /// The color data should be given as an array of rgba values (8 bit per channel).
   /// The depth data should be given as an array of z-positions in clip space per pixel.
-  virtual void setImage(Renderer::RenderedImage& image);
+  virtual void setImage(std::unique_ptr<Renderer::RenderedImage> image);
 
   /// Enables using the depth information for image based rendering.
   void setUseDepth(bool useDepth);
@@ -72,6 +72,7 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
 
   bool mEnabled = false;
 
+  std::unique_ptr<Renderer::RenderedImage>   mImage;
   glm::mat4                                  mTransform;
   std::vector<std::unique_ptr<VistaTexture>> mTexture;
   std::vector<std::unique_ptr<VistaTexture>> mDepthTexture;

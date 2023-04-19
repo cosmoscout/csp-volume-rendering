@@ -57,30 +57,38 @@ IrregularGrid::IrregularGrid(
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void IrregularGrid::setImage(Renderer::RenderedImage& image) {
-  DisplayNode::setImage(image);
-  mWidth  = image.getResolution();
-  mHeight = image.getResolution();
-
-  if (image.getLayerCount() != mLayerBuffers.size()) {
-    mLayerBuffers.resize(image.getLayerCount());
-    mLayerCountChanged = true;
-  }
-
-  for (auto i = 0u; i < image.getLayerCount(); ++i) {
-    if (!mLayerBuffers[i]) {
-      mLayerBuffers[i] = std::make_unique<LayerBuffers>();
-    }
-    mLayerBuffers[i]->mSurfaces.emplace(image.getDepthData(i), mWidth, mHeight);
-    mLayerBuffers[i]->mHoleFilling.mFBOs.resize(mHoleFillingLevels);
-  }
-
-  createBuffers();
+void IrregularGrid::setImage(std::unique_ptr<Renderer::RenderedImage> image) {
+  DisplayNode::setImage(std::move(image));
+  mNewImage = 2;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 bool IrregularGrid::DoImpl() {
+  if (--mNewImage == 0 && mImage) {
+    {
+      cs::utils::FrameTimings::ScopedTimer timer("Buffer");
+      std::this_thread::sleep_for(std::chrono::milliseconds(10 * mImage->getLayerCount()));
+    }
+    mWidth  = mImage->getResolution();
+    mHeight = mImage->getResolution();
+
+    if (mImage->getLayerCount() != mLayerBuffers.size()) {
+      mLayerBuffers.resize(mImage->getLayerCount());
+      mLayerCountChanged = true;
+    }
+
+    for (auto i = 0u; i < mImage->getLayerCount(); ++i) {
+      if (!mLayerBuffers[i]) {
+        mLayerBuffers[i] = std::make_unique<LayerBuffers>();
+      }
+      mLayerBuffers[i]->mSurfaces.emplace(mImage->getDepthData(i), mWidth, mHeight);
+      mLayerBuffers[i]->mHoleFilling.mFBOs.resize(mHoleFillingLevels);
+    }
+
+    createBuffers();
+  }
+
   if (mLayerBuffers.size() == 0) {
     return false;
   }
@@ -152,6 +160,9 @@ void IrregularGrid::drawIrregularGrid(glm::mat4 matMV, glm::mat4 matP) {
   int   layer              = 0;
   float halfLayerThickness = 1.f / mLayerBuffers.size();
   for (auto& layerBuffers : mLayerBuffers) {
+    if (layer >= mTexture.size()) {
+      continue;
+    }
     glm::vec4 depthCenter(0, 0, 1.f - (halfLayerThickness * (layer * 2 + 1.f)), 1);
     glm::vec4 depthFar(0, 0, 1.f - (halfLayerThickness * (layer * 2 + 2.f)), 1);
     depthCenter = mRendererMVP * depthCenter;
