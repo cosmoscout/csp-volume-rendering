@@ -485,17 +485,24 @@ std::unique_ptr<OSPRayRenderer::RenderedImage> OSPRayRenderer::renderFrame(
   if (resetAccumulation) {
     mFrameBufferAccumulationPasses = 0;
   }
+  std::vector<float> durations;
   for (int i = 0; i < parameters.mLayers; i++) {
-    renderLayer(world, camera, maxDepth, parameters, resetAccumulation, i);
+    durations.push_back(renderLayer(world, camera, maxDepth, parameters, resetAccumulation, i));
     image->addLayer(mCache.mFrameBuffer[i]);
   }
+  std::ofstream logfile("ospray_timing.csv", std::ios_base::app);
+  logfile << std::reduce(durations.begin(), durations.end()) << ";" << durations.size() << ";" << "[";
+  for (auto d : durations) {
+    logfile << d << ",";
+  }
+  logfile << "]" << std::endl;
   mFrameBufferAccumulationPasses++;
   return image;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void OSPRayRenderer::renderLayer(ospray::cpp::World const& world,
+float OSPRayRenderer::renderLayer(ospray::cpp::World const& world,
     OSPRayRenderer::Camera const& camera, std::optional<std::vector<float>>& maxDepth,
     Parameters const& parameters, bool resetAccumulation, int layer) {
 
@@ -543,10 +550,12 @@ void OSPRayRenderer::renderLayer(ospray::cpp::World const& world,
         mCache.mFrameBuffer[layer].renderFrame(renderer, camera.mOsprayCamera, world);
   }
   mRenderFuture[layer]->wait();
+  float duration = mRenderFuture[layer]->duration();
   {
     std::scoped_lock lock(mRenderFutureMutex);
     mRenderFuture[layer].reset();
   }
+  return duration;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

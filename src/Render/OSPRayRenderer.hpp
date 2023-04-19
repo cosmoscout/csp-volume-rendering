@@ -152,7 +152,7 @@ class OSPRayRenderer : public Renderer {
       ospray::cpp::World const& world, OSPRayRenderer::Camera const& camera,
       std::optional<std::vector<float>>&& maxDepth, Parameters const& parameters,
       bool resetAccumulation);
-  void renderLayer(ospray::cpp::World const& world, OSPRayRenderer::Camera const& camera,
+  float renderLayer(ospray::cpp::World const& world, OSPRayRenderer::Camera const& camera,
       std::optional<std::vector<float>>& maxDepth, Parameters const& parameters,
       bool resetAccumulation, int layer);
 };
