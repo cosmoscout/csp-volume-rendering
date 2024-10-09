@@ -70,14 +70,11 @@ void from_json(nlohmann::json const& j, Settings::Data& o) {
   if (j.contains("metadata")) {
     switch (o.mStructure.get()) {
     case VolumeStructure::eStructuredSpherical:
+    case VolumeStructure::eRectilinearSpherical:
+    case VolumeStructure::eImageSpherical:
       Settings::Data::Metadata::StructuredSpherical metadata;
       cs::core::Settings::deserialize(j, "metadata", metadata);
       o.mMetadata = {metadata};
-      break;
-    case VolumeStructure::eRectilinearSpherical:
-      Settings::Data::Metadata::StructuredSpherical metadata1;
-      cs::core::Settings::deserialize(j, "metadata", metadata1);
-      o.mMetadata = {metadata1};
       break;
     default:
       // No metadata expected

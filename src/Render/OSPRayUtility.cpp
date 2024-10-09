@@ -662,7 +662,7 @@ ospray::cpp::Volume createOSPRayVolume(vtkSmartPointer<vtkImageData> vtkVolume,
   vtkVolume->GetDimensions(dimensions);
   double origin[3] = {0,0,0};
   //origin[0] = (vtkVolume->GetBounds()[1] - vtkVolume->GetBounds()[0]) / 2;
-  origin[0] = 80;
+  origin[0] = metadata.mRanges.mRad[0];
   //for (int i = 0; i < 3; i++) {
   //  origin[i] = -(vtkVolume->GetBounds()[i * 2 + 1] - vtkVolume->GetBounds()[i * 2]) / 2;
   //}
