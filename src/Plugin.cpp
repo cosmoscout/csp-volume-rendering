@@ -215,10 +215,10 @@ void Plugin::onLoad() {
   }
 
   auto existence                    = anchor->second.mExistence;
-  mDisplayNodes[DisplayMode::eMesh] = std::make_shared<Billboard>(
-      mPluginSettings.mData.mShape.get(), mAllSettings, mPluginSettings.mTransform.mAnchor.get());
-  mDisplayNodes[DisplayMode::ePoints] = std::make_shared<PointsForwardWarped>(
-      mPluginSettings.mData.mShape.get(), mAllSettings, mPluginSettings.mTransform.mAnchor.get());
+  mDisplayNodes[DisplayMode::eMesh] = std::make_shared<Billboard>(mPluginSettings.mData.mShape.get(), mAllSettings,
+          mPluginSettings.mTransform.mAnchor.get(), mPluginSettings.mTransform.mInside.get());
+  mDisplayNodes[DisplayMode::ePoints] = std::make_shared<PointsForwardWarped>(mPluginSettings.mData.mShape.get(), mAllSettings,
+          mPluginSettings.mTransform.mAnchor.get(), mPluginSettings.mTransform.mInside.get());
 
   mDepthExtractor = std::make_unique<DepthExtractor>(
       mDisplayNodes[DisplayMode::eMesh], mSolarSystem, mTimeControl);

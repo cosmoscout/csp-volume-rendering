@@ -25,8 +25,8 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-DisplayNode::DisplayNode(
-    VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor)
+DisplayNode::DisplayNode(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings,
+    std::string anchor, bool renderInsideBody)
     : mShape(shape)
     , mTexture(GL_TEXTURE_2D)
     , mDepthTexture(GL_TEXTURE_2D)
@@ -35,8 +35,13 @@ DisplayNode::DisplayNode(
 
   VistaSceneGraph* pSG = GetVistaSystem()->GetGraphicsManager()->GetSceneGraph();
   mVistaNode.reset(pSG->NewOpenGLNode(pSG->GetRoot(), this));
-  VistaOpenSGMaterialTools::SetSortKeyOnSubtree(
-      mVistaNode.get(), static_cast<int>(cs::utils::DrawOrder::eStars) + 1);
+  int drawOrder;
+  if (renderInsideBody) {
+    drawOrder = static_cast<int>(cs::utils::DrawOrder::ePlanets) - 1;
+  } else {
+    drawOrder = static_cast<int>(cs::utils::DrawOrder::eStars) + 1;
+  }
+  VistaOpenSGMaterialTools::SetSortKeyOnSubtree(mVistaNode.get(), drawOrder);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -87,7 +92,7 @@ void DisplayNode::setRendererMatrices(glm::mat4 modelView, glm::mat4 projection,
   mRendererModelView  = std::move(modelView);
   mRendererProjection = std::move(projection);
   mRendererMVP        = mRendererProjection * mRendererModelView;
-  mInside             = inside;
+  mObserverInVolume   = inside;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

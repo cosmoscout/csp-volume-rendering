@@ -74,6 +74,7 @@ struct Settings {
 
   struct Transform {
     cs::utils::Property<std::string>       mAnchor;
+    cs::utils::Property<bool>              mInside;
     cs::utils::DefaultProperty<glm::dvec3> mPosition{glm::dvec3(0, 0, 0)};
     cs::utils::DefaultProperty<double>     mScale{1.};
     cs::utils::DefaultProperty<glm::dvec3> mRotation{glm::dvec3(0, 0, 0)};

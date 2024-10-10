@@ -168,6 +168,7 @@ void to_json(nlohmann::json& j, Settings::Display const& o) {
 
 void from_json(nlohmann::json const& j, Settings::Transform& o) {
   cs::core::Settings::deserialize(j, "anchor", o.mAnchor);
+  cs::core::Settings::deserialize(j, "inside", o.mInside);
   cs::core::Settings::deserialize(j, "position", o.mPosition);
   cs::core::Settings::deserialize(j, "scale", o.mScale);
   cs::core::Settings::deserialize(j, "rotation", o.mRotation);
@@ -175,6 +176,7 @@ void from_json(nlohmann::json const& j, Settings::Transform& o) {
 
 void to_json(nlohmann::json& j, Settings::Transform const& o) {
   cs::core::Settings::serialize(j, "anchor", o.mAnchor);
+  cs::core::Settings::serialize(j, "inside", o.mInside);
   cs::core::Settings::serialize(j, "position", o.mPosition);
   cs::core::Settings::serialize(j, "scale", o.mScale);
   cs::core::Settings::serialize(j, "rotation", o.mRotation);

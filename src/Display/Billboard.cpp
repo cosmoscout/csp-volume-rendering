@@ -26,9 +26,9 @@ const uint32_t GRID_RESOLUTION = 512;
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-Billboard::Billboard(
-    VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor)
-    : DisplayNode(shape, settings, anchor) {
+Billboard::Billboard(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings,
+    std::string anchor, bool renderInsideBody)
+    : DisplayNode(shape, settings, anchor, renderInsideBody) {
   createBuffers();
 }
 
@@ -77,7 +77,7 @@ bool Billboard::DoImpl() {
       mShader.GetUniformLocation("uFarClip"), cs::utils::getCurrentFarClipDistance());
   mShader.SetUniform(mShader.GetUniformLocation("uUseDepth"), mUseDepth);
   mShader.SetUniform(mShader.GetUniformLocation("uDrawDepth"), mDrawDepth);
-  mShader.SetUniform(mShader.GetUniformLocation("uInside"), mInside);
+  mShader.SetUniform(mShader.GetUniformLocation("uInside"), mObserverInVolume);
 
   mTexture.Bind(GL_TEXTURE0);
   mDepthTexture.Bind(GL_TEXTURE1);

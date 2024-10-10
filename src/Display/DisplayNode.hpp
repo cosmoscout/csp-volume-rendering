@@ -31,7 +31,8 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   /// Create a DisplayNode positioned at the given anchor using properties found in settings.
   /// It will automatically be added to the Vista scene graph on construction and removed on
   /// destruction. The depthResolution is used as an initial mesh resolution of the created objects.
-  DisplayNode(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor);
+  DisplayNode(VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor,
+      bool renderInsideBody);
   virtual ~DisplayNode();
 
   DisplayNode(DisplayNode const& other) = delete;
@@ -85,7 +86,7 @@ class DisplayNode : public cs::scene::CelestialObject, public IVistaOpenGLDraw {
   glm::mat4 mRendererModelView;
   glm::mat4 mRendererProjection;
   glm::mat4 mRendererMVP;
-  bool      mInside;
+  bool      mObserverInVolume;
   bool      mUseDepth  = true;
   bool      mDrawDepth = false;
 

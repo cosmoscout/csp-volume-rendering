@@ -25,9 +25,9 @@ namespace csp::volumerendering {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-PointsForwardWarped::PointsForwardWarped(
-    VolumeShape shape, std::shared_ptr<cs::core::Settings> settings, std::string anchor)
-    : DisplayNode(shape, settings, anchor)
+PointsForwardWarped::PointsForwardWarped(VolumeShape shape,
+    std::shared_ptr<cs::core::Settings> settings, std::string anchor, bool renderInsideBody)
+    : DisplayNode(shape, settings, anchor, renderInsideBody)
     , mDepthResolution(256) {
   createBuffers();
 }
@@ -115,7 +115,7 @@ bool PointsForwardWarped::DoImpl() {
       mShader.GetUniformLocation("uFarClip"), cs::utils::getCurrentFarClipDistance());
   mShader.SetUniform(mShader.GetUniformLocation("uUseDepth"), mUseDepth);
   mShader.SetUniform(mShader.GetUniformLocation("uDrawDepth"), mDrawDepth);
-  mShader.SetUniform(mShader.GetUniformLocation("uInside"), mInside);
+  mShader.SetUniform(mShader.GetUniformLocation("uInside"), mObserverInVolume);
 
   mTexture.Bind(GL_TEXTURE0);
   mDepthTexture.Bind(GL_TEXTURE1);
